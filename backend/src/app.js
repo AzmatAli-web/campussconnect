@@ -4,6 +4,8 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import {databaseReady} from './config/database.js';
 import {identityRouter} from './routes/identity.js';
+import {eventsRouter} from './routes/events.js';
+import {announcementsRouter} from './routes/announcements.js';
 import {HttpError} from './lib/http-error.js';
 export function createApp({config,firebaseAuth}) {
  const app=express();
@@ -19,6 +21,8 @@ export function createApp({config,firebaseAuth}) {
   res.status(ready?200:503).json({data:{status:ready?'ready':'not_ready',checks}});
  });
  app.use('/api/v1',identityRouter({config,firebaseAuth}));
+ app.use('/api/v1',eventsRouter({config,firebaseAuth}));
+ app.use('/api/v1',announcementsRouter({config,firebaseAuth}));
  app.use((_req,_res,next)=>next(new HttpError(404,'NOT_FOUND','Route not found')));
  app.use((err,_req,res,_next)=>{
   if (err?.type==='entity.too.large') return res.status(413).json({error:{code:'BODY_TOO_LARGE',message:'Request body too large'}});

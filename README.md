@@ -1,5 +1,10 @@
 # CampusConnect
 
-CampusConnect is a university platform MVP. This repository is being initialized with the Node.js/Express backend foundation; Firebase and MongoDB Atlas provisioning are still pending.
+CampusConnect MVP: Flutter mobile client, React web dashboards and Node.js/Express/MongoDB API.
 
-See `backend/README.md` and `docs/SETUP_CHECKLIST.md` for setup and security notes.
+**Current status:** Backend Foundation Milestone 1. Firebase and MongoDB Atlas are not yet provisioned; this is not a deployed application.
+
+- [Backend setup](backend/README.md)
+- [Cloud and security checklist](docs/SETUP_CHECKLIST.md)
+
+No secrets belong in GitHub. The full v1.4 SRS/API/database documentation is maintained as the design baseline. Other modules will be implemented in subsequent milestones.

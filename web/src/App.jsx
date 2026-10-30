@@ -95,6 +95,11 @@ export default function App(){
     <button disabled={busy} className="secondary" onClick={resend}>Resend verification email</button>
     <button className="link" onClick={()=>signOut(auth)}>Sign out</button>
    </div>}
+   {firebaseConfigured&&!loading&&signed&&!needsProfile&&!profile&&<div className="stack">
+    <p>Your email is verified, but your campus profile could not be loaded. Check the backend configuration, then retry.</p>
+    <button disabled={busy} onClick={afterVerification}>Retry profile connection</button>
+    <button className="secondary" type="button" onClick={()=>signOut(auth)}>Sign out / Switch account</button>
+   </div>}
    {firebaseConfigured&&!loading&&signed&&needsProfile&&<form onSubmit={saveProfile}>
     <label>Full name<input value={name} onChange={e=>setName(e.target.value)} minLength={2} maxLength={120} required autoComplete="name"/></label>
     <label>Registration number (optional)<input value={registrationNo} onChange={e=>setRegistrationNo(e.target.value)} maxLength={40} placeholder="FA23-BSE-000"/></label>

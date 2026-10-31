@@ -106,6 +106,13 @@ test('only test fixture Admin can initialize society and assign manager',async()
  assert.equal(assignment.status,201,JSON.stringify(assignment.body));
  const role=await User.findById(manager._id).lean();
  assert.ok(role.activeRoles.includes('societyManager'));
+ const mine=await request(app).get('/api/v1/me/managed-societies').set(auth('fixture-manager'));
+ assert.equal(mine.status,200,JSON.stringify(mine.body));
+ assert.equal(mine.body.data.length,1);
+ assert.equal(mine.body.data[0].id,societyId);
+ const notMine=await request(app).get('/api/v1/me/managed-societies').set(auth('fixture-unauthorized'));
+ assert.equal(notMine.status,403);
+
  const forbidden=await request(app).post('/api/v1/events')
   .set(auth('fixture-unauthorized')).send({...makeEvent('Cannot create event'),societyId});
  assert.equal(forbidden.status,403);
@@ -194,6 +201,16 @@ test('20 simultaneous student registrations never exceed 5 seats; retries are re
  const organizerAttendees=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth('fixture-faculty'));
  assert.equal(organizerAttendees.status,200,JSON.stringify(organizerAttendees.body));
  assert.equal(organizerAttendees.body.data.length,5);
+ assert.ok(organizerAttendees.body.data.every(r=>r.studentName?.startsWith('fixture student')));
+ assert.ok(organizerAttendees.body.data.every(r=>r.universityEmail?.endsWith('@'+DOMAIN)));
+ assert.ok(organizerAttendees.body.data.every(r=>!Object.hasOwn(r,'firebaseUid')));
+ const publicEvents=await request(app).get('/api/v1/events').set(auth('fixture-student-01'));
+ assert.equal(publicEvents.status,200);
+ assert.ok(publicEvents.body.data.every(e=>!Object.hasOwn(e,'studentName')));
+ const allowedOrganizerEvents=await request(app).get('/api/v1/me/organized-events').set(auth('fixture-faculty'));
+ assert.equal(allowedOrganizerEvents.status,200);
+ assert.ok(allowedOrganizerEvents.body.data.some(e=>e.id===eventId));
+
  const adminAttendees=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth('fixture-admin'));
  assert.equal(adminAttendees.status,200);
  assert.equal(adminAttendees.body.data.length,5);
@@ -219,6 +236,13 @@ test('revoked Society Manager loses ability to publish and audit trail records t
  const denied=await request(app).post('/api/v1/events')
   .set(auth('fixture-manager')).send({...makeEvent('Revoked manager event'),societyId:String(society._id)});
  assert.equal(denied.status,403);
+ const managed=await Event.findOne({organizerId:manager._id,organizerType:'societyManager'});
+ assert.ok(managed,'Managed event should still exist after revocation');
+ const leaked=await request(app).get('/api/v1/events/'+managed._id+'/registrations').set(auth('fixture-manager'));
+ assert.equal(leaked.status,403,'Revoked manager cannot read attendee identities');
+ const noLongerOrganized=await request(app).get('/api/v1/me/organized-events').set(auth('fixture-manager'));
+ assert.equal(noLongerOrganized.status,403,'Revoked manager loses organizer view');
+
  assert.ok(await AuditLog.countDocuments({action:'society.manager.revoked'})>=1);
 });
 
@@ -227,4 +251,14 @@ test('one-time Admin bootstrap unique index cannot create a second bootstrap rec
  await assert.rejects(()=>AdminBootstrap.create({
   universityId:UNIVERSITY_ID,adminUserId:manager._id,firebaseUid:manager.firebaseUid
  }),error=>error.code===11000);
+});
+
+test('private organized event list returns only current organizer records, not unrelated organizer events',async()=>{
+ const facultyView=await request(app).get('/api/v1/me/organized-events').set(auth('fixture-faculty'));
+ assert.equal(facultyView.status,200,JSON.stringify(facultyView.body));
+ assert.equal(facultyView.headers['cache-control'],'no-store');
+ assert.ok(facultyView.body.data.some(x=>x.title==='Verified Faculty Workshop'));
+ assert.ok(facultyView.body.data.every(x=>x.title!=='Software Guild Meetup'));
+ const denied=await request(app).get('/api/v1/me/organized-events').set(auth('fixture-student-00'));
+ assert.equal(denied.status,403);
 });

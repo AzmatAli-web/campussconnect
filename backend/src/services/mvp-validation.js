@@ -82,3 +82,9 @@ export function announcementView(doc){
  const a=doc.toObject?doc.toObject():doc;
  return {id:String(a._id),title:a.title,body:a.body,scope:a.scope,status:a.status,publishedAt:a.publishedAt};
 }
+
+export function privateRegistrationView(doc){
+ const r=doc.toObject?doc.toObject():doc;
+ return {...registrationView(r),studentName:r.studentNameSnapshot,
+  universityEmail:r.universityEmailNormalized,registrationNo:r.registrationNoSnapshot};
+}

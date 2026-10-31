@@ -57,3 +57,8 @@ Frontend tests: `npm.cmd test`, then `npm.cmd run build` from `web`.
 ## Security note
 
 The browser demo is hard-disabled in production builds by `import.meta.env.DEV`. Never use browser UI role switching to grant live privileges.
+
+
+## Real role-based workspace
+
+See [Live workspace setup and testing](../docs/REAL_DASHBOARD.md). The web application now renders real Student, Organizer, and Admin workspaces based on Firebase authentication and server-managed MongoDB permissions. The existing `?test-lab=1` simulation remains separate and development-only.

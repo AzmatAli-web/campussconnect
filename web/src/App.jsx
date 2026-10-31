@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {createUserWithEmailAndPassword,sendEmailVerification,signInWithEmailAndPassword,signOut,onAuthStateChanged,reload} from 'firebase/auth';
 import {auth,firebaseConfigured} from './firebase';
 import {callApi} from './api';
+import CampusWorkspace from './CampusWorkspace.jsx';
 const domain=(import.meta.env.VITE_UNIVERSITY_EMAIL_DOMAIN||'').trim().toLowerCase();
 const matchesUniversity=email=>domain&&email.toLowerCase().trim().endsWith('@'+domain);
 const readableError=err=>{
@@ -74,6 +75,9 @@ export default function App(){
   }catch(err){setError(readableError(err));}finally{setBusy(false);}
  }
  const signed=user&&user.emailVerified;
+ if(signed&&profile) return <CampusWorkspace
+  user={user} profile={profile} onSignOut={()=>signOut(auth)} onProfileChange={setProfile}
+ />;
  return <main className="shell">
   <header><div className="logo">CC</div><div><strong>CampusConnect</strong><small>COMSATS Abbottabad · MVP</small></div></header>
   <section className="panel">

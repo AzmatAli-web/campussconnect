@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campus-user.js';
 import {Event,EventRegistration,IdempotencyKey,Society,SocietyManagerAssignment} from '../models/campus-content.js';
-import {eventInput,eventView,registrationInput,registrationView,pagination,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
+import {eventInput,eventView,registrationInput,registrationView,privateRegistrationView,pagination,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
 
 const has=(req,role)=>req.roles.includes(role);
 const organizer=async(req,universityId,societyId)=>{
@@ -29,11 +29,39 @@ function receiptResult(prior,hash){
  if(prior.status!=='completed') throw new HttpError(409,'REQUEST_IN_PROGRESS','Request with this key is already processing');
  return {status:prior.responseCode,body:prior.responseBody};
 }
-function authorizedOrganizer(req,event) {
- return (has(req,'admin')||String(event.organizerId)===String(req.currentUser._id));
+async function authorizedOrganizer(req,event,universityId) {
+ if(has(req,'admin')) return true;
+ if(String(event.organizerId)!==String(req.currentUser._id)) return false;
+ if(event.organizerType==='faculty') return verifiedFaculty(req);
+ if(event.organizerType!=='societyManager'||!has(req,'societyManager')||!event.societyId) return false;
+ const assignment=await SocietyManagerAssignment.exists({
+  universityId,societyId:event.societyId,userId:req.currentUser._id,status:'active'
+ });
+ return Boolean(assignment);
 }
 export function eventsRouter(deps){
  const router=Router(),auth=campusUserMiddleware(deps);
+ router.get('/me/organized-events',auth,asyncHandler(async(req,res)=>{
+  if(!verifiedFaculty(req)&&!has(req,'societyManager')) throw new HttpError(403,'FORBIDDEN','Organizer role required');
+  const {page,limit,skip}=pagination(req.query);
+  const universityId=deps.config.universityId,organizerId=req.currentUser._id;
+  const authorized=[];
+  if(verifiedFaculty(req)) authorized.push({organizerType:'faculty'});
+  if(has(req,'societyManager')){
+   const societyIds=await SocietyManagerAssignment.distinct('societyId',{
+    universityId,userId:organizerId,status:'active'
+   });
+   if(societyIds.length) authorized.push({organizerType:'societyManager',societyId:{$in:societyIds}});
+  }
+  if(!authorized.length) return res.json({data:[],meta:{page,limit,total:0}});
+  const filter={universityId,organizerId,$or:authorized};
+  const [items,total]=await Promise.all([
+   Event.find(filter).sort({startsAt:-1,_id:-1}).skip(skip).limit(limit).lean(),
+   Event.countDocuments(filter)
+  ]);
+  res.set('Cache-Control','no-store');
+  return res.json({data:items.map(e=>eventView(e)),meta:{page,limit,total}});
+ }));
  router.get('/me/event-registrations',auth,asyncHandler(async(req,res)=>{
   needRole(req,'student');
   const {page,limit,skip}=pagination(req.query);
@@ -143,12 +171,12 @@ export function eventsRouter(deps){
   const id=requireObjectId(req.params.id);
   const event=await Event.findOne({_id:id,universityId:deps.config.universityId}).lean();
   if(!event) throw new HttpError(404,'EVENT_NOT_FOUND','Event not found');
-  if(!authorizedOrganizer(req,event)) throw new HttpError(403,'FORBIDDEN','Event creator or administrator only');
+  if(!await authorizedOrganizer(req,event,deps.config.universityId)) throw new HttpError(403,'FORBIDDEN','Current event organizer permission or administrator role required');
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,eventId:id};
   const [items,total]=await Promise.all([EventRegistration.find(filter).sort({confirmedAt:-1}).skip(skip).limit(limit).lean(),EventRegistration.countDocuments(filter)]);
   res.set('Cache-Control','no-store');
-  return res.json({data:items.map(registrationView),meta:{page,limit,total}});
+  return res.json({data:items.map(privateRegistrationView),meta:{page,limit,total}});
  }));
  router.post('/admin/events/:id/cancel',auth,asyncHandler(async(req,res)=>{
   needRole(req,'admin');

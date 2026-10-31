@@ -1,11 +1,11 @@
 const base=(import.meta.env.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
-export async function callApi(path,user,{method='GET',body}={}){
- const token=await user.getIdToken(true);
+export async function callApi(path,user,{method='GET',body,headers={}}={}){
+ const token=await user.getIdToken();
  let response;
  try{
   response=await fetch(base+path,{
-   method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},
-   ...(body?{body:JSON.stringify(body)}:{})
+   method,cache:'no-store',headers:{Authorization:'Bearer '+token,...(body!==undefined?{'Content-Type':'application/json'}:{}),...headers},
+   ...(body!==undefined?{body:JSON.stringify(body)}:{})
   });
  }catch{throw new Error('Cannot reach backend. Check that Express is running on port 4000.');}
  let result;

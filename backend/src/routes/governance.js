@@ -247,6 +247,18 @@ export function governanceRouter(deps) {
     return res.status(201).json({data:asSociety(created)});
   }));
 
+  router.get('/me/managed-societies',auth,asyncHandler(async(req,res)=>{
+    needRole(req,'societyManager');
+    const societyIds=await SocietyManagerAssignment.distinct('societyId',{
+      universityId:uni,userId:req.currentUser._id,status:'active'
+    });
+    const items=societyIds.length?await Society.find({
+      universityId:uni,_id:{$in:societyIds},status:'active'
+    }).sort({name:1,_id:1}).lean():[];
+    res.set('Cache-Control','no-store');
+    return res.json({data:items.map(asSociety)});
+  }));
+
   router.get('/societies',auth,asyncHandler(async(req,res)=>{
     const {page,limit,skip}=pagination(req.query);
     const filter={universityId:uni,status:'active'};

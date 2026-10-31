@@ -1,0 +1,115 @@
+name: Build CampusConnect Android APK
+run-name: Android ${{ github.event_name == 'workflow_dispatch' && inputs.build_mode || 'preview' }} APK
+
+on:
+  push:
+    branches:
+      - feature/cloud-android-apk
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Preview works offline; connected requires Android Firebase variables and HTTPS API'
+        type: choice
+        required: true
+        default: preview
+        options:
+          - preview
+          - connected
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      BUILD_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mode || 'preview' }}
+      FIREBASE_ANDROID_API_KEY: ${{ vars.CAMPUSCONNECT_FIREBASE_ANDROID_API_KEY }}
+      FIREBASE_ANDROID_APP_ID: ${{ vars.CAMPUSCONNECT_FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.CAMPUSCONNECT_FIREBASE_SENDER_ID }}
+      FIREBASE_PROJECT_ID: campussconnect-12fdb
+      API_BASE_URL: ${{ vars.CAMPUSCONNECT_API_BASE_URL }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Flutter SDK on GitHub runner
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android runner
+        run: flutter create --platforms=android --org=com.campusconnect --project-name=campusconnect_mobile .
+
+      - name: Resolve Flutter packages
+        run: flutter pub get
+
+      - name: Analyze source
+        run: flutter analyze
+
+      - name: Run unit and widget tests
+        run: flutter test
+
+      - name: Check connected build configuration
+        if: env.BUILD_MODE == 'connected'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$FIREBASE_ANDROID_API_KEY" || -z "$FIREBASE_ANDROID_APP_ID" || -z "$FIREBASE_MESSAGING_SENDER_ID" ]]; then
+            echo "::error::Add public Android Firebase config to repository Actions Variables before connected build."
+            exit 1
+          fi
+          if [[ "$FIREBASE_ANDROID_APP_ID" != *":android:"* ]]; then
+            echo "::error::Use the Firebase Android app ID, not the existing web app ID."
+            exit 1
+          fi
+          if [[ "$API_BASE_URL" != https://*/api/v1 ]]; then
+            echo "::error::Connected builds need a publicly reachable HTTPS backend URL ending in /api/v1. A phone cannot use localhost:4000."
+            exit 1
+          fi
+
+      - name: Build debug APK (offline preview or connected)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_MODE" == 'preview' ]]; then
+            flutter build apk --debug --dart-define=CAMPUSCONNECT_PREVIEW=true
+          else
+            flutter build apk --debug \
+              "--dart-define=API_BASE_URL=$API_BASE_URL" \
+              "--dart-define=FIREBASE_ANDROID_API_KEY=$FIREBASE_ANDROID_API_KEY" \
+              "--dart-define=FIREBASE_ANDROID_APP_ID=$FIREBASE_ANDROID_APP_ID" \
+              "--dart-define=FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID" \
+              "--dart-define=FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
+          fi
+          cp build/app/outputs/flutter-apk/app-debug.apk "build/app/outputs/flutter-apk/CampusConnect-${BUILD_MODE}-debug.apk"
+          cd build/app/outputs/flutter-apk
+          sha256sum "CampusConnect-${BUILD_MODE}-debug.apk" > "CampusConnect-${BUILD_MODE}-debug.apk.sha256"
+
+      - name: Upload APK and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: CampusConnect-${{ env.BUILD_MODE }}-Android-APK
+          path: |
+            mobile/build/app/outputs/flutter-apk/CampusConnect-${{ env.BUILD_MODE }}-debug.apk
+            mobile/build/app/outputs/flutter-apk/CampusConnect-${{ env.BUILD_MODE }}-debug.apk.sha256
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14

@@ -3,9 +3,16 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
+import 'preview_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  const previewMode = bool.fromEnvironment('CAMPUSCONNECT_PREVIEW', defaultValue: false);
+  if (previewMode) {
+    // Deliberate offline-only preview: no Firebase or Express initialization.
+    runApp(const CampusConnectPreviewApp());
+    return;
+  }
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -32,10 +39,10 @@ Future<void> main() async {
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
                 const SizedBox(height: 14),
                 const Text(
-                  'From the mobile/ directory, run flutterfire configure '
-                  '--project=campussconnect-12fdb and select Android. '
-                  'Then rebuild the application. '
-                  'Never use a Firebase Admin service-account key in a mobile app.',
+                  'This connected APK needs the public Android Firebase app configuration '
+                  'and a reachable HTTPS CampusConnect backend. Build it using '
+                  'GitHub Actions repository variables, or use the separate '
+                  'offline preview APK. Never use a Firebase Admin private key.',
                   textAlign: TextAlign.center,
                 ),
               ],

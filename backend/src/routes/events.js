@@ -34,6 +34,17 @@ function authorizedOrganizer(req,event) {
 }
 export function eventsRouter(deps){
  const router=Router(),auth=campusUserMiddleware(deps);
+ router.get('/me/event-registrations',auth,asyncHandler(async(req,res)=>{
+  needRole(req,'student');
+  const {page,limit,skip}=pagination(req.query);
+  const filter={universityId:deps.config.universityId,studentId:req.currentUser._id};
+  const [items,total]=await Promise.all([
+   EventRegistration.find(filter).sort({confirmedAt:-1,_id:-1}).skip(skip).limit(limit).lean(),
+   EventRegistration.countDocuments(filter)
+  ]);
+  res.set('Cache-Control','no-store');
+  return res.json({data:items.map(registrationView),meta:{page,limit,total}});
+ }));
  router.get('/events',auth,asyncHandler(async(req,res)=>{
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,status:'published'};
@@ -136,6 +147,7 @@ export function eventsRouter(deps){
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,eventId:id};
   const [items,total]=await Promise.all([EventRegistration.find(filter).sort({confirmedAt:-1}).skip(skip).limit(limit).lean(),EventRegistration.countDocuments(filter)]);
+  res.set('Cache-Control','no-store');
   return res.json({data:items.map(registrationView),meta:{page,limit,total}});
  }));
  router.post('/admin/events/:id/cancel',auth,asyncHandler(async(req,res)=>{

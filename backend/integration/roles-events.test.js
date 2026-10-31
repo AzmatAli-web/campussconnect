@@ -177,6 +177,29 @@ test('20 simultaneous student registrations never exceed 5 seats; retries are re
  assert.equal(replay.status,201);
  assert.equal(replay.body.data.id,results[winner].body.data.id);
  assert.equal((await Event.findById(eventId)).confirmedCount,5);
+ // Students may inspect their own status but cannot see any other attendee.
+ const winnerUid='fixture-student-'+winner.toString().padStart(2,'0');
+ const loser=results.findIndex(r=>r.status===409);
+ const loserUid='fixture-student-'+loser.toString().padStart(2,'0');
+ const mine=await request(app).get('/api/v1/me/event-registrations').set(auth(winnerUid));
+ assert.equal(mine.status,200,JSON.stringify(mine.body));
+ assert.equal(mine.headers['cache-control'],'no-store');
+ assert.equal(mine.body.data.length,1);
+ assert.equal(mine.body.data[0].studentId,String(students[winner]._id));
+ const notMine=await request(app).get('/api/v1/me/event-registrations').set(auth(loserUid));
+ assert.equal(notMine.status,200);
+ assert.equal(notMine.body.data.length,0);
+ const forbiddenAttendees=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth(winnerUid));
+ assert.equal(forbiddenAttendees.status,403);
+ const organizerAttendees=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth('fixture-faculty'));
+ assert.equal(organizerAttendees.status,200,JSON.stringify(organizerAttendees.body));
+ assert.equal(organizerAttendees.body.data.length,5);
+ const adminAttendees=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth('fixture-admin'));
+ assert.equal(adminAttendees.status,200);
+ assert.equal(adminAttendees.body.data.length,5);
+ const unrelatedManager=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth('fixture-manager'));
+ assert.equal(unrelatedManager.status,403);
+
  const duplicate=await tryRegister(winner,'new-attempt-key-'+winner.toString().padStart(8,'0'));
  assert.equal(duplicate.status,409);
  const wrongEmail=await request(app)

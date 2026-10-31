@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {applyDemoAction,createInitialLab,eventSeats} from './test-lab-domain.js';
+import {applyDemoAction,createInitialLab,eventSeats,visibleActivity,registrantsForViewer} from './test-lab-domain.js';
 import './test-lab.css';
 
 const sections=[
@@ -25,6 +25,7 @@ export default function TestLab(){
  const isStudent=actor?.roles.includes('student')&&actor.status==='active';
  const isPublisher=canPublish(actor);
  const confirmed=data.registrations.length;
+ const activity=useMemo(()=>visibleActivity(data,actorId),[data,actorId]);
  const act=(type,payload)=>{
   const r=applyDemoAction(data,actorId,type,payload);
   setFeedback({kind:r.ok?'success':'error',code:r.code,text:r.message});
@@ -68,14 +69,14 @@ export default function TestLab(){
        <div className="lab-inline-metrics"><div><small>Can publish events</small><strong>{isPublisher?'Yes':'No'}</strong></div><div><small>Can manage roles</small><strong>{isAdmin?'Yes':'No'}</strong></div><div><small>Can register</small><strong>{isStudent?'Yes':'No'}</strong></div></div>
        <button type="button" className="lab-primary" onClick={()=>setSection('access')}>Review permissions <span>↗</span></button>
       </section>
-      <section className="lab-card"><div className="lab-card-head"><div><span className="lab-overline">SIMULATED ACTIVITY</span><h2>Activity feed</h2></div><span className="lab-counter">{data.audit.length} entries</span></div>
-       <div className="lab-audit">{data.audit.slice(0,6).map(a=><div className="lab-audit-row" key={a.id}><span className="lab-audit-indicator"/><div><strong>{a.label}</strong><small>{new Date(a.createdAt).toLocaleTimeString()}</small></div></div>)}</div>
+      <section className="lab-card"><div className="lab-card-head"><div><span className="lab-overline">SIMULATED ACTIVITY</span><h2>Activity feed</h2></div><span className="lab-counter">{activity.length} visible</span></div>
+       <div className="lab-audit">{activity.slice(0,6).map(a=><div className="lab-audit-row" key={a.id}><span className="lab-audit-indicator"/><div><strong>{a.label}</strong><small>{new Date(a.createdAt).toLocaleTimeString()}</small></div></div>)}{activity.length===0&&<p className="lab-privacy-note">No activity is visible for this account yet.</p>}</div>
       </section>
     </div>}
 
     {section==='events'&&<div className="lab-two">
      <section className="lab-card"><div className="lab-card-head"><div><span className="lab-overline">PUBLISHED</span><h2>Campus events</h2></div><span className="lab-counter">{data.events.length} events</span></div>
-      <div className="lab-eventlist">{data.events.map(e=>{const seats=eventSeats(data,e.id),registered=data.registrations.some(r=>r.eventId===e.id&&r.studentId===actor.id);return <div className="lab-event" key={e.id}><div className="lab-event-top"><strong>{e.title}</strong><span className={seats.available===0?'lab-full':'lab-open'}>{seats.available===0?'Full':'Open'}</span></div><p>{e.venue} · {e.organizer}</p><div className="lab-capacity"><span style={{width:(seats.occupied/seats.capacity*100)+'%'}}/></div><div className="lab-event-bottom"><small>{seats.occupied} / {seats.capacity} confirmed</small>{isStudent&&<button type="button" disabled={registered} onClick={()=>act('register',{eventId:e.id})}>{registered?'Registered ✓':'Register'}</button>}</div></div>})}</div>
+      <div className="lab-eventlist">{data.events.map(e=>{const seats=eventSeats(data,e.id),registered=data.registrations.some(r=>r.eventId===e.id&&r.studentId===actor.id),registrants=registrantsForViewer(data,actorId,e.id);return <div className="lab-event" key={e.id}><div className="lab-event-top"><strong>{e.title}</strong><span className={seats.available===0?'lab-full':'lab-open'}>{seats.available===0?'Full':'Open'}</span></div><p>{e.venue} · {e.organizer}</p><div className="lab-capacity"><span style={{width:(seats.occupied/seats.capacity*100)+'%'}}/></div><div className="lab-event-bottom"><small>{seats.occupied} / {seats.capacity} confirmed</small>{isStudent&&<button type="button" disabled={registered} onClick={()=>act('register',{eventId:e.id})}>{registered?'Registered ✓':'Register'}</button>}</div>{registered&&<div className="lab-private-status">✓ Your own registration is confirmed. Other students cannot see your identity.</div>}{registrants!==null&&<details className="lab-attendee-details"><summary>Private attendee list · Organizer / Admin only ({registrants.length})</summary>{registrants.length===0?<p>No confirmed attendees yet.</p>:<ul>{registrants.map(r=><li key={r.id}>{r.name}</li>)}</ul>}</details>}</div>})}</div>
      </section>
      <section className="lab-card"><div className="lab-card-head"><div><span className="lab-overline">ORGANIZER CONSOLE</span><h2>Create an event</h2></div></div>
       {isPublisher?<form className="lab-form" onSubmit={e=>{e.preventDefault();if(act('createEvent',eventForm))setEventForm({title:'',venue:'',capacity:5});}}>

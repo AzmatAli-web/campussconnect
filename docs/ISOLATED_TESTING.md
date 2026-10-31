@@ -32,3 +32,11 @@ The suite verifies:
 - Do **not** set your real `MONGODB_URI` for this suite; the test imports `createApp` and connects to its own temporary database.
 - If MongoDB binary download fails, inspect network access / platform support. This must be reported as a failed test, not a pass.
 - First-admin CLI and real Atlas behavior remain separate manual staging checks.
+
+
+## Privacy: attendee identities
+
+- The public Test Lab Activity Feed filters activity by the current persona. Individual registration notifications are visible only to the student who registered; role approvals are visible only to Admin.
+- Students see their own registration status plus publicly available event seat totals. The private attendee list appears only for the event creator or the Demo Admin.
+- Real backend: `GET /api/v1/me/event-registrations` returns **only the authenticated student's** registration records; `GET /api/v1/events/:id/registrations` stays restricted to the event creator or Admin. Responses set `Cache-Control: no-store`.
+- All privacy checks also run in the isolated backend integration suite and frontend unit tests. Browser persona switching is a test-only simulation and is **not** real authentication.

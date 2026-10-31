@@ -20,7 +20,36 @@ const refuse=(code,message)=>({ok:false,code,message});
 const succeed=(next,message)=>({ok:true,next,message});
 const acting=(state,actorId)=>state.people.find(p=>p.id===actorId);
 const privileged=(p,role)=>p?.status==='active'&&p.roles.includes(role);
-const record=(state,label)=>[{id:'audit-'+Math.random().toString(36).slice(2),label,createdAt:now()},...state.audit].slice(0,20);
+const record=(state,label,access={visibility:'public'})=>[
+ {id:'audit-'+Math.random().toString(36).slice(2),label,createdAt:now(),...access},
+ ...state.audit
+].slice(0,20);
+
+// Render only activity that belongs to the current persona or is approved for general viewing.
+// This is only a browser-memory simulation; the real API must enforce access independently.
+export function visibleActivity(state,viewerId) {
+ const viewer=acting(state,viewerId);
+ if(!viewer) return [];
+ return state.audit.filter(item=>{
+  if(item.visibility==='registration') return item.studentId===viewer.id;
+  if(item.visibility==='admin') return privileged(viewer,'admin');
+  return item.visibility==='public' || item.visibility===undefined;
+ });
+}
+
+// Full attendee identities are visible only to the event creator or authorized administrator.
+// Returns null (not an empty list) for unauthorized viewers.
+export function registrantsForViewer(state,viewerId,eventId) {
+ const viewer=acting(state,viewerId);
+ const event=state.events.find(e=>e.id===eventId);
+ if(!viewer || !event) return null;
+ if(!privileged(viewer,'admin') && event.organizerId!==viewerId) return null;
+ return state.registrations.filter(r=>r.eventId===eventId).map(r=>({
+  id:r.id,
+  name:state.people.find(p=>p.id===r.studentId)?.name??'Unknown student',
+  createdAt:r.createdAt
+ }));
+}
 
 export function applyDemoAction(state,actorId,type,payload={}){
  const actor=acting(state,actorId);
@@ -31,7 +60,7 @@ export function applyDemoAction(state,actorId,type,payload={}){
   if(target.status!=='pending') return refuse('ALREADY_APPROVED','Faculty already approved.');
   return succeed({...state,people:state.people.map(p=>p.id!==target.id?p:{
    ...p,status:'active',verified:true,roles:[...new Set([...p.roles,'faculty'])]
-  }),audit:record(state,'Faculty applicant approved by Demo Admin')},'Faculty approved for this local demo.');
+  }),audit:record(state,'Faculty applicant approved by Demo Admin',{visibility:'admin'})},'Faculty approved for this local demo.');
  }
  if(type==='assignManager'){
   if(!privileged(actor,'admin')) return refuse('FORBIDDEN','Only the Demo Admin can assign a manager.');
@@ -39,7 +68,7 @@ export function applyDemoAction(state,actorId,type,payload={}){
   if(target.societyIds.includes('society-1')) return refuse('ALREADY_ASSIGNED','Manager already assigned.');
   return succeed({...state,people:state.people.map(p=>p.id!==target.id?p:{
    ...p,roles:[...new Set([...p.roles,'societyManager'])],societyIds:[...p.societyIds,'society-1']
-  }),audit:record(state,'Computing Society Manager approved')},'Manager assigned to Computing Society.');
+  }),audit:record(state,'Computing Society Manager approved',{visibility:'admin'})},'Manager assigned to Computing Society.');
  }
  if(type==='createEvent'){
   const faculty=privileged(actor,'faculty');
@@ -73,7 +102,7 @@ export function applyDemoAction(state,actorId,type,payload={}){
   const occupied=state.registrations.filter(r=>r.eventId===event.id).length;
   if(occupied>=event.capacity) return refuse('CAPACITY_REACHED','Event is full. Registration blocked.');
   const registration={id:'reg-'+Math.random().toString(36).slice(2),eventId:event.id,studentId:actor.id,createdAt:now()};
-  return succeed({...state,registrations:[...state.registrations,registration],audit:record(state,actor.name+' registered for '+event.title)},'Registration confirmed in demo memory.');
+  return succeed({...state,registrations:[...state.registrations,registration],audit:record(state,'Your registration for '+event.title+' was confirmed',{visibility:'registration',studentId:actor.id})},'Registration confirmed in demo memory.');
  }
  return refuse('UNKNOWN_ACTION','Unknown demo action.');
 }

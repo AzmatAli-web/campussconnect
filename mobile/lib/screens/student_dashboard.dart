@@ -21,10 +21,13 @@ String _date(DateTime? date) {
 class StudentDashboard extends StatefulWidget {
   final CampusApi api;
   final CampusProfile profile;
+  /// When true, the UI uses in-memory fictional records only.
+  final bool previewMode;
   const StudentDashboard({
     super.key,
     required this.api,
     required this.profile,
+    this.previewMode = false,
   });
 
   @override
@@ -74,7 +77,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
     try {
       await widget.api.registerForEvent(event, widget.profile);
       if (!mounted) return;
-      _snack('Registration confirmed. Your identity remains private.');
+      _snack(widget.previewMode
+          ? 'Demo registration saved locally. No real reservation was made.'
+          : 'Registration confirmed. Your identity remains private.');
       await _reload();
     } catch (error) {
       if (!mounted) return;
@@ -120,8 +125,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('CampusConnect',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+            Text(widget.previewMode ? 'CampusConnect · DEMO' : 'CampusConnect',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
           ],
         ),
         actions: [
@@ -190,13 +195,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('COMSATS ABBOTTABAD / STUDENT',
+            Text(widget.previewMode ? 'OFFLINE DEMO / FICTIONAL DATA' : 'COMSATS ABBOTTABAD / STUDENT',
                 style: TextStyle(color: Colors.teal.shade50, fontSize: 10, letterSpacing: 1.7, fontWeight: FontWeight.w800)),
             const SizedBox(height: 13),
             Text(title,
                 style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            const Text('Campus information, with student privacy built in.',
+            Text(widget.previewMode
+                ? 'This preview does not connect to Firebase, Express, or MongoDB.'
+                : 'Campus information, with student privacy built in.',
                 style: TextStyle(color: Color(0xFFCCEDE8), fontSize: 12)),
           ],
         ),
@@ -428,7 +435,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Widget _profilePage() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _SectionHeader(title: 'Your verified identity'),
+          _SectionHeader(title: widget.previewMode
+              ? 'Demo profile · not a real login'
+              : 'Your verified identity'),
           const SizedBox(height: 13),
           Card(
             child: Padding(
@@ -460,11 +469,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     style: TextStyle(fontSize: 11, color: _muted, height: 1.6),
                   ),
                   const SizedBox(height: 17),
-                  OutlinedButton.icon(
-                    onPressed: () => FirebaseAuth.instance.signOut(),
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sign out'),
-                  ),
+                  if (widget.previewMode)
+                    const Text('OFFLINE PREVIEW — No real account is signed in.',
+                      style: TextStyle(color: Color(0xFF98561B),
+                        fontWeight: FontWeight.w800, fontSize: 11))
+                  else
+                    OutlinedButton.icon(
+                      onPressed: () => FirebaseAuth.instance.signOut(),
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Sign out'),
+                    ),
                 ],
               ),
             ),

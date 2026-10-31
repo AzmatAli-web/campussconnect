@@ -18,3 +18,9 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000/api/v1
 The source includes a placeholder `lib/firebase_options.dart`; run `flutterfire configure --project=campussconnect-12fdb --platforms=android` to replace it before launching the app. **Do not paste an Admin SDK key into mobile files.**
 
 Run tests: `flutter analyze` and `flutter test`.
+
+## APK download without installing Flutter locally
+
+GitHub Actions can build an offline **preview APK** that runs on a physical Android phone without requiring Flutter or Android Studio on your PC. It uses **fictional data** and never connects to Firebase or MongoDB. A connected build will require Android Firebase configuration and an accessible HTTPS backend.
+
+See [Cloud APK build, download and install instructions](../docs/CLOUD_ANDROID_APK.md).

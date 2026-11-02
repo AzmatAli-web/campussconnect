@@ -5,7 +5,8 @@ class AppConfig {
   );
 
   // 10.0.2.2 is the host machine from inside the standard Android emulator.
-  // A physical device needs a reachable HTTPS backend or your computer's LAN IP.
+  // A USB-connected phone can use http://127.0.0.1 after "adb reverse tcp:4000 tcp:4000".
+  // Production builds must use a reachable HTTPS API.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:4000/api/v1',

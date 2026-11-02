@@ -39,10 +39,12 @@ Future<void> main() async {
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
                 const SizedBox(height: 14),
                 const Text(
-                  'This connected APK needs the public Android Firebase app configuration '
-                  'and a reachable HTTPS CampusConnect backend. Build it using '
-                  'GitHub Actions repository variables, or use the separate '
-                  'offline preview APK. Never use a Firebase Admin private key.',
+                  'This live app needs its Android Firebase client configuration. '
+                  'For local USB debug testing, register the Android app, '
+                  'then use mobile/scripts/run-phone-live.ps1 to connect to '
+                  'your laptop backend via adb reverse. '
+                  'Production builds require an HTTPS API. '
+                  'Never use a Firebase Admin private key.',
                   textAlign: TextAlign.center,
                 ),
               ],

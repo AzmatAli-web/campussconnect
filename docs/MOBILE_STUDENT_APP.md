@@ -1,5 +1,8 @@
 # CampusConnect — Flutter Student App (Milestone 6)
 
+> **USB-connected phone (recommended):** Now that the Android SDK and Flutter run on Windows, you can connect to the live local Express backend without a public HTTPS deployment. Follow [USB Android Live Testing](USB_ANDROID_LIVE_TEST.md) and use `mobile/scripts/run-phone-live.ps1` instead of the legacy manual Firebase configuration instructions below. The project deliberately supplies build-time Firebase Android options; do **not** overwrite `lib/firebase_options.dart` using `flutterfire configure` for this workflow.
+
+
 **Branch:** `feature/flutter-student-app` (stacked on real React dashboard PR #5).
 
 This is an Android-first Flutter student client. It talks to the **same** Firebase project and Node.js/Express/MongoDB backend as the web application. Students use their existing `@cuiatd.edu.pk` Firebase account and MongoDB campus profile, without a new app-specific login. No real Admin account is required.

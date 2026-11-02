@@ -17,7 +17,7 @@ GitHub Actions artifacts normally require a signed-in GitHub account and expire 
 
 ## B. Connected Android APK (later, once real Firebase Android app + HTTPS backend exist)
 
-A device cannot reach the Windows backend at `localhost:4000` or the emulator alias `10.0.2.2`. Before running the *connected* workflow, deploy a **secured HTTPS staging API** or choose another reliably reachable HTTPS development backend.
+Without USB port forwarding, a phone cannot reach the Windows backend at `localhost:4000`, and `10.0.2.2` is only the emulator alias. A **USB-connected development phone can use adb reverse** as documented in [USB Android Live Testing](USB_ANDROID_LIVE_TEST.md). Before running a cloud-built *connected* workflow for general distribution, deploy a **secured HTTPS staging API** or choose another reliably reachable HTTPS development backend.
 
 Register the **Android** app in the **existing Firebase project** `campussconnect-12fdb` under project settings. Use application ID `com.campusconnect.campusconnect_mobile`. This is a different app from the previously configured Firebase **web** app. Never reuse the web App ID.
 

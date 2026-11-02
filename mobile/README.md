@@ -1,26 +1,39 @@
 # CampusConnect Mobile — Flutter Student Application
 
-Android-first Flutter client connected to the **existing** Firebase project (`campussconnect-12fdb`) and Express/MongoDB API.
+The same Firebase and Express backend serve both the React website and Flutter student app.
 
-**Features:** verified university email login, student profile, events, automatic capacity-protected registrations, private "My registrations", announcements, and profile.
+## Android phone with USB (recommended for development)
 
-**Local setup:** [Complete Windows/Android/FlutterFire setup](../docs/MOBILE_STUDENT_APP.md).
+You can test the LIVE Flutter app on a USB-connected Android phone **without Android Studio or deploying a backend**. This uses `adb reverse` to connect the phone to the Express API on your Windows laptop. You only need to register the Android app with the existing Firebase project.
 
-Quick commands:
+**[Follow the step-by-step USB live testing guide](../docs/USB_ANDROID_LIVE_TEST.md).**
+
+Quick launch after the one-time Firebase Android registration and starting Express:
 
 ```powershell
-flutter create --platforms=android --org=com.campusconnect --project-name=campusconnect_mobile .
-flutter pub get
-# Then configure Firebase using FlutterFire CLI (see full guide).
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000/api/v1
+cd C:\Users\azmii\Desktop\campussconnect\mobile
+.\scripts\run-phone-live.ps1
 ```
 
-The source includes a placeholder `lib/firebase_options.dart`; run `flutterfire configure --project=campussconnect-12fdb --platforms=android` to replace it before launching the app. **Do not paste an Admin SDK key into mobile files.**
+This reads public Firebase Android config from the locally downloaded and gitignored `android/app/google-services.json`. No Admin SDK JSON should ever be placed in the mobile app.
 
-Run tests: `flutter analyze` and `flutter test`.
+## Offline preview (fictional data)
 
-## APK download without installing Flutter locally
+```powershell
+flutter run --dart-define=CAMPUSCONNECT_PREVIEW=true
+```
 
-GitHub Actions can build an offline **preview APK** that runs on a physical Android phone without requiring Flutter or Android Studio on your PC. It uses **fictional data** and never connects to Firebase or MongoDB. A connected build will require Android Firebase configuration and an accessible HTTPS backend.
+Offline preview has no Firebase login, Express calls or real student registrations.
 
-See [Cloud APK build, download and install instructions](../docs/CLOUD_ANDROID_APK.md).
+## CI builds without local Flutter
+
+GitHub Actions can build an offline preview APK. Instructions: [Cloud Android APK](../docs/CLOUD_ANDROID_APK.md).
+
+## Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Production builds must use authenticated Firebase sessions and a deployed HTTPS API; the USB HTTP forwarding approach is only for local debug builds.

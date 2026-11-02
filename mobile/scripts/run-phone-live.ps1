@@ -111,7 +111,7 @@ Write-Host "Do not select the offline preview flag. Keep the backend running." -
 
 # Each --dart-define value is a public Firebase client setting, not an Admin key.
 # Avoid echoing the Firebase API key to terminal output.
-$args = @(
+$flutterArgs = @(
   'run',
   '-d', $DeviceId,
   '--dart-define=CAMPUSCONNECT_PREVIEW=false',
@@ -124,7 +124,7 @@ $args = @(
 
 Push-Location $mobileRoot
 try {
-  & flutter @args
+  & flutter @flutterArgs
   if ($LASTEXITCODE -ne 0) {
     throw "flutter run exited with code $LASTEXITCODE. Check the Flutter error output."
   }

@@ -267,39 +267,10 @@ class CampusApi {
 
   Future<List<CampusFeePayment>> getMyFeePayments(
       CampusFeeInvoice invoice) async {
-    if(!RegExp(r'^[a-f0-9]{24}
-  /// A new attempt begins only after the server confirms completion.
-  Future<CampusRegistration> registerForEvent(
-    CampusEvent event,
-    CampusProfile profile,
-  ) async {
-    if (!profile.canRegister) {
-      throw const CampusApiException('FORBIDDEN', 'Only active students can register.');
-    }
-    if (!event.registrationOpen || event.isFull) {
-      throw const CampusApiException('REGISTRATION_UNAVAILABLE', 'Registration is closed or full.');
-    }
-    final key = _registrationAttempts.putIfAbsent(event.id, () => _uuid.v4());
-    final registration = CampusRegistration.fromJson(asJson(await _request(
-      '/events/${Uri.encodeComponent(event.id)}/registrations',
-      method: 'POST',
-      extraHeaders: {'Idempotency-Key': key},
-      body: {
-        'universityEmail': profile.email,
-        if (profile.registrationNo != null && profile.registrationNo!.isNotEmpty)
-          'registrationNo': profile.registrationNo,
-      },
-    )));
-    _registrationAttempts.remove(event.id);
-    return registration;
-  }
-
-  void dispose() => client.close();
-}
-).hasMatch(invoice.id)){
+    if(invoice.id.length!=24 || RegExp(r'[^a-f0-9]').hasMatch(invoice.id)){
       throw const CampusApiException('INVALID_FEE','Invalid fee identifier.');
     }
-    return asJsonList(await _request('/me/fees/' + invoice.id + '/payments'))
+    return asJsonList(await _request('/me/fees/${invoice.id}/payments'))
         .map(CampusFeePayment.fromJson).toList(growable:false);
   }
 

@@ -46,10 +46,11 @@ test('only students and service roles see complaints navigation, not Faculty or 
  assert.equal(navigationFor({status:'active',activeRoles:['admin']}).some(x=>x.id==='complaints'),true);
 });
 
-test('fees access is visible only to Student and Staff/Admin roles',()=>{
+test('fees access is visible only to Student and Finance Officer roles',()=>{
  assert.equal(navigationFor(student).some(x=>x.id==='fees'),true);
  assert.equal(navigationFor(faculty).some(x=>x.id==='fees'),false);
  assert.equal(navigationFor(manager).some(x=>x.id==='fees'),false);
- assert.equal(navigationFor({status:'active',activeRoles:['staff']}).some(x=>x.id==='fees'),true);
- assert.equal(navigationFor({status:'active',activeRoles:['admin']}).some(x=>x.id==='fees'),true);
+ assert.equal(navigationFor({status:'active',activeRoles:['staff']}).some(x=>x.id==='fees'),false);
+ assert.equal(navigationFor({status:'active',activeRoles:['admin']}).some(x=>x.id==='fees'),false);
+ assert.equal(navigationFor({status:'active',activeRoles:['staff','financeOfficer']}).some(x=>x.id==='fees'),true);
 });

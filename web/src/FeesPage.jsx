@@ -6,7 +6,7 @@ const empty={studentEmail:'',invoiceNo:'',title:'',term:'Fall 2026',
  dueDate:'',amountPkr:''};
 export default function FeesPage({profile,call,act,busy}){
  const student=hasRole(profile,'student');
- const reviewer=hasRole(profile,'staff')||hasRole(profile,'admin');
+ const reviewer=hasRole(profile,'financeOfficer');
  const [mine,setMine]=useState([]);
  const [staffRows,setStaffRows]=useState([]);
  const [studentEmail,setStudentEmail]=useState('');
@@ -33,7 +33,7 @@ export default function FeesPage({profile,call,act,busy}){
   if(!reviewer||!email.trim())return;
   setReviewLoading(true);
   try{
-   const items=await call('/staff/fees?studentEmail='+encodeURIComponent(email.trim()));
+   const items=await call('/finance/fees?studentEmail='+encodeURIComponent(email.trim()));
    setStaffRows(Array.isArray(items)?items:[]);
    setError('');
   }catch(e){setError(e.message||'Unable to find fee records.');}
@@ -42,7 +42,7 @@ export default function FeesPage({profile,call,act,busy}){
  async function issue(e){
   e.preventDefault();
   const payload={...form,amountPkr:Number(form.amountPkr)};
-  const ok=await act(()=>call('/staff/fees',{method:'POST',body:payload}),
+  const ok=await act(()=>call('/finance/fees',{method:'POST',body:payload}),
    'Fee invoice issued for the selected student.');
   if(ok){
    setStudentEmail(form.studentEmail);
@@ -61,7 +61,7 @@ export default function FeesPage({profile,call,act,busy}){
    +'This does not charge a card or verify a bank transfer.'))return;
   setBusyPayment(item.id);
   try{
-   const ok=await act(()=>call('/staff/fees/'+item.id+'/payments',{
+   const ok=await act(()=>call('/finance/fees/'+item.id+'/payments',{
     method:'POST',body:{amountPkr:amount,receiptRef:data.receiptRef.trim()}
    }),'Offline payment record saved.');
    if(ok){
@@ -142,9 +142,9 @@ export default function FeesPage({profile,call,act,busy}){
    </div>}
   </section>
   {reviewer&&<section className="wc-panel">
-   <div className="wc-head"><div><span className="wc-kicker">AUTHORIZED STAFF / ADMIN</span>
+   <div className="wc-head"><div><span className="wc-kicker">AUTHORIZED FINANCE OFFICER ONLY</span>
     <h2>Finance office ledger</h2>
-    <p>Search for one active student by verified university email. Staff can issue invoices and record already-verified offline payments.</p>
+    <p>Search for one active student by verified university email. Only an approved Finance Officer can issue invoices and record already-verified offline payments.</p>
    </div></div>
    <form className="wc-fee-search" onSubmit={e=>{e.preventDefault();loadStaff();}}>
     <label>Student university email<input type="email" required

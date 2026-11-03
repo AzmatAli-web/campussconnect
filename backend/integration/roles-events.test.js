@@ -620,22 +620,41 @@ test('private complaints: students submit and read only their own records',async
 test('fee records: restricted issuance, private student view and atomic receipt ledger',async()=>{
  const student='fixture-student-00',other='fixture-student-01';
  const staffUid='fixture-fees-staff';
- await User.create(person(staffUid,['staff']));
+ const staffUser=await User.create(person(staffUid,['staff']));
+ // General Staff cannot issue or read fee records.
+ const deniedLegacy=await request(app).get('/api/v1/staff/fees')
+   .set(auth(staffUid));
+ assert.equal(deniedLegacy.status,404);
+ const restricted=await request(app).post('/api/v1/finance/fees')
+   .set(auth(staffUid)).send({
+    studentEmail:student+'@'+DOMAIN,invoiceNo:'FEE-FALL-2026-0001',
+    title:'Fall semester tuition',term:'Fall 2026',
+    dueDate:'2027-01-15',amountPkr:10000
+   });
+ assert.equal(restricted.status,403);
+ // Real governance endpoint: Admin explicitly attests finance authorization.
+ const grant=await request(app).post('/api/v1/admin/finance-officers/'+staffUser._id+'/grant')
+   .set(auth('fixture-admin')).send({
+    attested:true,evidenceReference:'FIN-DEPT-APPROVAL-2026',
+    reason:'Independent verified authorization for office finance duties'
+   });
+ assert.equal(grant.status,200,JSON.stringify(grant.body));
+ assert.ok(grant.body.data.activeRoles.includes('financeOfficer'));
  const requestInvoice={
   studentEmail:student+'@'+DOMAIN,invoiceNo:'FEE-FALL-2026-0001',
   title:'Fall semester tuition',term:'Fall 2026',dueDate:'2027-01-15',
   amountPkr:10000
  };
- const studentPost=await request(app).post('/api/v1/staff/fees')
+ const studentPost=await request(app).post('/api/v1/finance/fees')
   .set(auth(student)).send(requestInvoice);
  assert.equal(studentPost.status,403);
  const noAuth=await request(app).get('/api/v1/me/fees');
  assert.equal(noAuth.status,401);
- const forged=await request(app).post('/api/v1/staff/fees')
+ const forged=await request(app).post('/api/v1/finance/fees')
   .set(auth(staffUid))
   .send({...requestInvoice,paidPkr:10000,studentId:String(students[1]._id)});
  assert.equal(forged.status,422);
- const created=await request(app).post('/api/v1/staff/fees')
+ const created=await request(app).post('/api/v1/finance/fees')
   .set(auth(staffUid)).send(requestInvoice);
  assert.equal(created.status,201,JSON.stringify(created.body));
  assert.equal(created.headers['cache-control'],'private, no-store');
@@ -648,7 +667,7 @@ test('fee records: restricted issuance, private student view and atomic receipt 
  for(const key of ['studentId','studentEmail','issuedBy','universityId']){
   assert.equal(Object.hasOwn(invoice,key),false,key);
  }
- const duplicate=await request(app).post('/api/v1/staff/fees')
+ const duplicate=await request(app).post('/api/v1/finance/fees')
   .set(auth(staffUid)).send(requestInvoice);
  assert.equal(duplicate.status,409);
 
@@ -664,14 +683,14 @@ test('fee records: restricted issuance, private student view and atomic receipt 
   .set(auth(other));
  assert.equal(otherPayments.status,404);
  const studentCannotPay=await request(app)
-  .post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .post('/api/v1/finance/fees/'+invoice.id+'/payments')
   .set(auth(student)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
  assert.equal(studentCannotPay.status,403);
 
- const invalid=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+ const invalid=await request(app).post('/api/v1/finance/fees/'+invoice.id+'/payments')
   .set(auth(staffUid)).send({amountPkr:-3,receiptRef:'RECEIPT-TEST-001'});
  assert.equal(invalid.status,422);
- const partial=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+ const partial=await request(app).post('/api/v1/finance/fees/'+invoice.id+'/payments')
   .set(auth(staffUid)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
  assert.equal(partial.status,201,JSON.stringify(partial.body));
  assert.equal(partial.body.data.invoice.status,'partially_recorded');
@@ -680,17 +699,17 @@ test('fee records: restricted issuance, private student view and atomic receipt 
  assert.equal(partial.body.data.payment.receiptRef,'RECEIPT-TEST-001');
  assert.equal(Object.hasOwn(partial.body.data.payment,'recordedBy'),false);
 
- const retry=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+ const retry=await request(app).post('/api/v1/finance/fees/'+invoice.id+'/payments')
   .set(auth(staffUid)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
  assert.equal(retry.status,409,JSON.stringify(retry.body));
  assert.equal(retry.body.error.code,'RECEIPT_ALREADY_RECORDED');
  const afterRetry=await FeeInvoice.findById(invoice.id).lean();
  assert.equal(afterRetry.paidPkr,3000,'duplicate receipt must NOT increment balance');
- const overpay=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+ const overpay=await request(app).post('/api/v1/finance/fees/'+invoice.id+'/payments')
   .set(auth(staffUid)).send({amountPkr:7001,receiptRef:'RECEIPT-TEST-OVER'});
  assert.equal(overpay.status,409);
- const finished=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
-  .set(auth('fixture-admin')).send({amountPkr:7000,receiptRef:'RECEIPT-TEST-002'});
+ const finished=await request(app).post('/api/v1/finance/fees/'+invoice.id+'/payments')
+  .set(auth(staffUid)).send({amountPkr:7000,receiptRef:'RECEIPT-TEST-002'});
  assert.equal(finished.status,201,JSON.stringify(finished.body));
  assert.equal(finished.body.data.invoice.status,'paid');
  assert.equal(finished.body.data.invoice.outstandingPkr,0);
@@ -704,17 +723,83 @@ test('fee records: restricted issuance, private student view and atomic receipt 
  const final=studentView.body.data.find(x=>x.id===invoice.id);
  assert.equal(final.status,'paid');
  assert.equal(final.paidPkr,10000);
- const staffList=await request(app).get('/api/v1/staff/fees')
+ const staffList=await request(app).get('/api/v1/finance/fees')
   .set(auth(staffUid)).query({studentEmail:requestInvoice.studentEmail});
  assert.equal(staffList.status,200);
  assert.ok(staffList.body.data.some(x=>x.id===invoice.id));
- const wrongStudent=await request(app).get('/api/v1/staff/fees')
+ const wrongStudent=await request(app).get('/api/v1/finance/fees')
   .set(auth(staffUid)).query({studentEmail:other+'@'+DOMAIN});
  assert.ok(!wrongStudent.body.data.some(x=>x.id===invoice.id));
- const unauthorizedFilter=await request(app).get('/api/v1/staff/fees')
+ const unauthorizedFilter=await request(app).get('/api/v1/finance/fees')
   .set(auth(staffUid)).query({studentId:String(students[0]._id)});
  assert.equal(unauthorizedFilter.status,400);
  assert.equal(await FeePaymentRecord.countDocuments({invoiceId:invoice.id}),2);
  const saved=await FeeInvoice.findById(invoice.id).lean();
  assert.equal(String(saved.studentId),String(students[0]._id));
+ // Audit is committed atomically with invoice + payment changes.
+ const audits=await AuditLog.find({universityId:UNIVERSITY_ID,
+  targetId:invoice.id}).sort({occurredAt:1}).lean();
+ assert.equal(audits.filter(a=>a.action==='finance.invoice.issued').length,1);
+ const receipts=audits.filter(a=>a.action==='finance.payment.recorded');
+ assert.equal(receipts.length,2,'failed or duplicate payments must not create audit entries');
+ assert.deepEqual(receipts.map(a=>a.details.amountPkr).sort((a,b)=>a-b),[3000,7000]);
+ assert.ok(audits.every(a=>String(a.actorId)===String(staffUser._id)));
+ const afterAuth=await request(app).post('/api/v1/admin/finance-officers/'+staffUser._id+'/revoke')
+  .set(auth('fixture-admin')).send({reason:'Finance assignment has ended and access must be revoked'});
+ assert.equal(afterAuth.status,200,JSON.stringify(afterAuth.body));
+ assert.ok(!afterAuth.body.data.activeRoles.includes('financeOfficer'));
+ const postRevoke=await request(app).get('/api/v1/finance/fees')
+  .set(auth(staffUid)).query({studentEmail:requestInvoice.studentEmail});
+ assert.equal(postRevoke.status,403);
+ const adminRead=await request(app).get('/api/v1/admin/audit-logs?limit=100')
+  .set(auth('fixture-admin'));
+ assert.equal(adminRead.status,200);
+ assert.ok(adminRead.body.data.some(a=>a.action==='finance.officer.granted'));
+ assert.ok(adminRead.body.data.some(a=>a.action==='finance.officer.revoked'));
+},{timeout:45000});
+
+test('finance role granting requires Admin, eligible Staff and explicit attestation',async()=>{
+ const candidate=await User.create(person('fixture-finance-approval-target',['staff']));
+ const student=students[2];
+ const reason='Approved by finance office for official ledger duties';
+ const invalid=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/grant')
+  .set(auth('fixture-admin'))
+  .send({attested:false,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(invalid.status,422);
+ const unauthorized=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/grant')
+  .set(auth('fixture-finance-approval-target'))
+  .send({attested:true,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(unauthorized.status,403);
+ const notStaff=await request(app).post('/api/v1/admin/finance-officers/'+student._id+'/grant')
+  .set(auth('fixture-admin'))
+  .send({attested:true,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(notStaff.status,409);
+ const selfGrant=await request(app).post('/api/v1/admin/finance-officers/'+admin._id+'/grant')
+  .set(auth('fixture-admin'))
+  .send({attested:true,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(selfGrant.status,403);
+ const granted=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/grant')
+  .set(auth('fixture-admin'))
+  .send({attested:true,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(granted.status,200,JSON.stringify(granted.body));
+ assert.ok(granted.body.data.activeRoles.includes('financeOfficer'));
+ const repeated=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/grant')
+  .set(auth('fixture-admin'))
+  .send({attested:true,evidenceReference:'FIN-REF-2026',reason});
+ assert.equal(repeated.status,409);
+ const revokeDenied=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/revoke')
+  .set(auth('fixture-finance-approval-target'))
+  .send({reason:'Revoke this finance access without administrator approval'});
+ assert.equal(revokeDenied.status,403);
+ const revoked=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/revoke')
+  .set(auth('fixture-admin'))
+  .send({reason:'Finance department appointment ended for this employee'});
+ assert.equal(revoked.status,200);
+ const revokedAgain=await request(app).post('/api/v1/admin/finance-officers/'+candidate._id+'/revoke')
+  .set(auth('fixture-admin'))
+  .send({reason:'Finance department appointment ended for this employee'});
+ assert.equal(revokedAgain.status,409);
+ const history=await AuditLog.find({universityId:UNIVERSITY_ID,targetId:candidate._id}).lean();
+ assert.equal(history.filter(a=>a.action==='finance.officer.granted').length,1);
+ assert.equal(history.filter(a=>a.action==='finance.officer.revoked').length,1);
 },{timeout:45000});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  requireCampusEmail,parseStatusChange,parseFacultyApproval,parseManagerAssignment,
  parseStaffInvitation,parseStaffActivation,parseSociety,assertEligibleFaculty,
- assertVerifiedActiveCampusUser,canBootstrapAdmin
+ assertVerifiedActiveCampusUser,parseFinanceGrant,canBootstrapAdmin
 } from '../src/services/governance-policy.js';
 
 const id='6ae43793f5a4a7f228330ca7';
@@ -47,4 +47,20 @@ test('society names and slugs checked',()=>{
 test('activation requires a valid user id',()=>{
  assert.equal(parseStaffActivation({userId:id}).userId,id);
  assert.throws(()=>parseStaffActivation({userId:'not-an-id'}),{code:'INVALID_ID'});
+});
+
+test('finance approval must be explicitly attested and justified',()=>{
+ const ok={attested:true,evidenceReference:'FIN-OFFICE-APPROVAL-2026',
+  reason:'The college finance office authorized this appointment'};
+ assert.deepEqual(parseFinanceGrant(ok),{
+  evidenceReference:ok.evidenceReference,reason:ok.reason
+ });
+ assert.throws(()=>parseFinanceGrant({...ok,attested:false}),
+  {code:'FINANCE_REVIEW_REQUIRED'});
+ assert.throws(()=>parseFinanceGrant({...ok,evidenceReference:'x'}),
+  {code:'INVALID_EVIDENCEREFERENCE'});
+ assert.throws(()=>parseFinanceGrant({...ok,reason:'short'}),
+  {code:'INVALID_REASON'});
+ assert.throws(()=>parseFinanceGrant({...ok,activeRoles:['admin']}),
+  {code:'UNKNOWN_FIELD'});
 });

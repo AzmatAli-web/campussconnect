@@ -19,6 +19,12 @@ class CampusApiException implements Exception {
   String toString() => message;
 }
 
+
+class CampusReadiness {
+  final bool ready;
+  const CampusReadiness({required this.ready});
+}
+
 class CampusApi {
   final Uri baseUri;
   final IdTokenProvider idTokenProvider;
@@ -101,6 +107,35 @@ class CampusApi {
       throw const CampusApiException('INVALID_RESPONSE', 'Backend response is missing data.');
     }
     return envelope['data'];
+  }
+
+  /// Public, read-only endpoint. No Firebase token or private record is sent.
+  Future<CampusReadiness> getReadiness() async {
+    http.Response response;
+    try {
+      response = await client.get(
+        _endpoint('/health/ready'),
+        headers: const {'Accept': 'application/json', 'Cache-Control': 'no-store'},
+      ).timeout(requestTimeout);
+    } on TimeoutException {
+      throw const CampusApiException(
+        'NETWORK_TIMEOUT', 'Campus backend did not respond in time.');
+    } on http.ClientException {
+      throw const CampusApiException(
+        'NETWORK_FAILURE', 'Campus backend is unreachable.');
+    }
+
+    try {
+      final envelope = asJson(jsonDecode(response.body));
+      final data = asJson(envelope['data']);
+      final status = stringField(data, 'status');
+      return CampusReadiness(
+        ready: response.statusCode == 200 && status == 'ready',
+      );
+    } on FormatException {
+      throw const CampusApiException(
+        'INVALID_RESPONSE', 'Backend health response was invalid.');
+    }
   }
 
   Future<CampusProfile> getProfile() async =>

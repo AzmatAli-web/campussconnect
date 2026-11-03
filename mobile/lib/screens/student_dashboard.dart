@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/campus_models.dart';
 import '../services/campus_api.dart';
+import '../services/live_diagnostics.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -39,6 +40,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
   bool _loading = true;
   String? _error;
   String? _busyEvent;
+  bool _checkingDiagnostics = false;
+  List<CampusDiagnosticCheck>? _diagnostics;
   List<CampusEvent> _events = const [];
   List<CampusRegistration> _registrations = const [];
   List<CampusAnnouncement> _announcements = const [];
@@ -92,6 +95,20 @@ class _StudentDashboardState extends State<StudentDashboard> {
       if (mounted) _snack(message, error: true);
     } finally {
       if (mounted) setState(() => _busyEvent = null);
+    }
+  }
+
+  Future<void> _checkLiveConnection() async {
+    if (_checkingDiagnostics || widget.previewMode) return;
+    setState(() {
+      _checkingDiagnostics = true;
+      _diagnostics = null;
+    });
+    try {
+      final results = await runCampusDiagnostics(widget.api, widget.profile);
+      if (mounted) setState(() => _diagnostics = results);
+    } finally {
+      if (mounted) setState(() => _checkingDiagnostics = false);
     }
   }
 
@@ -469,6 +486,63 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     style: TextStyle(fontSize: 11, color: _muted, height: 1.6),
                   ),
                   const SizedBox(height: 17),
+                  if (!widget.previewMode) ...[
+                    const Divider(color: _line),
+                    const SizedBox(height: 12),
+                    const Text('Live connection diagnostics',
+                        style: TextStyle(fontWeight: FontWeight.w900,
+                            fontSize: 15, color: _navy)),
+                    const SizedBox(height: 7),
+                    const Text(
+                      'Read-only checks for the backend, Firebase identity, '
+                      'private registrations, events and announcements. '
+                      'No tokens or other students’ details are displayed.',
+                      style: TextStyle(fontSize: 11, color: _muted, height: 1.6),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: _checkingDiagnostics ? null : _checkLiveConnection,
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: Text(_checkingDiagnostics
+                          ? 'Checking connection…' : 'Check live connections'),
+                    ),
+                    if (_checkingDiagnostics)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: LinearProgressIndicator(),
+                      ),
+                    if (_diagnostics != null) ...[
+                      const SizedBox(height: 9),
+                      for (final check in _diagnostics!)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 11),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(check.passed
+                                  ? Icons.check_circle_rounded
+                                  : Icons.error_outline_rounded,
+                                  color: check.passed
+                                      ? const Color(0xFF169A78)
+                                      : const Color(0xFFBB5261),
+                                  size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(check.label, style: const TextStyle(
+                                      fontWeight: FontWeight.w800, fontSize: 12)),
+                                  const SizedBox(height: 3),
+                                  Text(check.detail, style: const TextStyle(
+                                      fontSize: 11, color: _muted, height: 1.5)),
+                                ],
+                              )),
+                            ],
+                          ),
+                        ),
+                    ],
+                    const SizedBox(height: 14),
+                  ],
                   if (widget.previewMode)
                     const Text('OFFLINE PREVIEW — No real account is signed in.',
                       style: TextStyle(color: Color(0xFF98561B),

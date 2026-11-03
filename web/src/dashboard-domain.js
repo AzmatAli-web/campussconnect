@@ -8,6 +8,7 @@ export function navigationFor(profile){
  const items=[['overview','Overview','◫'],['events','Explore events','▣']];
  if(hasRole(profile,'student'))items.push(['registrations','My registrations','✓']);
  items.push(['announcements','Announcements','◉']);
+ items.push(['timetable','Timetable','▦']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
  return items.map(([id,label,icon])=>({id,label,icon}));

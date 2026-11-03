@@ -73,6 +73,28 @@ class PreviewCampusApi extends CampusApi {
         }),
       ];
 
+
+  @override
+  Future<List<CampusTimetableGroup>> getTimetableGroups() async => [
+    const CampusTimetableGroup(
+      term: 'Fall 2026 (Demo)', program: 'BSE', semester: 7, section: 'A'),
+  ];
+
+  @override
+  Future<List<CampusTimetableSlot>> getTimetableSlots(
+      CampusTimetableGroup group) async => [
+    const CampusTimetableSlot(
+      id: 'demo-slot-1', dayOfWeek: 1, startTime: '08:00',
+      endTime: '09:30', courseCode: 'CSC494',
+      courseTitle: 'Software Project Management',
+      instructorName: 'Sample Lecturer', room: 'Demo Room 201'),
+    const CampusTimetableSlot(
+      id: 'demo-slot-2', dayOfWeek: 2, startTime: '10:00',
+      endTime: '11:30', courseCode: 'CSC412',
+      courseTitle: 'Advanced Programming',
+      instructorName: 'Sample Lecturer', room: 'Demo Lab'),
+  ];
+
   @override
   Future<CampusRegistration> registerForEvent(
     CampusEvent event,

@@ -149,3 +149,49 @@ bool studentIsRegistered(
   (registration) => registration.eventId == eventId &&
       registration.status == 'confirmed',
 );
+
+class CampusTimetableGroup {
+  final String term;
+  final String program;
+  final int semester;
+  final String section;
+  const CampusTimetableGroup({
+    required this.term, required this.program,
+    required this.semester, required this.section,
+  });
+  factory CampusTimetableGroup.fromJson(Json json) => CampusTimetableGroup(
+    term: stringField(json, 'term'),
+    program: stringField(json, 'program'),
+    semester: numberField(json, 'semester'),
+    section: stringField(json, 'section'),
+  );
+  String get key => '$term|$program|$semester|$section';
+  String get label => '$term · $program · Sem $semester · $section';
+}
+
+class CampusTimetableSlot {
+  final String id;
+  final int dayOfWeek;
+  final String startTime;
+  final String endTime;
+  final String courseCode;
+  final String courseTitle;
+  final String instructorName;
+  final String room;
+  const CampusTimetableSlot({
+    required this.id, required this.dayOfWeek,
+    required this.startTime, required this.endTime,
+    required this.courseCode, required this.courseTitle,
+    required this.instructorName, required this.room,
+  });
+  factory CampusTimetableSlot.fromJson(Json json) => CampusTimetableSlot(
+    id: stringField(json, 'id'),
+    dayOfWeek: numberField(json, 'dayOfWeek'),
+    startTime: stringField(json, 'startTime'),
+    endTime: stringField(json, 'endTime'),
+    courseCode: stringField(json, 'courseCode'),
+    courseTitle: stringField(json, 'courseTitle'),
+    instructorName: stringField(json, 'instructorName'),
+    room: stringField(json, 'room'),
+  );
+}

@@ -172,6 +172,25 @@ class CampusApi {
           .map(CampusAnnouncement.fromJson)
           .toList();
 
+  /// University-published groups, never a student-editable schedule.
+  Future<List<CampusTimetableGroup>> getTimetableGroups() async =>
+      asJsonList(await _request('/timetable/groups'))
+          .map(CampusTimetableGroup.fromJson)
+          .toList(growable: false);
+
+  Future<List<CampusTimetableSlot>> getTimetableSlots(
+      CampusTimetableGroup group) async {
+    final query = Uri(queryParameters: {
+      'term': group.term,
+      'program': group.program,
+      'semester': group.semester.toString(),
+      'section': group.section,
+    }).query;
+    return asJsonList(await _request('/timetable/slots?$query'))
+        .map(CampusTimetableSlot.fromJson)
+        .toList(growable: false);
+  }
+
   /// Stable per-event attempt key is reused on timeout/retry.
   /// A new attempt begins only after the server confirms completion.
   Future<CampusRegistration> registerForEvent(

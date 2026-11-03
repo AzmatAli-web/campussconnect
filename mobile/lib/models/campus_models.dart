@@ -195,3 +195,36 @@ class CampusTimetableSlot {
     room: stringField(json, 'room'),
   );
 }
+
+class CampusAcademicResource {
+  final String id;
+  final String title;
+  final String description;
+  final String program;
+  final int semester;
+  final String courseCode;
+  final String fileName;
+  final int sizeBytes;
+  final String status;
+  final DateTime? createdAt;
+
+  const CampusAcademicResource({
+    required this.id, required this.title, required this.description,
+    required this.program, required this.semester, required this.courseCode,
+    required this.fileName, required this.sizeBytes, required this.status,
+    required this.createdAt,
+  });
+
+  factory CampusAcademicResource.fromJson(Json data) => CampusAcademicResource(
+    id: stringField(data, 'id'),
+    title: stringField(data, 'title'),
+    description: stringField(data, 'description'),
+    program: stringField(data, 'program'),
+    semester: numberField(data, 'semester'),
+    courseCode: stringField(data, 'courseCode'),
+    fileName: stringField(data, 'fileName'),
+    sizeBytes: numberField(data, 'sizeBytes'),
+    status: stringField(data, 'status'),
+    createdAt: parseDate(data['createdAt']),
+  );
+}

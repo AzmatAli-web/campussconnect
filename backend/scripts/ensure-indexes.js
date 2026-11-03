@@ -6,13 +6,14 @@ import {User} from '../src/models/user.js';
 import {AdminBootstrap,AuditLog,StaffInvitation} from '../src/models/governance.js';
 import {Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey} from '../src/models/campus-content.js';
 import {TimetableSlot} from '../src/models/timetable.js';
+import {AcademicResource} from '../src/models/academic-resource.js';
 
 async function main(){
  const config=parseEnvironment();
  if(!config.mongoUri||!config.universityId) throw new Error('Database and university must be configured first');
  await connectDatabase(config);
  try{
-  for(const model of [User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot]){
+  for(const model of [User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot,AcademicResource]){
    await model.createIndexes();
    console.log('Checked indexes:',model.collection.name);
   }

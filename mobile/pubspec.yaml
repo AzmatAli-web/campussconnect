@@ -13,6 +13,8 @@ dependencies:
   firebase_auth: ^7.0.1
   http: ^1.6.0
   uuid: ^4.6.0
+  path_provider: ^2.1.6
+  open_filex: ^5.0.0
 
 dev_dependencies:
   flutter_test:

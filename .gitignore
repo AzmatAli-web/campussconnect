@@ -13,3 +13,6 @@ dist/
 *serviceAccount*.json
 *service-account*.json
 firebase-adminsdk*.json
+
+# Untrusted uploaded PDFs must remain private and outside git history.
+**/private_uploads/

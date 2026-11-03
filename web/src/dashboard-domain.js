@@ -9,6 +9,7 @@ export function navigationFor(profile){
  if(hasRole(profile,'student'))items.push(['registrations','My registrations','✓']);
  items.push(['announcements','Announcements','◉']);
  items.push(['timetable','Timetable','▦']);
+ items.push(['resources','Academic Resources','▤']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
  return items.map(([id,label,icon])=>({id,label,icon}));

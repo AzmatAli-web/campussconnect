@@ -96,6 +96,32 @@ class PreviewCampusApi extends CampusApi {
   ];
 
   @override
+  Future<List<CampusAcademicResource>> getAcademicResources({
+    String? program, int? semester, String? courseCode,
+  }) async {
+    const demo=CampusAcademicResource(
+      id: 'offline-demo-resource',
+      title: 'Introduction to Software Engineering',
+      description: 'Fictional notes displayed for offline preview only.',
+      program: 'BSE', semester: 7, courseCode: 'CSC494',
+      fileName: 'demo-notes.pdf', sizeBytes: 128000,
+      status: 'published', createdAt: null,
+    );
+    if(program != null && program.trim().isNotEmpty &&
+        program.trim().toUpperCase()!=demo.program) return [];
+    if(semester != null && semester!=demo.semester) return [];
+    if(courseCode != null && courseCode.trim().isNotEmpty &&
+        courseCode.trim().toUpperCase()!=demo.courseCode) return [];
+    return [demo];
+  }
+
+  @override
+  Future<List<int>> downloadAcademicPdf(CampusAcademicResource resource) async {
+    throw const CampusApiException('OFFLINE_PREVIEW',
+      'Offline demo has no PDF download.');
+  }
+
+  @override
   Future<CampusRegistration> registerForEvent(
     CampusEvent event,
     CampusProfile profile,

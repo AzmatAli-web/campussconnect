@@ -10,7 +10,7 @@ import {pagination,requireObjectId} from '../services/mvp-validation.js';
 import {
   parseStatusChange,parseFacultyApproval,parseManagerAssignment,
   parseStaffInvitation,parseStaffActivation,parseReason,parseSociety,
-  assertEligibleFaculty,assertVerifiedActiveCampusUser
+  assertEligibleFaculty,assertVerifiedActiveCampusUser,parseFinanceGrant
 } from '../services/governance-policy.js';
 
 const university=(deps)=>deps.config.universityId?new mongoose.Types.ObjectId(deps.config.universityId):null;
@@ -214,6 +214,60 @@ export function governanceRouter(deps) {
       return revoked;
     });
     return res.json({data:{id:String(invite._id),status:invite.status}});
+  }));
+
+
+  // Finance privileges require an active, independently verified Staff identity.
+  // Neither Firebase sign-up nor ordinary Staff status can grant finance access.
+  router.post('/admin/finance-officers/:id/grant',admin,asyncHandler(async(req,res)=>{
+    const id=requireObjectId(req.params.id);
+    const evidence=parseFinanceGrant(req.body);
+    await transaction(async session=>{
+      const target=await User.findOne({_id:id,universityId:uni}).session(session);
+      assertVerifiedActiveCampusUser(target);
+      if(String(target._id)===String(req.currentUser._id)||
+         target.activeRoles.includes('admin')){
+        throw new HttpError(403,'ADMIN_PROTECTED','Administrators cannot grant finance access to themselves or other Admins');
+      }
+      if(!target.activeRoles.includes('staff')){
+        throw new HttpError(409,'STAFF_REQUIRED','Only a verified active Staff user is eligible');
+      }
+      if(target.activeRoles.includes('financeOfficer')){
+        throw new HttpError(409,'FINANCE_ALREADY_GRANTED','Finance Officer role already active');
+      }
+      await ensureFreshFirebaseUser(deps.firebaseAuth,target);
+      const changed=await User.updateOne({
+        _id:id,universityId:uni,status:'active',activeRoles:{$all:['staff'],$nin:['financeOfficer']}
+      },{$addToSet:{activeRoles:'financeOfficer'}},{session});
+      if(changed.modifiedCount!==1)throw new HttpError(409,'ACCOUNT_CHANGED','Target permissions changed; refresh');
+      await AuditLog.create([action(uni,req.currentUser,'finance.officer.granted','user',target._id,{
+        evidenceReference:evidence.evidenceReference,reason:evidence.reason
+      })],{session});
+    });
+    return res.json({data:asUser(await User.findOne({_id:id,universityId:uni}).lean())});
+  }));
+
+  router.post('/admin/finance-officers/:id/revoke',admin,asyncHandler(async(req,res)=>{
+    const id=requireObjectId(req.params.id),reason=parseReason(req.body);
+    await transaction(async session=>{
+      const target=await User.findOne({_id:id,universityId:uni}).session(session);
+      if(!target)throw new HttpError(404,'USER_NOT_FOUND','User not found');
+      if(String(target._id)===String(req.currentUser._id)||
+         target.activeRoles.includes('admin')){
+        throw new HttpError(403,'ADMIN_PROTECTED','Admin accounts cannot be changed');
+      }
+      if(!target.activeRoles.includes('financeOfficer')){
+        throw new HttpError(409,'FINANCE_NOT_GRANTED','Target does not have the Finance Officer role');
+      }
+      const updated=await User.updateOne({
+        _id:id,universityId:uni,activeRoles:'financeOfficer'
+      },{$pull:{activeRoles:'financeOfficer'}},{session});
+      if(updated.modifiedCount!==1)throw new HttpError(409,'ACCOUNT_CHANGED','Target permissions changed; refresh');
+      await AuditLog.create([action(uni,req.currentUser,'finance.officer.revoked','user',target._id,{
+        reason
+      })],{session});
+    });
+    return res.json({data:asUser(await User.findOne({_id:id,universityId:uni}).lean())});
   }));
 
   router.get('/admin/audit-logs',admin,asyncHandler(async(req,res)=>{

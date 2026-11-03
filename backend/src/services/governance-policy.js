@@ -66,3 +66,15 @@ export function canBootstrapAdmin({firebaseUser,user,domainApproved,universityEx
     normalizeEmail(user?.emailNormalized)===normalizeEmail(firebaseUser?.email) &&
     !alreadyBootstrapped && !existingAdmin);
 }
+
+export function parseFinanceGrant(body) {
+ requireBody(body,['attested','evidenceReference','reason']);
+ if(body.attested!==true){
+  throw new HttpError(422,'FINANCE_REVIEW_REQUIRED',
+   'Administrator must attest finance department authorization');
+ }
+ return {
+  evidenceReference:textField(body.evidenceReference,'evidenceReference',6,200),
+  reason:textField(body.reason,'reason',10,500)
+ };
+}

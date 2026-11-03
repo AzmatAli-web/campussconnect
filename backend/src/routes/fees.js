@@ -5,6 +5,7 @@ import {campusUserMiddleware,needRole} from '../middleware/campus-user.js';
 import {requireObjectId,pagination} from '../services/mvp-validation.js';
 import {User} from '../models/user.js';
 import {FeeInvoice,FeePaymentRecord} from '../models/fees.js';
+import {AuditLog} from '../models/governance.js';
 import {
  normalizeStudentEmail,feeInvoiceInput,feePaymentInput,invoiceView,paymentView
 } from '../services/fees-validation.js';
@@ -57,9 +58,9 @@ export function feesRouter(deps){
   }).sort({createdAt:1,_id:1}).limit(100).lean();
   return res.json({data:rows.map(paymentView)});
  }));
- // Staff must specify ONE campus email; no unbounded cross-student finance directory.
- router.get('/staff/fees',auth,asyncHandler(async(req,res)=>{
-  needRole(req,'staff','admin');
+ // Finance Officers must specify ONE campus email; no unbounded cross-student finance directory.
+ router.get('/finance/fees',auth,asyncHandler(async(req,res)=>{
+  needRole(req,'financeOfficer');
   exactQuery(req.query,['studentEmail']);
   const email=normalizeStudentEmail(req.query.studentEmail,deps.config.domains);
   const student=await validStudent(email,deps.config);
@@ -68,16 +69,28 @@ export function feesRouter(deps){
   }).sort({dueDate:-1,_id:-1}).limit(100).lean();
   return res.json({data:rows.map(invoiceView)});
  }));
- router.post('/staff/fees',auth,asyncHandler(async(req,res)=>{
-  needRole(req,'staff','admin');
+ router.post('/finance/fees',auth,asyncHandler(async(req,res)=>{
+  needRole(req,'financeOfficer');
   const data=feeInvoiceInput(req.body,deps.config.domains);
   const student=await validStudent(data.studentEmail,deps.config);
   const {studentEmail,...input}=data;
   try{
-   const invoice=await FeeInvoice.create({
-    ...input,universityId:deps.config.universityId,studentId:student._id,
-    paidPkr:0,issuedBy:req.currentUser._id
-   });
+   const session=await mongoose.startSession();
+   let invoice;
+   try{
+    await session.withTransaction(async()=>{
+     [invoice]=await FeeInvoice.create([{
+      ...input,universityId:deps.config.universityId,studentId:student._id,
+      paidPkr:0,issuedBy:req.currentUser._id
+     }],{session});
+     await AuditLog.create([{
+      universityId:deps.config.universityId,actorId:req.currentUser._id,
+      action:'finance.invoice.issued',targetType:'feeInvoice',targetId:invoice._id,
+      details:{invoiceNo:invoice.invoiceNo,amountPkr:invoice.amountPkr,
+       studentId:String(student._id),dueDate:invoice.dueDate}
+     }],{session});
+    });
+   }finally{await session.endSession();}
    return res.status(201).json({data:invoiceView(invoice)});
   }catch(error){
    if(error?.code===11000)throw new HttpError(409,'INVOICE_EXISTS',
@@ -87,8 +100,8 @@ export function feesRouter(deps){
  }));
  // This is an administrative entry for an already verified OFFLINE payment.
  // It is NOT a bank transfer, gateway charge or verification of a bank receipt.
- router.post('/staff/fees/:id/payments',auth,asyncHandler(async(req,res)=>{
-  needRole(req,'staff','admin');
+ router.post('/finance/fees/:id/payments',auth,asyncHandler(async(req,res)=>{
+  needRole(req,'financeOfficer');
   const id=requireObjectId(req.params.id);
   const payment=feePaymentInput(req.body);
   const session=await mongoose.startSession();
@@ -113,6 +126,13 @@ export function feesRouter(deps){
     const [entry]=await FeePaymentRecord.create([{
      universityId:deps.config.universityId,studentId:invoice.studentId,
      invoiceId:invoice._id,...payment,recordedBy:req.currentUser._id
+    }],{session});
+    await AuditLog.create([{
+     universityId:deps.config.universityId,actorId:req.currentUser._id,
+     action:'finance.payment.recorded',targetType:'feeInvoice',targetId:invoice._id,
+     details:{receiptId:String(entry._id),receiptRef:payment.receiptRef,
+      amountPkr:entry.amountPkr,balanceBeforePkr:invoice.amountPkr-invoice.paidPkr,
+      balanceAfterPkr:next.amountPkr-next.paidPkr}
     }],{session});
     result={invoice:invoiceView(next),payment:paymentView(entry)};
    });

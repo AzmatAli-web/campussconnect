@@ -13,13 +13,30 @@ export default function AdminPanel({data,call,act,busy,showRoster,openRoster,ros
  const [assignment,setAssignment]=useState({societyId:'',userId:''});
  const [staff,setStaff]=useState('');
  const [moderation,setModeration]=useState({userId:'',status:'suspended',reason:''});
+ const [finance,setFinance]=useState({mode:'grant',userId:'',reason:'',evidenceReference:'',attested:false});
  const pending=users.filter(u=>u.requestedRole==='faculty'&&u.status==='pending'&&u.facultyVerificationStatus!=='verified');
  const active=users.filter(u=>u.status==='active'&&!u.activeRoles.includes('admin'));
+ const financeCandidates=users.filter(u=>u.status==='active'&&
+  u.activeRoles.includes('staff')&&!u.activeRoles.includes('admin')&&
+  (finance.mode==='grant'?!u.activeRoles.includes('financeOfficer'):
+    u.activeRoles.includes('financeOfficer')));
  async function approve(e){e.preventDefault();const ok=await act(()=>call('/admin/users/'+target+'/verify-faculty',{method:'POST',body:review}),'Faculty approved after independent evidence review.');if(ok){setTarget('');setReview(initialReview);}}
  async function addSociety(e){e.preventDefault();const ok=await act(()=>call('/admin/societies',{method:'POST',body:society}),'Campus society created.');if(ok)setSociety({name:'',slug:'',description:''});}
  async function assign(e){e.preventDefault();await act(()=>call('/admin/society-manager-assignments',{method:'POST',body:assignment}),'Society Manager assigned.');}
  async function invite(e){e.preventDefault();const ok=await act(()=>call('/admin/staff-invitations',{method:'POST',body:{universityEmail:staff.trim()}}),'Staff invitation record created. This does not send email or automatically activate Staff access.');if(ok)setStaff('');}
  async function status(e){e.preventDefault();await act(()=>call('/admin/users/'+moderation.userId+'/status',{method:'PATCH',body:{status:moderation.status,reason:moderation.reason}}),'Account status updated.');}
+ async function changeFinance(e){
+  e.preventDefault();
+  if(!finance.userId)return;
+  const granting=finance.mode==='grant';
+  const body=granting
+   ? {attested:finance.attested,evidenceReference:finance.evidenceReference,reason:finance.reason}
+   : {reason:finance.reason};
+  const ok=await act(()=>call('/admin/finance-officers/'+finance.userId+'/'+
+    (granting?'grant':'revoke'),{method:'POST',body}),
+    granting?'Finance Officer access approved and logged.':'Finance Officer access revoked and logged.');
+  if(ok)setFinance({mode:finance.mode,userId:'',reason:'',evidenceReference:'',attested:false});
+ }
  return <div className="wc-stack">
   <div className="wc-admin-banner"><strong>Restricted Admin workspace</strong><small>Every operation is checked by the backend against a real Firebase identity and an active Admin role. The Demo Administrator cannot enter this screen.</small></div>
   <div className="wc-metrics"><div className="wc-metric"><small>Campus users</small><strong>{users.length}</strong><em>First 100 records</em></div><div className="wc-metric"><small>Published events</small><strong>{events.length}</strong><em>Campus records</em></div><div className="wc-metric"><small>Societies</small><strong>{societies.length}</strong><em>Active groups</em></div><div className="wc-metric"><small>Audit entries</small><strong>{audits.length}</strong><em>Recent actions</em></div></div>
@@ -54,6 +71,39 @@ export default function AdminPanel({data,call,act,busy,showRoster,openRoster,ros
      <label>Reason<textarea required minLength="8" maxLength="500" rows="3" value={moderation.reason} onChange={e=>setModeration({...moderation,reason:e.target.value})}/></label><button className="wc-outline dangerous" disabled={busy||!moderation.userId}>Apply status change</button></form>
    </section>
   </div>
+  <section className="wc-panel">
+   <Header kicker="FINANCE AUTHORIZATION" title="Grant or revoke Finance Officer access"
+    desc="Only active verified Staff can be approved for Finance Officer access. Verify the finance department authorization independently; role changes are recorded in the audit trail."/>
+   <form className="wc-form" onSubmit={changeFinance}>
+    <label>Action<select value={finance.mode} onChange={e=>setFinance({
+      mode:e.target.value,userId:'',reason:'',evidenceReference:'',attested:false
+    })}>
+      <option value="grant">Grant Finance Officer</option>
+      <option value="revoke">Revoke Finance Officer</option>
+    </select></label>
+    <label>Active Staff user<select required value={finance.userId}
+      onChange={e=>setFinance({...finance,userId:e.target.value})}>
+      <option value="">Choose an eligible Staff account</option>
+      {financeCandidates.map(u=><option key={u.id} value={u.id}>{u.fullName} · {u.email}</option>)}
+    </select></label>
+    {finance.mode==='grant'&&<>
+      <label>Authorization reference<input required minLength="6" maxLength="200"
+        placeholder="Finance department authorization ID"
+        value={finance.evidenceReference}
+        onChange={e=>setFinance({...finance,evidenceReference:e.target.value})}/></label>
+      <label className="wc-checkbox"><input type="checkbox" checked={finance.attested}
+        onChange={e=>setFinance({...finance,attested:e.target.checked})}/>
+        I independently confirmed this Staff member is authorized by the finance office.</label>
+    </>}
+    <label>Reason<textarea required minLength="10" maxLength="500" rows="3"
+      value={finance.reason}
+      onChange={e=>setFinance({...finance,reason:e.target.value})}/></label>
+    <button className={finance.mode==='revoke'?'wc-outline dangerous':'wc-primary'}
+      disabled={busy||!finance.userId||(finance.mode==='grant'&&!finance.attested)}>
+      {finance.mode==='grant'?'Grant restricted finance access':'Revoke finance access'}
+    </button>
+   </form>
+  </section>
   <section className="wc-panel"><Header kicker="PRIVATE USERS" title="Users and roles" desc="Personally identifiable user records are not shown to Students."/>
    {users.length?<div className="wc-tablewrap"><table><thead><tr><th>Name</th><th>University email</th><th>Status</th><th>Roles</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.fullName}</td><td>{u.email}</td><td>{u.status}</td><td>{(u.activeRoles||[]).join(', ')||'Pending'}</td></tr>)}</tbody></table></div>:<Empty text="No accounts found."/>}
   </section>

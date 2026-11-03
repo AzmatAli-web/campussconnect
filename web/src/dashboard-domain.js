@@ -3,7 +3,7 @@ export const activeRoles=p=>p?.status==='active'&&Array.isArray(p.activeRoles)?p
 export const hasRole=(p,role)=>activeRoles(p).includes(role);
 export const isVerifiedFaculty=p=>hasRole(p,'faculty')&&p.facultyVerificationStatus==='verified';
 export const canOrganize=p=>isVerifiedFaculty(p)||hasRole(p,'societyManager');
-export const displayRole=p=>hasRole(p,'admin')?'Administrator':isVerifiedFaculty(p)?'Faculty':hasRole(p,'societyManager')?'Society Manager':hasRole(p,'staff')?'Staff':'Student';
+export const displayRole=p=>hasRole(p,'admin')?'Administrator':isVerifiedFaculty(p)?'Faculty':hasRole(p,'societyManager')?'Society Manager':hasRole(p,'financeOfficer')?'Finance Officer':hasRole(p,'staff')?'Staff':'Student';
 export function navigationFor(profile){
  const items=[['overview','Overview','◫'],['events','Explore events','▣']];
  if(hasRole(profile,'student'))items.push(['registrations','My registrations','✓']);
@@ -11,7 +11,7 @@ export function navigationFor(profile){
  items.push(['timetable','Timetable','▦']);
  items.push(['resources','Academic Resources','▤']);
  if(hasRole(profile,'student')||hasRole(profile,'staff')||hasRole(profile,'admin'))items.push(['complaints','Complaints','✉']);
- if(hasRole(profile,'student')||hasRole(profile,'staff')||hasRole(profile,'admin'))items.push(['fees','Fees & dues','▥']);
+ if(hasRole(profile,'student')||hasRole(profile,'financeOfficer'))items.push(['fees','Fees & dues','▥']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
  return items.map(([id,label,icon])=>({id,label,icon}));

@@ -16,6 +16,7 @@ import {AdminBootstrap,AuditLog,StaffInvitation} from '../src/models/governance.
 import {TimetableSlot} from '../src/models/timetable.js';
 import {AcademicResource} from '../src/models/academic-resource.js';
 import {StudentComplaint} from '../src/models/complaint.js';
+import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -71,7 +72,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([

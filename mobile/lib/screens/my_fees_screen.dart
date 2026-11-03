@@ -81,7 +81,7 @@ class _MyFeesScreenState extends State<MyFeesScreen>{
     }
   }
 
-  String _money(int n)=>'PKR '+n.toString();
+  String _money(int n)=>'PKR $n';
   String _status(CampusFeeInvoice invoice){
     if(invoice.status=='paid'){
       return 'FULLY RECORDED';
@@ -165,13 +165,13 @@ class _MyFeesScreenState extends State<MyFeesScreen>{
                           Text(invoice.invoiceNo,
                             style:const TextStyle(fontSize:11,color:_muted)),
                           const SizedBox(height:7),
-                          Text(_money(invoice.outstandingPkr)+' outstanding',
+                          Text('${_money(invoice.outstandingPkr)} outstanding',
                             style:const TextStyle(
                               color:_teal,fontWeight:FontWeight.w900,
                               fontSize:13)),
                           const SizedBox(height:5),
                           Text(invoice.overdue
-                              ? 'OVERDUE · '+_status(invoice)
+                              ? 'OVERDUE · ${_status(invoice)}'
                               : _status(invoice),
                             style:TextStyle(
                               fontSize:11,fontWeight:FontWeight.w800,

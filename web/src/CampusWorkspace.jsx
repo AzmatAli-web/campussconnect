@@ -5,8 +5,10 @@ import {Overview,Events,Registrations,Announcements,Organizer,Admin} from './Wor
 import './workspace.css';
 import './timetable.css';
 import TimetablePage from './TimetablePage.jsx';
+import AcademicResourcesPage from './AcademicResourcesPage.jsx';
+import './resources.css';
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','events','registrations','admin'].includes(tab))requested.events='/events?limit=50';
@@ -83,13 +85,14 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  async function refreshProfile(){
   await act(async()=>{const next=await call('/me');onProfileChange(next);},'Account permissions refreshed.');
  }
- const props={data,profile,busy,call,act,register,showRoster,openRoster,rosters,choose};
+ const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
   overview:<Overview {...props}/>,
   events:<Events {...props}/>,
   registrations:<Registrations {...props}/>,
   announcements:<Announcements {...props}/>,
   timetable:<TimetablePage {...props}/>,
+  resources:<AcademicResourcesPage {...props}/>,
   organizer:<Organizer {...props}/>,
   admin:<Admin {...props}/>
  }[activeTab];

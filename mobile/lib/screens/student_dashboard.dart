@@ -5,6 +5,7 @@ import '../models/campus_models.dart';
 import '../services/campus_api.dart';
 import '../services/live_diagnostics.dart';
 import 'timetable_panel.dart';
+import 'academic_resources_panel.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -126,7 +127,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    const pages = ['Overview', 'Campus events', 'My registrations', 'Announcements', 'My profile', 'Timetable'];
+    const pages = ['Overview', 'Campus events', 'My registrations', 'Announcements', 'My profile', 'Timetable', 'Academic resources'];
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -178,7 +179,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               2 => _myRegistrations(),
                               3 => _announcementList(),
                               4 => _profilePage(),
-                              _ => TimetablePanel(
+                              5 => TimetablePanel(
+                                api: widget.api,
+                                previewMode: widget.previewMode,
+                              ),
+                              _ => AcademicResourcesPanel(
                                 api: widget.api,
                                 previewMode: widget.previewMode,
                               ),
@@ -201,6 +206,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
           NavigationDestination(icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month), label: 'Classes'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book), label: 'Notes'),
         ],
       ),
     );

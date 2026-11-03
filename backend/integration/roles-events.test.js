@@ -1,6 +1,9 @@
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
+import {mkdtemp, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import request from 'supertest';
 import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
@@ -11,6 +14,7 @@ import {
 } from '../src/models/campus-content.js';
 import {AdminBootstrap,AuditLog,StaffInvitation} from '../src/models/governance.js';
 import {TimetableSlot} from '../src/models/timetable.js';
+import {AcademicResource} from '../src/models/academic-resource.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -66,7 +70,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -76,11 +80,13 @@ before(async()=>{
   person('fixture-unauthorized'),
   ...Array.from({length:20},(_,i)=>person('fixture-student-'+i.toString().padStart(2,'0')))
  ]);
+ config.resourceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-resources-test-'));
  app=createApp({config,firebaseAuth:mockFirebase});
 },{timeout:180000});
 after(async()=>{
  await mongoose.disconnect();
  if(mongo) await mongo.stop();
+ if(config.resourceUploadDir) await rm(config.resourceUploadDir,{recursive:true,force:true});
 },{timeout:60000});
 
 test('Admin is not accessible without a test fixture token or to ordinary students',async()=>{
@@ -429,3 +435,103 @@ test('official timetable: only staff/admin publish and conflicting quarter-hour 
  assert.equal(reoccupied.status,201,JSON.stringify(reoccupied.body));
  assert.equal(await TimetableSlot.countDocuments({status:'archived'}),1);
 },{timeout:30000});
+
+
+test('academic resource upload requires verified faculty; students receive only published authorized PDF',async()=>{
+ const studentUid='fixture-student-00';
+ const newAuthor=await User.create(person('fixture-faculty-resource-test',['faculty'],{
+  requestedRole:'faculty',facultyVerificationStatus:'verified'
+ }));
+ const fixturePdf=Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n');
+ function attachPdf(req,bytes=fixturePdf,fileName='software-notes.pdf'){
+  return req.field('title','Software Project Management notes')
+   .field('program','BSE').field('semester','7')
+   .field('courseCode','CSC494')
+   .field('description','Faculty-approved academic notes')
+   .attach('file',bytes,{filename:fileName,contentType:'application/pdf'});
+ }
+ const refused=await attachPdf(request(app).post('/api/v1/resources').set(auth(studentUid)));
+ assert.equal(refused.status,403,JSON.stringify(refused.body));
+
+ const pending=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-pending-resource')));
+ // A UID that has no test token is not an authorized verified Faculty account.
+ assert.equal(pending.status,401);
+
+ const invalid=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-resource-test')),Buffer.from('NOT A PDF'),'fake.pdf');
+ assert.equal(invalid.status,415,JSON.stringify(invalid.body));
+
+ const published=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-resource-test')));
+ assert.equal(published.status,201,JSON.stringify(published.body));
+ const item=published.body.data;
+ assert.equal(item.title,'Software Project Management notes');
+ assert.equal(item.courseCode,'CSC494');
+ assert.equal(item.semester,7);
+ assert.equal(item.status,'published');
+ assert.equal(item.sizeBytes,fixturePdf.length);
+ for(const forbidden of ['storageKey','uploadedBy','universityId']){
+  assert.equal(Object.hasOwn(item,forbidden),false,forbidden);
+ }
+
+ const list=await request(app).get('/api/v1/resources')
+  .query({program:'bse',semester:'7',courseCode:'csc494'})
+  .set(auth(studentUid));
+ assert.equal(list.status,200,JSON.stringify(list.body));
+ assert.equal(list.headers['cache-control'],'private, no-store');
+ assert.ok(list.body.data.some(r=>r.id===item.id));
+ assert.ok(list.body.data.every(r=>r.program==='BSE'&&r.semester===7));
+ assert.ok(list.body.data.every(r=>!Object.hasOwn(r,'storageKey')));
+
+ const wrongCourse=await request(app).get('/api/v1/resources')
+  .query({courseCode:'CSC412'}).set(auth(studentUid));
+ assert.equal(wrongCourse.status,200);
+ assert.ok(!wrongCourse.body.data.some(r=>r.id===item.id));
+
+ const missingAuth=await request(app).get('/api/v1/resources/'+item.id+'/file');
+ assert.equal(missingAuth.status,401);
+ const downloaded=await request(app).get('/api/v1/resources/'+item.id+'/file')
+  .set(auth(studentUid)).buffer(true).parse((res,callback)=>{
+    const chunks=[];
+    res.on('data',chunk=>chunks.push(chunk));
+    res.on('end',()=>callback(null,Buffer.concat(chunks)));
+  });
+ assert.equal(downloaded.status,200,JSON.stringify(downloaded.body));
+ assert.equal(downloaded.headers['content-type'],'application/pdf');
+ assert.equal(downloaded.headers['x-content-type-options'],'nosniff');
+ assert.equal(downloaded.headers['cache-control'],'private, no-store');
+ assert.equal(downloaded.headers['content-length'],String(fixturePdf.length));
+ assert.ok(downloaded.headers['content-disposition'].startsWith('attachment;'));
+ assert.deepEqual(downloaded.body,fixturePdf);
+
+ const otherFaculty=await request(app).post('/api/v1/resources/'+item.id+'/archive')
+  .set(auth('fixture-faculty')).send({});
+ assert.equal(otherFaculty.status,403);
+ const adminArchived=await request(app).post('/api/v1/resources/'+item.id+'/archive')
+  .set(auth('fixture-admin')).send({});
+ assert.equal(adminArchived.status,200,JSON.stringify(adminArchived.body));
+ assert.equal(adminArchived.body.data.status,'archived');
+ const noLongerPublic=await request(app).get('/api/v1/resources/'+item.id+'/file')
+  .set(auth(studentUid));
+ assert.equal(noLongerPublic.status,404);
+ const listAfter=await request(app).get('/api/v1/resources').set(auth(studentUid));
+ assert.ok(!listAfter.body.data.some(r=>r.id===item.id));
+
+ const second=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-resource-test')));
+ assert.equal(second.status,201);
+ const owned=await request(app).get('/api/v1/me/resources')
+  .set(auth('fixture-faculty-resource-test'));
+ assert.equal(owned.status,200);
+ assert.ok(owned.body.data.some(r=>r.id===item.id&&r.status==='archived'));
+ assert.ok(owned.body.data.some(r=>r.id===second.body.data.id));
+ const facultyArchive=await request(app).post('/api/v1/resources/'+second.body.data.id+'/archive')
+  .set(auth('fixture-faculty-resource-test')).send({});
+ assert.equal(facultyArchive.status,200);
+ assert.equal(newAuthor.firebaseUid,'fixture-faculty-resource-test');
+
+ const unknownField=await request(app).get('/api/v1/resources')
+  .query({universityId:String(UNIVERSITY_ID)}).set(auth(studentUid));
+ assert.equal(unknownField.status,400);
+},{timeout:45000});

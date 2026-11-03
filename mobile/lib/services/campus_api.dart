@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -189,6 +190,56 @@ class CampusApi {
     return asJsonList(await _request('/timetable/slots?$query'))
         .map(CampusTimetableSlot.fromJson)
         .toList(growable: false);
+  }
+
+  Future<List<CampusAcademicResource>> getAcademicResources({
+    String? program, int? semester, String? courseCode,
+  }) async {
+    final query=Uri(queryParameters: {
+      'limit': '100',
+      if(program != null && program.trim().isNotEmpty)
+        'program': program.trim(),
+      if(semester != null) 'semester': semester.toString(),
+      if(courseCode != null && courseCode.trim().isNotEmpty)
+        'courseCode': courseCode.trim(),
+    }).query;
+    return asJsonList(await _request('/resources?$query'))
+        .map(CampusAcademicResource.fromJson)
+        .toList(growable: false);
+  }
+
+  /// Authenticated file transfer. Never expose a token in a shareable URL.
+  Future<Uint8List> downloadAcademicPdf(CampusAcademicResource resource) async {
+    if(!RegExp(r'^[a-f0-9]{24}$').hasMatch(resource.id)) {
+      throw const CampusApiException('INVALID_RESOURCE', 'Invalid resource identifier.');
+    }
+    final token = await idTokenProvider();
+    if(token.isEmpty) {
+      throw const CampusApiException('AUTH_REQUIRED', 'Sign in again to download notes.');
+    }
+    http.Response response;
+    try {
+      response=await client.get(_endpoint('/resources/${resource.id}/file'),
+        headers: {'Authorization': 'Bearer $token',
+          'Accept': 'application/pdf', 'Cache-Control': 'no-store'})
+        .timeout(requestTimeout);
+    } on TimeoutException {
+      throw const CampusApiException('NETWORK_TIMEOUT', 'Resource download timed out.');
+    } on http.ClientException {
+      throw const CampusApiException('NETWORK_FAILURE', 'Cannot reach CampusConnect.');
+    }
+    if(response.statusCode!=200) {
+      throw CampusApiException('RESOURCE_DOWNLOAD_FAILED',
+        'This PDF is unavailable or your campus access has changed.',
+        response.statusCode);
+    }
+    final type=response.headers['content-type'] ?? '';
+    final bytes=response.bodyBytes;
+    if(!type.contains('application/pdf') || bytes.length>8*1024*1024 ||
+        bytes.length<8 || String.fromCharCodes(bytes.take(5))!='%PDF-') {
+      throw const CampusApiException('INVALID_PDF', 'Backend returned an invalid PDF.');
+    }
+    return bytes;
   }
 
   /// Stable per-event attempt key is reused on timeout/retry.

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/campus_models.dart';
 import 'campus_api.dart';
 
@@ -116,7 +118,7 @@ class PreviewCampusApi extends CampusApi {
   }
 
   @override
-  Future<List<int>> downloadAcademicPdf(CampusAcademicResource resource) async {
+  Future<Uint8List> downloadAcademicPdf(CampusAcademicResource resource) async {
     throw const CampusApiException('OFFLINE_PREVIEW',
       'Offline demo has no PDF download.');
   }

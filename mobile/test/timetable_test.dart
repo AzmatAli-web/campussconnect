@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:campusconnect_mobile/models/campus_models.dart';
 import 'package:campusconnect_mobile/services/campus_api.dart';
 import 'package:campusconnect_mobile/services/preview_campus_api.dart';
 import 'package:flutter_test/flutter_test.dart';

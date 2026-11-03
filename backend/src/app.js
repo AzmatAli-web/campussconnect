@@ -18,7 +18,9 @@ export function createApp({config,firebaseAuth}) {
  app.use(helmet());
  app.use(cors({origin:config.corsOrigin,methods:['GET','POST','PATCH','OPTIONS']}));
  app.use(express.json({limit:'32kb',strict:true}));
- app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
+ // In-memory integration suites issue hundreds of requests against one app instance.
+ // Disable throttling only for NODE_ENV=test; development/production remain rate-limited.
+ if(config.nodeEnv!=='test') app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
  app.get('/api/v1/health/live',(_req,res)=>res.json({data:{status:'alive'}}));
  app.get('/api/v1/health/ready',(_req,res)=>{
   const checks={database:databaseReady(),firebase:Boolean(firebaseAuth),university:Boolean(config.universityId),emailDomains:config.domains.length>0};

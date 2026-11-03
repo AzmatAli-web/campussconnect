@@ -262,3 +262,96 @@ test('private organized event list returns only current organizer records, not u
  const denied=await request(app).get('/api/v1/me/organized-events').set(auth('fixture-student-00'));
  assert.equal(denied.status,403);
 });
+
+
+test('cross-client contract: organizer publishes on React, student registers on Flutter, web reads own registration',async()=>{
+ // This runs ONLY in the isolated MongoMemoryReplSet with mock Firebase claims.
+ // "Web" and "Flutter" are different consumers of the same REST API contract.
+ const facultyCreated=await request(app)
+  .post('/api/v1/events')
+  .set({...auth('fixture-faculty'),'User-Agent':'CampusConnect-Web-ContractTest'})
+  .send(makeEvent('Cross-platform registration workshop',2));
+ assert.equal(facultyCreated.status,201,JSON.stringify(facultyCreated.body));
+ const created=facultyCreated.body.data;
+ const eventId=created.id;
+ assert.match(eventId,/^[0-9a-f]{24}$/);
+ assert.equal(created.capacity,2);
+ assert.equal(created.confirmedCount,0);
+ assert.equal(created.registrationOpen,true);
+
+ // Flutter's public-to-campus event listing must expose the same event fields.
+ const studentUid='fixture-student-10',otherUid='fixture-student-11';
+ const onPhone=await request(app).get('/api/v1/events?limit=100')
+  .set({...auth(studentUid),'User-Agent':'CampusConnect-Flutter-ContractTest'});
+ assert.equal(onPhone.status,200,JSON.stringify(onPhone.body));
+ const phoneEvent=onPhone.body.data.find(event=>event.id===eventId);
+ assert.ok(phoneEvent,'Flutter client should see the event published by the organizer');
+ for(const key of ['id','title','description','venue','startsAt','endsAt',
+  'capacity','confirmedCount','registrationOpen','isFull']){
+  assert.ok(Object.hasOwn(phoneEvent,key),'Missing mobile model field: '+key);
+  assert.equal(phoneEvent[key],created[key]);
+ }
+ assert.ok(!Object.hasOwn(phoneEvent,'studentName'));
+ assert.ok(!Object.hasOwn(phoneEvent,'universityEmail'));
+
+ // A student registers using the exact body/headers sent by the Flutter app.
+ const key='cross-client-mobile-register-0001';
+ const body={universityEmail:studentUid+'@'+DOMAIN};
+ const phoneRegister=await request(app)
+  .post('/api/v1/events/'+eventId+'/registrations')
+  .set({...auth(studentUid),'Idempotency-Key':key,
+    'User-Agent':'CampusConnect-Flutter-ContractTest'})
+  .send(body);
+ assert.equal(phoneRegister.status,201,JSON.stringify(phoneRegister.body));
+ assert.equal(phoneRegister.body.data.eventId,eventId);
+ assert.equal(phoneRegister.body.data.status,'confirmed');
+ assert.ok(phoneRegister.body.data.id);
+ assert.ok(phoneRegister.body.data.confirmedAt);
+
+ // The SAME student signs into React and sees the registration immediately.
+ const onWeb=await request(app).get('/api/v1/me/event-registrations?limit=100')
+  .set({...auth(studentUid),'User-Agent':'CampusConnect-Web-ContractTest'});
+ assert.equal(onWeb.status,200,JSON.stringify(onWeb.body));
+ assert.equal(onWeb.headers['cache-control'],'no-store');
+ const ownRecord=onWeb.body.data.find(r=>r.eventId===eventId);
+ assert.ok(ownRecord,'Registration must be accessible from the web account');
+ assert.equal(ownRecord.id,phoneRegister.body.data.id);
+ assert.equal(ownRecord.status,'confirmed');
+
+ // The event count updates globally, but the attendee identity stays private.
+ const updated=await request(app).get('/api/v1/events/'+eventId).set(auth(otherUid));
+ assert.equal(updated.status,200,JSON.stringify(updated.body));
+ assert.equal(updated.body.data.confirmedCount,1);
+ assert.equal(updated.body.data.capacity,2);
+ assert.equal(updated.body.data.registrationOpen,true);
+ assert.ok(!Object.hasOwn(updated.body.data,'studentId'));
+ const otherOwn=await request(app).get('/api/v1/me/event-registrations?limit=100').set(auth(otherUid));
+ assert.equal(otherOwn.status,200);
+ assert.ok(!otherOwn.body.data.some(r=>r.eventId===eventId));
+ const forbiddenRoster=await request(app).get('/api/v1/events/'+eventId+'/registrations')
+  .set(auth(otherUid));
+ assert.equal(forbiddenRoster.status,403);
+
+ // A network retry with the SAME key must return the exact original receipt.
+ const retry=await request(app).post('/api/v1/events/'+eventId+'/registrations')
+  .set({...auth(studentUid),'Idempotency-Key':key}).send(body);
+ assert.equal(retry.status,201,JSON.stringify(retry.body));
+ assert.equal(retry.body.data.id,phoneRegister.body.data.id);
+ assert.equal((await Event.findById(eventId)).confirmedCount,1);
+
+ // A NEW key must not double-book the same student across devices.
+ const duplicate=await request(app).post('/api/v1/events/'+eventId+'/registrations')
+  .set({...auth(studentUid),'Idempotency-Key':'cross-client-web-duplicate-0001'}).send(body);
+ assert.equal(duplicate.status,409,JSON.stringify(duplicate.body));
+ assert.equal(await EventRegistration.countDocuments({eventId}),1);
+
+ // An organizer cannot silently change the published event after a seat is booked.
+ const frozen=await request(app).patch('/api/v1/events/'+eventId)
+  .set(auth('fixture-faculty')).send({venue:'Unauthorized change after registration'});
+ assert.equal(frozen.status,409);
+ const organizerRoster=await request(app).get('/api/v1/events/'+eventId+'/registrations')
+  .set(auth('fixture-faculty'));
+ assert.equal(organizerRoster.status,200);
+ assert.equal(organizerRoster.body.data.length,1);
+ assert.equal(organizerRoster.body.data[0].studentId,String(students[10]._id));
+},{timeout:90000});

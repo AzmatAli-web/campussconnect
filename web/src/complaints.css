@@ -1,0 +1,16 @@
+
+.wc-complaint-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:14px}
+.wc-complaint{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #dce9ed;border-radius:14px;background:#fcfefe}
+.wc-complaint-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.wc-complaint h3{font-size:16px;margin:4px 0 0;color:#18384d;overflow-wrap:anywhere}
+.wc-complaint>p,.wc-complaint-response p{font-size:12px;line-height:1.7;color:#567589;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.wc-complaint>small{color:#879aaa;font-size:11px;margin-top:auto}
+.wc-complaint-response{background:#f0faf6;padding:14px;border-radius:10px}
+.wc-complaint-response strong{display:block;font-size:12px;color:#166d64;margin-bottom:7px}
+.wc-complaint-form{margin:19px 0 0;max-width:720px}
+.wc-complaint-hint{font-size:12px;line-height:1.6;color:#8b5c27;background:#fff6e9;padding:12px;border-radius:11px}
+.wc-complaint-error{border:1px solid #f2c8cf;background:#fff2f4;color:#9c3d4c;padding:12px;border-radius:9px}
+.wc-complaint-actions{display:grid;gap:12px;border-top:1px solid #e1eaf0;padding-top:12px}
+.wc-complaint-actions label{display:grid;gap:7px;font-size:12px;color:#688092;font-weight:700}
+.wc-complaint-actions textarea{width:100%;padding:12px;border:1px solid #cfe1e5;border-radius:9px;font:inherit;font-size:12px;resize:vertical}
+.wc-complaint-actions button{justify-self:start}

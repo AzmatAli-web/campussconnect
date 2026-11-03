@@ -7,8 +7,10 @@ import './timetable.css';
 import TimetablePage from './TimetablePage.jsx';
 import AcademicResourcesPage from './AcademicResourcesPage.jsx';
 import './resources.css';
+import ComplaintsPage from './ComplaintsPage.jsx';
+import './complaints.css';
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',complaints:'Private complaints & tracking',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','events','registrations','admin'].includes(tab))requested.events='/events?limit=50';
@@ -93,6 +95,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   announcements:<Announcements {...props}/>,
   timetable:<TimetablePage {...props}/>,
   resources:<AcademicResourcesPage {...props}/>,
+  complaints:<ComplaintsPage {...props}/>,
   organizer:<Organizer {...props}/>,
   admin:<Admin {...props}/>
  }[activeTab];

@@ -129,6 +129,27 @@ class PreviewCampusApi extends CampusApi {
       'Offline demo has no PDF download.');
   }
 
+
+  final List<CampusComplaint> _demoComplaints=[];
+
+  @override
+  Future<List<CampusComplaint>> getMyComplaints() async =>
+      List.unmodifiable(_demoComplaints);
+
+  @override
+  Future<CampusComplaint> submitComplaint({
+    required String category, required String title,
+    required String description,
+  }) async {
+    final item=CampusComplaint(
+      id:'preview-complaint-${_demoComplaints.length+1}',
+      category:category,title:title.trim(),description:description.trim(),
+      status:'submitted',staffResponse:'',createdAt:DateTime.now(),
+    );
+    _demoComplaints.insert(0,item);
+    return item;
+  }
+
   @override
   Future<CampusRegistration> registerForEvent(
     CampusEvent event,

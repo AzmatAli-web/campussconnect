@@ -228,3 +228,26 @@ class CampusAcademicResource {
     createdAt: parseDate(data['createdAt']),
   );
 }
+
+class CampusComplaint {
+  final String id;
+  final String category;
+  final String title;
+  final String description;
+  final String status;
+  final String staffResponse;
+  final DateTime? createdAt;
+
+  const CampusComplaint({
+    required this.id, required this.category, required this.title,
+    required this.description, required this.status,
+    required this.staffResponse, required this.createdAt,
+  });
+  factory CampusComplaint.fromJson(Json json)=>CampusComplaint(
+    id:stringField(json,'id'),category:stringField(json,'category'),
+    title:stringField(json,'title'),description:stringField(json,'description'),
+    status:stringField(json,'status'),
+    staffResponse:stringField(json,'staffResponse'),
+    createdAt:parseDate(json['createdAt']),
+  );
+}

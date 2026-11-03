@@ -11,6 +11,7 @@ export function navigationFor(profile){
  items.push(['timetable','Timetable','▦']);
  items.push(['resources','Academic Resources','▤']);
  if(hasRole(profile,'student')||hasRole(profile,'staff')||hasRole(profile,'admin'))items.push(['complaints','Complaints','✉']);
+ if(hasRole(profile,'student')||hasRole(profile,'staff')||hasRole(profile,'admin'))items.push(['fees','Fees & dues','▥']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
  return items.map(([id,label,icon])=>({id,label,icon}));

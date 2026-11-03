@@ -9,8 +9,10 @@ import AcademicResourcesPage from './AcademicResourcesPage.jsx';
 import './resources.css';
 import ComplaintsPage from './ComplaintsPage.jsx';
 import './complaints.css';
+import FeesPage from './FeesPage.jsx';
+import './fees.css';
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',complaints:'Private complaints & tracking',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','events','registrations','admin'].includes(tab))requested.events='/events?limit=50';
@@ -96,6 +98,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   timetable:<TimetablePage {...props}/>,
   resources:<AcademicResourcesPage {...props}/>,
   complaints:<ComplaintsPage {...props}/>,
+  fees:<FeesPage {...props}/>,
   organizer:<Organizer {...props}/>,
   admin:<Admin {...props}/>
  }[activeTab];

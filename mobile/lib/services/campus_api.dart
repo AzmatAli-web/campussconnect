@@ -259,6 +259,21 @@ class CampusApi {
           'description':description.trim(),
         })));
 
+
+  /// Read-only finance for Students; Staff record offline receipts.
+  Future<List<CampusFeeInvoice>> getMyFees() async =>
+      asJsonList(await _request('/me/fees?limit=100'))
+          .map(CampusFeeInvoice.fromJson).toList(growable:false);
+
+  Future<List<CampusFeePayment>> getMyFeePayments(
+      CampusFeeInvoice invoice) async {
+    if(invoice.id.length!=24 || RegExp(r'[^a-f0-9]').hasMatch(invoice.id)){
+      throw const CampusApiException('INVALID_FEE','Invalid fee identifier.');
+    }
+    return asJsonList(await _request('/me/fees/${invoice.id}/payments'))
+        .map(CampusFeePayment.fromJson).toList(growable:false);
+  }
+
   /// Stable per-event attempt key is reused on timeout/retry.
   /// A new attempt begins only after the server confirms completion.
   Future<CampusRegistration> registerForEvent(

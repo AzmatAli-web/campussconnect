@@ -10,6 +10,7 @@ import {governanceRouter} from './routes/governance.js';
 import {timetableRouter} from './routes/timetable.js';
 import {resourcesRouter} from './routes/resources.js';
 import {complaintsRouter} from './routes/complaints.js';
+import {feesRouter} from './routes/fees.js';
 import {HttpError} from './lib/http-error.js';
 export function createApp({config,firebaseAuth}) {
  const app=express();
@@ -17,7 +18,9 @@ export function createApp({config,firebaseAuth}) {
  app.use(helmet());
  app.use(cors({origin:config.corsOrigin,methods:['GET','POST','PATCH','OPTIONS']}));
  app.use(express.json({limit:'32kb',strict:true}));
- app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
+ // In-memory integration suites issue hundreds of requests against one app instance.
+ // Disable throttling only for NODE_ENV=test; development/production remain rate-limited.
+ if(config.nodeEnv!=='test') app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
  app.get('/api/v1/health/live',(_req,res)=>res.json({data:{status:'alive'}}));
  app.get('/api/v1/health/ready',(_req,res)=>{
   const checks={database:databaseReady(),firebase:Boolean(firebaseAuth),university:Boolean(config.universityId),emailDomains:config.domains.length>0};
@@ -31,6 +34,7 @@ export function createApp({config,firebaseAuth}) {
  app.use('/api/v1',timetableRouter({config,firebaseAuth}));
  app.use('/api/v1',resourcesRouter({config,firebaseAuth}));
  app.use('/api/v1',complaintsRouter({config,firebaseAuth}));
+ app.use('/api/v1',feesRouter({config,firebaseAuth}));
  app.use((_req,_res,next)=>next(new HttpError(404,'NOT_FOUND','Route not found')));
  app.use((err,_req,res,_next)=>{
   if (err?.type==='entity.too.large') return res.status(413).json({error:{code:'BODY_TOO_LARGE',message:'Request body too large'}});

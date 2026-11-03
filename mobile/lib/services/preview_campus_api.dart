@@ -150,6 +150,26 @@ class PreviewCampusApi extends CampusApi {
     return item;
   }
 
+
+  @override
+  Future<List<CampusFeeInvoice>> getMyFees() async => [
+    const CampusFeeInvoice(
+      id:'offline-demo-fee',invoiceNo:'DEMO-2026-001',
+      title:'Sample semester fee (not a real invoice)',
+      term:'Fall 2026',dueDate:'2027-01-15',currency:'PKR',
+      amountPkr:18000,paidPkr:5000,outstandingPkr:13000,
+      status:'partially_recorded',overdue:false,
+    ),
+  ];
+  @override
+  Future<List<CampusFeePayment>> getMyFeePayments(
+      CampusFeeInvoice invoice) async => [
+    const CampusFeePayment(
+      id:'demo-receipt',invoiceId:'offline-demo-fee',amountPkr:5000,
+      receiptRef:'DEMO-RECEIPT-ONLY',recordedAt:null,
+    ),
+  ];
+
   @override
   Future<CampusRegistration> registerForEvent(
     CampusEvent event,

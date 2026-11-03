@@ -615,3 +615,105 @@ test('private complaints: students submit and read only their own records',async
  assert.equal(String(doc.handledBy),String(admin._id));
  assert.equal(String(staff._id).length,24);
 },{timeout:35000});
+
+test('fee records: restricted issuance, private student view and atomic receipt ledger',async()=>{
+ const student='fixture-student-00',other='fixture-student-01';
+ const staffUid='fixture-fees-staff';
+ await User.create(person(staffUid,['staff']));
+ const requestInvoice={
+  studentEmail:student+'@'+DOMAIN,invoiceNo:'FEE-FALL-2026-0001',
+  title:'Fall semester tuition',term:'Fall 2026',dueDate:'2027-01-15',
+  amountPkr:10000
+ };
+ const studentPost=await request(app).post('/api/v1/staff/fees')
+  .set(auth(student)).send(requestInvoice);
+ assert.equal(studentPost.status,403);
+ const noAuth=await request(app).get('/api/v1/me/fees');
+ assert.equal(noAuth.status,401);
+ const forged=await request(app).post('/api/v1/staff/fees')
+  .set(auth(staffUid))
+  .send({...requestInvoice,paidPkr:10000,studentId:String(students[1]._id)});
+ assert.equal(forged.status,422);
+ const created=await request(app).post('/api/v1/staff/fees')
+  .set(auth(staffUid)).send(requestInvoice);
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ assert.equal(created.headers['cache-control'],'private, no-store');
+ const invoice=created.body.data;
+ assert.equal(invoice.currency,'PKR');
+ assert.equal(invoice.amountPkr,10000);
+ assert.equal(invoice.paidPkr,0);
+ assert.equal(invoice.outstandingPkr,10000);
+ assert.equal(invoice.status,'unpaid');
+ for(const key of ['studentId','studentEmail','issuedBy','universityId']){
+  assert.equal(Object.hasOwn(invoice,key),false,key);
+ }
+ const duplicate=await request(app).post('/api/v1/staff/fees')
+  .set(auth(staffUid)).send(requestInvoice);
+ assert.equal(duplicate.status,409);
+
+ const mine=await request(app).get('/api/v1/me/fees?limit=100')
+  .set(auth(student));
+ assert.equal(mine.status,200,JSON.stringify(mine.body));
+ assert.ok(mine.body.data.some(x=>x.id===invoice.id));
+ const otherList=await request(app).get('/api/v1/me/fees?limit=100')
+  .set(auth(other));
+ assert.equal(otherList.status,200);
+ assert.ok(!otherList.body.data.some(x=>x.id===invoice.id));
+ const otherPayments=await request(app).get('/api/v1/me/fees/'+invoice.id+'/payments')
+  .set(auth(other));
+ assert.equal(otherPayments.status,404);
+ const studentCannotPay=await request(app)
+  .post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth(student)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
+ assert.equal(studentCannotPay.status,403);
+
+ const invalid=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth(staffUid)).send({amountPkr:-3,receiptRef:'RECEIPT-TEST-001'});
+ assert.equal(invalid.status,422);
+ const partial=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth(staffUid)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
+ assert.equal(partial.status,201,JSON.stringify(partial.body));
+ assert.equal(partial.body.data.invoice.status,'partially_recorded');
+ assert.equal(partial.body.data.invoice.paidPkr,3000);
+ assert.equal(partial.body.data.invoice.outstandingPkr,7000);
+ assert.equal(partial.body.data.payment.receiptRef,'RECEIPT-TEST-001');
+ assert.equal(Object.hasOwn(partial.body.data.payment,'recordedBy'),false);
+
+ const retry=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth(staffUid)).send({amountPkr:3000,receiptRef:'RECEIPT-TEST-001'});
+ assert.equal(retry.status,409,JSON.stringify(retry.body));
+ assert.equal(retry.body.error.code,'RECEIPT_ALREADY_RECORDED');
+ const afterRetry=await FeeInvoice.findById(invoice.id).lean();
+ assert.equal(afterRetry.paidPkr,3000,'duplicate receipt must NOT increment balance');
+ const overpay=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth(staffUid)).send({amountPkr:7001,receiptRef:'RECEIPT-TEST-OVER'});
+ assert.equal(overpay.status,409);
+ const finished=await request(app).post('/api/v1/staff/fees/'+invoice.id+'/payments')
+  .set(auth('fixture-admin')).send({amountPkr:7000,receiptRef:'RECEIPT-TEST-002'});
+ assert.equal(finished.status,201,JSON.stringify(finished.body));
+ assert.equal(finished.body.data.invoice.status,'paid');
+ assert.equal(finished.body.data.invoice.outstandingPkr,0);
+ const paidHistory=await request(app).get('/api/v1/me/fees/'+invoice.id+'/payments')
+  .set(auth(student));
+ assert.equal(paidHistory.status,200);
+ assert.equal(paidHistory.body.data.length,2);
+ assert.equal(paidHistory.body.data.reduce((n,p)=>n+p.amountPkr,0),10000);
+ const studentView=await request(app).get('/api/v1/me/fees')
+  .set(auth(student));
+ const final=studentView.body.data.find(x=>x.id===invoice.id);
+ assert.equal(final.status,'paid');
+ assert.equal(final.paidPkr,10000);
+ const staffList=await request(app).get('/api/v1/staff/fees')
+  .set(auth(staffUid)).query({studentEmail:requestInvoice.studentEmail});
+ assert.equal(staffList.status,200);
+ assert.ok(staffList.body.data.some(x=>x.id===invoice.id));
+ const wrongStudent=await request(app).get('/api/v1/staff/fees')
+  .set(auth(staffUid)).query({studentEmail:other+'@'+DOMAIN});
+ assert.ok(!wrongStudent.body.data.some(x=>x.id===invoice.id));
+ const unauthorizedFilter=await request(app).get('/api/v1/staff/fees')
+  .set(auth(staffUid)).query({studentId:String(students[0]._id)});
+ assert.equal(unauthorizedFilter.status,400);
+ assert.equal(await FeePaymentRecord.countDocuments({invoiceId:invoice.id}),2);
+ const saved=await FeeInvoice.findById(invoice.id).lean();
+ assert.equal(String(saved.studentId),String(students[0]._id));
+},{timeout:45000});

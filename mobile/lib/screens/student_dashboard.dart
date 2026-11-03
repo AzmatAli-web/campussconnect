@@ -7,6 +7,7 @@ import '../services/live_diagnostics.dart';
 import 'timetable_panel.dart';
 import 'academic_resources_panel.dart';
 import 'my_complaints_screen.dart';
+import 'my_fees_screen.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -504,6 +505,24 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ? () => Navigator.of(context).push(
                                 MaterialPageRoute<void>(
                                   builder: (_) => MyComplaintsScreen(
+                                    api: widget.api,
+                                    previewMode: widget.previewMode,
+                                  ),
+                                ),
+                              )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('My fees & dues'),
+                      onPressed: widget.profile.canRegister
+                          ? () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => MyFeesScreen(
                                     api: widget.api,
                                     previewMode: widget.previewMode,
                                   ),

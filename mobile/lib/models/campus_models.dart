@@ -251,3 +251,53 @@ class CampusComplaint {
     createdAt:parseDate(json['createdAt']),
   );
 }
+
+class CampusFeeInvoice {
+  final String id;
+  final String invoiceNo;
+  final String title;
+  final String term;
+  final String dueDate;
+  final String currency;
+  final int amountPkr;
+  final int paidPkr;
+  final int outstandingPkr;
+  final String status;
+  final bool overdue;
+  const CampusFeeInvoice({
+    required this.id,required this.invoiceNo,required this.title,
+    required this.term,required this.dueDate,required this.currency,
+    required this.amountPkr,required this.paidPkr,required this.outstandingPkr,
+    required this.status,required this.overdue,
+  });
+  factory CampusFeeInvoice.fromJson(Json data)=>CampusFeeInvoice(
+    id:stringField(data,'id'),
+    invoiceNo:stringField(data,'invoiceNo'),
+    title:stringField(data,'title'),
+    term:stringField(data,'term'),
+    dueDate:stringField(data,'dueDate'),
+    currency:stringField(data,'currency','PKR'),
+    amountPkr:numberField(data,'amountPkr'),
+    paidPkr:numberField(data,'paidPkr'),
+    outstandingPkr:numberField(data,'outstandingPkr'),
+    status:stringField(data,'status'),
+    overdue:data['overdue']==true,
+  );
+}
+class CampusFeePayment {
+  final String id;
+  final String invoiceId;
+  final int amountPkr;
+  final String receiptRef;
+  final DateTime? recordedAt;
+  const CampusFeePayment({
+    required this.id,required this.invoiceId,required this.amountPkr,
+    required this.receiptRef,required this.recordedAt,
+  });
+  factory CampusFeePayment.fromJson(Json json)=>CampusFeePayment(
+    id:stringField(json,'id'),invoiceId:stringField(json,'invoiceId'),
+    amountPkr:numberField(json,'amountPkr'),
+    receiptRef:stringField(json,'receiptRef'),
+    recordedAt:parseDate(json['recordedAt']),
+  );
+}

@@ -10,6 +10,7 @@ import {governanceRouter} from './routes/governance.js';
 import {timetableRouter} from './routes/timetable.js';
 import {resourcesRouter} from './routes/resources.js';
 import {complaintsRouter} from './routes/complaints.js';
+import {feesRouter} from './routes/fees.js';
 import {HttpError} from './lib/http-error.js';
 export function createApp({config,firebaseAuth}) {
  const app=express();
@@ -31,6 +32,7 @@ export function createApp({config,firebaseAuth}) {
  app.use('/api/v1',timetableRouter({config,firebaseAuth}));
  app.use('/api/v1',resourcesRouter({config,firebaseAuth}));
  app.use('/api/v1',complaintsRouter({config,firebaseAuth}));
+ app.use('/api/v1',feesRouter({config,firebaseAuth}));
  app.use((_req,_res,next)=>next(new HttpError(404,'NOT_FOUND','Route not found')));
  app.use((err,_req,res,_next)=>{
   if (err?.type==='entity.too.large') return res.status(413).json({error:{code:'BODY_TOO_LARGE',message:'Request body too large'}});

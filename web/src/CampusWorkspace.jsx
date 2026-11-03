@@ -3,8 +3,10 @@ import {callApi} from './api.js';
 import {activeRoles,displayRole,hasRole,navigationFor,registrationAttemptKey} from './dashboard-domain.js';
 import {Overview,Events,Registrations,Announcements,Organizer,Admin} from './WorkspacePages.jsx';
 import './workspace.css';
+import './timetable.css';
+import TimetablePage from './TimetablePage.jsx';
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','events','registrations','admin'].includes(tab))requested.events='/events?limit=50';
@@ -87,6 +89,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   events:<Events {...props}/>,
   registrations:<Registrations {...props}/>,
   announcements:<Announcements {...props}/>,
+  timetable:<TimetablePage {...props}/>,
   organizer:<Organizer {...props}/>,
   admin:<Admin {...props}/>
  }[activeTab];

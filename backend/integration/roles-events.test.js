@@ -10,6 +10,7 @@ import {
  Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey
 } from '../src/models/campus-content.js';
 import {AdminBootstrap,AuditLog,StaffInvitation} from '../src/models/governance.js';
+import {TimetableSlot} from '../src/models/timetable.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -65,7 +66,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -355,3 +356,76 @@ test('cross-client contract: organizer publishes on React, student registers on 
  assert.equal(organizerRoster.body.data.length,1);
  assert.equal(organizerRoster.body.data[0].studentId,String(students[10]._id));
 },{timeout:90000});
+
+test('official timetable: only staff/admin publish and conflicting quarter-hour slots are blocked', async () => {
+ const payload=(changes={})=>({
+  term:'Fall 2026',program:'BSE',semester:7,section:'A',dayOfWeek:1,
+  startTime:'08:00',endTime:'09:30',courseCode:'CSC494',
+  courseTitle:'Software Project Management',instructorName:'Test Instructor',
+  room:'Lab 3',...changes
+ });
+ const denied=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-student-00')).send(payload());
+ assert.equal(denied.status,403);
+
+ const invalid=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload({startTime:'08:10'}));
+ assert.equal(invalid.status,422);
+
+ const first=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload());
+ assert.equal(first.status,201,JSON.stringify(first.body));
+ assert.equal(first.body.data.startTime,'08:00');
+ assert.ok(!Object.hasOwn(first.body.data,'publishedBy'));
+ const id=first.body.data.id;
+
+ const collision=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload({
+   startTime:'09:00',endTime:'10:00',courseCode:'CSC412'
+  }));
+ assert.equal(collision.status,409,JSON.stringify(collision.body));
+ assert.equal(collision.body.error.code,'TIMETABLE_CONFLICT');
+
+ const next=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload({
+    startTime:'09:30',endTime:'10:30',courseCode:'CSC412',
+    courseTitle:'Advanced Programming',room:'Room 205'
+  }));
+ assert.equal(next.status,201,JSON.stringify(next.body));
+
+ const otherSection=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload({section:'B'}));
+ assert.equal(otherSection.status,201,JSON.stringify(otherSection.body));
+
+ const groups=await request(app).get('/api/v1/timetable/groups')
+  .set(auth('fixture-student-00'));
+ assert.equal(groups.status,200,JSON.stringify(groups.body));
+ assert.equal(groups.headers['cache-control'],'no-store');
+ assert.ok(groups.body.data.some(g=>g.program==='BSE'&&g.semester===7&&g.section==='A'));
+ assert.ok(groups.body.data.some(g=>g.section==='B'));
+
+ const groupA=await request(app).get('/api/v1/timetable/slots')
+  .query({term:'Fall 2026',program:'bse',semester:'7',section:'a'})
+  .set(auth('fixture-student-01'));
+ assert.equal(groupA.status,200,JSON.stringify(groupA.body));
+ assert.equal(groupA.body.data.length,2);
+ assert.equal(groupA.body.data[0].id,id);
+ assert.ok(groupA.body.data.every(s=>s.section==='A'));
+ assert.ok(groupA.body.data.every(s=>!Object.hasOwn(s,'publishedBy')));
+
+ const missingFilters=await request(app).get('/api/v1/timetable/slots')
+  .set(auth('fixture-student-00'));
+ assert.equal(missingFilters.status,400);
+
+ const deniedArchive=await request(app).post('/api/v1/timetable/slots/'+id+'/archive')
+  .set(auth('fixture-student-00')).send({});
+ assert.equal(deniedArchive.status,403);
+ const archived=await request(app).post('/api/v1/timetable/slots/'+id+'/archive')
+  .set(auth('fixture-admin')).send({});
+ assert.equal(archived.status,200,JSON.stringify(archived.body));
+ assert.equal(archived.body.data.status,'archived');
+ const reoccupied=await request(app).post('/api/v1/timetable/slots')
+  .set(auth('fixture-admin')).send(payload());
+ assert.equal(reoccupied.status,201,JSON.stringify(reoccupied.body));
+ assert.equal(await TimetableSlot.countDocuments({status:'archived'}),1);
+},{timeout:30000});

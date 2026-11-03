@@ -61,7 +61,7 @@ void main(){
   expect(rows,hasLength(1));
   expect(rows.single.amountPkr,6000);
   expect(seen.single.method,'GET');
-  expect(seen.single.url.path,'/api/v1/me/fees/'+example.id+'/payments');
+  expect(seen.single.url.path,'/api/v1/me/fees/${example.id}/payments');
   expect(seen.single.headers['authorization'],'Bearer token');
   api.dispose();
  });

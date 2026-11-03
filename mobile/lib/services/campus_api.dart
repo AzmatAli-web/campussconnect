@@ -242,6 +242,23 @@ class CampusApi {
     return bytes;
   }
 
+
+  Future<List<CampusComplaint>> getMyComplaints() async =>
+      asJsonList(await _request('/me/complaints?limit=100'))
+        .map(CampusComplaint.fromJson).toList(growable:false);
+
+  /// Identity is derived from Firebase, never accepted from the client.
+  Future<CampusComplaint> submitComplaint({
+    required String category, required String title,
+    required String description,
+  }) async =>
+      CampusComplaint.fromJson(asJson(await _request('/complaints',
+        method:'POST',body:{
+          'category':category,
+          'title':title.trim(),
+          'description':description.trim(),
+        })));
+
   /// Stable per-event attempt key is reused on timeout/retry.
   /// A new attempt begins only after the server confirms completion.
   Future<CampusRegistration> registerForEvent(

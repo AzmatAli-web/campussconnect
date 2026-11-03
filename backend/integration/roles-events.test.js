@@ -15,6 +15,7 @@ import {
 import {AdminBootstrap,AuditLog,StaffInvitation} from '../src/models/governance.js';
 import {TimetableSlot} from '../src/models/timetable.js';
 import {AcademicResource} from '../src/models/academic-resource.js';
+import {StudentComplaint} from '../src/models/complaint.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -70,7 +71,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -535,3 +536,82 @@ test('academic resource upload requires verified faculty; students receive only 
   .query({universityId:String(UNIVERSITY_ID)}).set(auth(studentUid));
  assert.equal(unknownField.status,400);
 },{timeout:45000});
+
+test('private complaints: students submit and read only their own records',async()=>{
+ const student='fixture-student-00',other='fixture-student-01';
+ const input={category:'academic',title:'Classroom schedule mismatch',
+  description:'The published timetable and actual class time disagree.'};
+ const noToken=await request(app).post('/api/v1/complaints').send(input);
+ assert.equal(noToken.status,401);
+ const invalid=await request(app).post('/api/v1/complaints')
+  .set(auth(student)).send({...input,status:'resolved',studentId:String(students[1]._id)});
+ assert.equal(invalid.status,422);
+ const created=await request(app).post('/api/v1/complaints')
+  .set(auth(student)).send(input);
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ assert.equal(created.headers['cache-control'],'private, no-store');
+ assert.equal(created.body.data.status,'submitted');
+ assert.ok(created.body.data.id);
+ assert.ok(!Object.hasOwn(created.body.data,'studentId'));
+ assert.ok(!Object.hasOwn(created.body.data,'handledBy'));
+ const id=created.body.data.id;
+ const mine=await request(app).get('/api/v1/me/complaints')
+  .set(auth(student));
+ assert.equal(mine.status,200);
+ assert.ok(mine.body.data.some(c=>c.id===id));
+ const otherList=await request(app).get('/api/v1/me/complaints')
+  .set(auth(other));
+ assert.equal(otherList.status,200);
+ assert.ok(!otherList.body.data.some(c=>c.id===id));
+ const otherDetail=await request(app).get('/api/v1/me/complaints/'+id)
+  .set(auth(other));
+ assert.equal(otherDetail.status,404);
+ const mineDetail=await request(app).get('/api/v1/me/complaints/'+id)
+  .set(auth(student));
+ assert.equal(mineDetail.status,200);
+ assert.equal(mineDetail.body.data.description,input.description);
+ const deniedQueue=await request(app).get('/api/v1/staff/complaints')
+  .set(auth(student));
+ assert.equal(deniedQueue.status,403);
+ const deniedUpdate=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth(student)).send({status:'in_review'});
+ assert.equal(deniedUpdate.status,403);
+ const deniedFaculty=await request(app).get('/api/v1/staff/complaints')
+  .set(auth('fixture-faculty'));
+ assert.equal(deniedFaculty.status,403);
+
+ const staff=await User.create(person('fixture-staff-complaints',['staff']));
+ const queue=await request(app).get('/api/v1/staff/complaints')
+  .set(auth('fixture-staff-complaints')).query({status:'submitted'});
+ assert.equal(queue.status,200,JSON.stringify(queue.body));
+ assert.ok(queue.body.data.some(c=>c.id===id));
+ assert.ok(queue.body.data.every(c=>!Object.hasOwn(c,'studentId')));
+ const skipped=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-staff-complaints')).send({status:'resolved',staffResponse:'Done'});
+ assert.equal(skipped.status,409);
+ const review=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-staff-complaints')).send({status:'in_review'});
+ assert.equal(review.status,200,JSON.stringify(review.body));
+ const noAnswer=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-staff-complaints')).send({status:'resolved'});
+ assert.equal(noAnswer.status,422);
+ const solved=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-staff-complaints'))
+  .send({status:'resolved',staffResponse:'The schedule is corrected in the student portal.'});
+ assert.equal(solved.status,200,JSON.stringify(solved.body));
+ const studentResult=await request(app).get('/api/v1/me/complaints/'+id)
+  .set(auth(student));
+ assert.equal(studentResult.status,200);
+ assert.equal(studentResult.body.data.status,'resolved');
+ assert.equal(studentResult.body.data.staffResponse,'The schedule is corrected in the student portal.');
+ const closed=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-admin')).send({status:'closed'});
+ assert.equal(closed.status,200);
+ const repeat=await request(app).patch('/api/v1/staff/complaints/'+id)
+  .set(auth('fixture-admin')).send({status:'closed'});
+ assert.equal(repeat.status,409);
+ const doc=await StudentComplaint.findById(id).lean();
+ assert.equal(String(doc.studentId),String(students[0]._id));
+ assert.equal(String(doc.handledBy),String(admin._id));
+ assert.equal(String(staff._id).length,24);
+},{timeout:35000});

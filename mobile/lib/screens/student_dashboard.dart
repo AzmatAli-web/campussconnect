@@ -6,6 +6,7 @@ import '../services/campus_api.dart';
 import '../services/live_diagnostics.dart';
 import 'timetable_panel.dart';
 import 'academic_resources_panel.dart';
+import 'my_complaints_screen.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -493,6 +494,24 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   _ProfileField('Account', widget.profile.status),
                   _ProfileField('Role', widget.profile.roles.join(', ')),
                   _ProfileField('Registration no.', widget.profile.registrationNo ?? 'Not provided'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.support_agent_outlined),
+                      label: const Text('My complaints & tracking'),
+                      onPressed: widget.profile.canRegister
+                          ? () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => MyComplaintsScreen(
+                                    api: widget.api,
+                                    previewMode: widget.previewMode,
+                                  ),
+                                ),
+                              )
+                          : null,
+                    ),
+                  ),
                   const SizedBox(height: 15),
                   const Text(
                     'Only the university Admin can approve privileged roles. '

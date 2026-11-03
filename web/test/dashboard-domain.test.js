@@ -5,7 +5,7 @@ const student={status:'active',activeRoles:['student']};
 const faculty={status:'active',activeRoles:['faculty'],facultyVerificationStatus:'verified'};
 const manager={status:'active',activeRoles:['societyManager']};
 test('student cannot navigate to Admin or organizer screens',()=>{
- assert.deepEqual(navigationFor(student).map(x=>x.id),['overview','events','registrations','announcements','timetable','resources']);
+ assert.deepEqual(navigationFor(student).map(x=>x.id),['overview','events','registrations','announcements','timetable','resources','complaints']);
  assert.equal(hasRole(student,'admin'),false);
  assert.equal(navigationFor({...student,status:'suspended',activeRoles:['admin']}).some(x=>x.id==='admin'),false);
  assert.equal(isVerifiedFaculty({...faculty,facultyVerificationStatus:'pending'}),false);
@@ -37,4 +37,11 @@ test('retries reuse idempotency keys for the same event only',()=>{
  assert.equal(registrationAttemptKey(m,'event-a',factory),'1');
  assert.equal(registrationAttemptKey(m,'event-a',factory),'1');
  assert.equal(registrationAttemptKey(m,'event-b',factory),'2');
+});
+test('only students and service roles see complaints navigation, not Faculty or Society Managers',()=>{
+ assert.equal(navigationFor(student).some(x=>x.id==='complaints'),true);
+ assert.equal(navigationFor(faculty).some(x=>x.id==='complaints'),false);
+ assert.equal(navigationFor(manager).some(x=>x.id==='complaints'),false);
+ assert.equal(navigationFor({status:'active',activeRoles:['staff']}).some(x=>x.id==='complaints'),true);
+ assert.equal(navigationFor({status:'active',activeRoles:['admin']}).some(x=>x.id==='complaints'),true);
 });

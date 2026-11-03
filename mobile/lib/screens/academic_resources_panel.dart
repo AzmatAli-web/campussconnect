@@ -67,8 +67,10 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
     } on CampusApiException catch(e){
       if(mounted)setState(()=>_error=e.message);
     } catch (_) {
-      if(mounted)setState(()=>_error=
+      if (mounted) {
+        setState(() => _error=
           'Unable to fetch notes. Check the backend connection.');
+      }
     } finally {
       if(mounted)setState(()=>_loading=false);
     }

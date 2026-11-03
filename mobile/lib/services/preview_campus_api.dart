@@ -110,10 +110,16 @@ class PreviewCampusApi extends CampusApi {
       status: 'published', createdAt: null,
     );
     if(program != null && program.trim().isNotEmpty &&
-        program.trim().toUpperCase()!=demo.program) return [];
-    if(semester != null && semester!=demo.semester) return [];
+        program.trim().toUpperCase()!=demo.program) {
+      return [];
+    }
+    if(semester != null && semester!=demo.semester) {
+      return [];
+    }
     if(courseCode != null && courseCode.trim().isNotEmpty &&
-        courseCode.trim().toUpperCase()!=demo.courseCode) return [];
+        courseCode.trim().toUpperCase()!=demo.courseCode) {
+      return [];
+    }
     return [demo];
   }
 

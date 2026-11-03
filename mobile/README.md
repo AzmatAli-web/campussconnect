@@ -37,3 +37,11 @@ flutter test
 ```
 
 Production builds must use authenticated Firebase sessions and a deployed HTTPS API; the USB HTTP forwarding approach is only for local debug builds.
+
+
+## Verify the real phone connection
+
+In the **real** Firebase-connected app (not the offline preview), open **Profile → Check live connections**. This checks the Express backend, verifies the current user's own MongoDB profile, tests private registrations, and checks events/announcements availability.
+
+All checks are read-only and use only your existing student identity. Full instructions: [Live diagnostics guide](../docs/MOBILE_LIVE_DIAGNOSTICS.md).
+

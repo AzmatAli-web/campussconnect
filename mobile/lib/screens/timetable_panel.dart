@@ -50,7 +50,9 @@ class _TimetablePanelState extends State<TimetablePanel> {
         if (selected == null) _slots = const [];
       });
       final matches = result.where((g) => g.key == selected);
-      if (matches.isNotEmpty) await _loadSlots(matches.first);
+      if (matches.isNotEmpty) {
+        await _loadSlots(matches.first);
+      }
     } catch (_) {
       if (mounted) setState(() {
         _error = 'Cannot load timetables. Check USB connection and backend.';

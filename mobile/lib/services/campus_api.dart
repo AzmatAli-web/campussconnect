@@ -210,7 +210,7 @@ class CampusApi {
 
   /// Authenticated file transfer. Never expose a token in a shareable URL.
   Future<Uint8List> downloadAcademicPdf(CampusAcademicResource resource) async {
-    if(!RegExp(r'^[a-f0-9]{24}\$').hasMatch(resource.id)) {
+    if(!RegExp(r'^[a-f0-9]{24}$').hasMatch(resource.id)) {
       throw const CampusApiException('INVALID_RESOURCE', 'Invalid resource identifier.');
     }
     final token = await idTokenProvider();

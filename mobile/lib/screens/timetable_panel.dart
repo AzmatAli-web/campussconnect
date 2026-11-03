@@ -54,10 +54,12 @@ class _TimetablePanelState extends State<TimetablePanel> {
         await _loadSlots(matches.first);
       }
     } catch (_) {
-      if (mounted) setState(() {
-        _error = 'Cannot load timetables. Check USB connection and backend.';
-        _loadingGroups = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Cannot load timetables. Check USB connection and backend.';
+          _loadingGroups = false;
+        });
+      }
     }
   }
 

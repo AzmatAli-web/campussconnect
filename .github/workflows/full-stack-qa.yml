@@ -1,0 +1,75 @@
+name: Consolidated full-stack QA
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'docs/RELEASE_QA.md'
+      - 'README.md'
+      - '.github/workflows/full-stack-qa.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'docs/RELEASE_QA.md'
+      - 'README.md'
+      - '.github/workflows/full-stack-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend unit + isolated integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MONGOMS_VERSION: '7.0.24'
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run test:integration
+
+  web:
+    name: React tests + split bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+
+  mobile:
+    name: Flutter static analysis + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # Flutter-native Android runner is generated in the CI checkout.
+      # No production Firebase credentials or Android hardware required.
+      - run: flutter create --platforms=android --org=com.campusconnect --project-name=campusconnect_mobile .
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

@@ -1,16 +1,24 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{Suspense,lazy,useEffect,useMemo,useRef,useState} from 'react';
 import {callApi} from './api.js';
 import {activeRoles,displayRole,hasRole,navigationFor,registrationAttemptKey} from './dashboard-domain.js';
-import {Overview,Events,Registrations,Announcements,Organizer,Admin} from './WorkspacePages.jsx';
+import {Overview,Events,Registrations,Announcements,Organizer} from './WorkspacePages.jsx';
 import './workspace.css';
 import './timetable.css';
-import TimetablePage from './TimetablePage.jsx';
-import AcademicResourcesPage from './AcademicResourcesPage.jsx';
+
+
 import './resources.css';
-import ComplaintsPage from './ComplaintsPage.jsx';
+
 import './complaints.css';
-import FeesPage from './FeesPage.jsx';
+
 import './fees.css';
+
+// Feature tabs are split into on-demand JS chunks so Student login does not
+// download Staff/Admin or resource-management interfaces unnecessarily.
+const TimetablePage=lazy(()=>import('./TimetablePage.jsx'));
+const AcademicResourcesPage=lazy(()=>import('./AcademicResourcesPage.jsx'));
+const ComplaintsPage=lazy(()=>import('./ComplaintsPage.jsx'));
+const FeesPage=lazy(()=>import('./FeesPage.jsx'));
+const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
 const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
@@ -115,7 +123,10 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
    <main className="wc-content">
     <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
-    {loading?<div className="wc-loading"><div/><div/><div/></div>:page}
+    {loading?<div className="wc-loading"><div/><div/><div/></div>:
+     <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>
+      {page}
+     </Suspense>}
     <footer className="wc-footer">CampusConnect · Role-based campus services · Registration identities remain private</footer>
    </main>
   </div>

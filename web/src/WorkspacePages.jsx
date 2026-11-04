@@ -87,4 +87,3 @@ export function Organizer({data,profile,act,call,busy,showRoster,openRoster,rost
  </div>;
 }
 
-export {default as Admin} from './AdminPanel.jsx';

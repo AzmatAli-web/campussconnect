@@ -11,21 +11,24 @@ const eventSchema=new Schema({
  status:{type:String,enum:['published','completed','cancelled'],required:true,default:'published'},
  cancelledBy:{type:Schema.Types.ObjectId,default:null},cancelReason:{type:String,default:null}
 },{timestamps:true,collection:'events',versionKey:false});
-eventSchema.index({universityId:1,status:1,startsAt:1});eventSchema.index({organizerId:1,startsAt:1});
+eventSchema.index({universityId:1,status:1,startsAt:1,_id:1});
+eventSchema.index({universityId:1,organizerId:1,startsAt:-1,_id:-1});
 eventSchema.pre('validate',function(next){if(this.confirmedCount>this.capacity)return next(new Error('Confirmed count cannot exceed capacity'));next();});
 const registrationSchema=new Schema({
  universityId:oid,eventId:oid,studentId:oid,universityEmailNormalized:{type:String,required:true},
  studentNameSnapshot:{type:String,required:true},registrationNoSnapshot:{type:String,default:null},
  status:{type:String,enum:['confirmed'],default:'confirmed',required:true},confirmedAt:{type:Date,required:true}
 },{timestamps:true,collection:'event_registrations',versionKey:false});
-registrationSchema.index({eventId:1,studentId:1},{unique:true});registrationSchema.index({universityId:1,eventId:1,confirmedAt:-1});
+registrationSchema.index({eventId:1,studentId:1},{unique:true});
+registrationSchema.index({universityId:1,eventId:1,confirmedAt:-1,_id:-1});
+registrationSchema.index({universityId:1,studentId:1,confirmedAt:-1,_id:-1});
 const announcementSchema=new Schema({
  universityId:oid,authorId:oid,scope:{type:String,enum:['university','department','society'],required:true},
  departmentId:{type:Schema.Types.ObjectId,default:null},societyId:{type:Schema.Types.ObjectId,default:null},
  title:{type:String,required:true,maxlength:180},body:{type:String,required:true,maxlength:10000},
  status:{type:String,enum:['published','archived'],default:'published',required:true},publishedAt:{type:Date,required:true}
 },{timestamps:true,collection:'announcements',versionKey:false});
-announcementSchema.index({universityId:1,status:1,publishedAt:-1});announcementSchema.index({societyId:1,publishedAt:-1});
+announcementSchema.index({universityId:1,status:1,publishedAt:-1,_id:-1});announcementSchema.index({societyId:1,publishedAt:-1});
 const assignmentSchema=new Schema({
  universityId:oid,societyId:oid,userId:oid,status:{type:String,enum:['active','revoked'],required:true},
  approvedAt:{type:Date,required:true},approvedBy:{type:Schema.Types.ObjectId,default:null}

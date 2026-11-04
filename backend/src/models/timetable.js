@@ -8,7 +8,7 @@ const {Schema} = mongoose;
  * even when two staff members publish concurrently.
  */
 const slotSchema = new Schema({
-  universityId: {type: Schema.Types.ObjectId, required: true, index: true},
+  universityId: {type: Schema.Types.ObjectId, required: true},
   term: {type: String, required: true, maxlength: 40},
   termKey: {type: String, required: true, maxlength: 40},
   program: {type: String, required: true, maxlength: 24},

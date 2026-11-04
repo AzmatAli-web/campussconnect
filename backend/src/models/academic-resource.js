@@ -7,7 +7,7 @@ const {Schema} = mongoose;
  * authenticated file-streaming route and never returned in resource listings.
  */
 const resourceSchema = new Schema({
-  universityId: {type: Schema.Types.ObjectId, required: true, index: true},
+  universityId: {type: Schema.Types.ObjectId, required: true},
   uploadedBy: {type: Schema.Types.ObjectId, required: true},
   title: {type: String, required: true, minlength: 3, maxlength: 160},
   description: {type: String, default: '', maxlength: 1200},

@@ -63,7 +63,8 @@ export function resourcesRouter(deps) {
     const {filter, limit} = validateResourceFilter(req.query);
     const rows = await AcademicResource.find({
       universityId: deps.config.universityId, status: 'published', ...filter
-    }).sort({createdAt: -1, _id: -1}).limit(limit).lean();
+    }).select('title description program semester courseCode fileName sizeBytes status createdAt')
+      .sort({createdAt: -1, _id: -1}).limit(limit).lean();
     return res.json({data: rows.map(resourceView)});
   }));
 
@@ -75,7 +76,8 @@ export function resourcesRouter(deps) {
     const rows = await AcademicResource.find({
       universityId: deps.config.universityId,
       uploadedBy: req.currentUser._id
-    }).sort({createdAt: -1, _id: -1}).limit(100).lean();
+    }).select('title description program semester courseCode fileName sizeBytes status createdAt')
+      .sort({createdAt: -1, _id: -1}).limit(100).lean();
     return res.json({data: rows.map(resourceView)});
   }));
 

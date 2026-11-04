@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/campus_models.dart';
 import '../services/campus_api.dart';
 import '../services/live_diagnostics.dart';
+import '../services/dashboard_feeds.dart';
 import 'timetable_panel.dart';
 import 'academic_resources_panel.dart';
 import 'my_complaints_screen.dart';
@@ -59,20 +60,21 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Future<void> _reload() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // No user directory or attendee-list endpoint is requested by students.
-      final events = await widget.api.getEvents();
-      final regs = widget.profile.canRegister
-          ? await widget.api.getMyRegistrations()
-          : <CampusRegistration>[];
-      final announcements = await widget.api.getAnnouncements();
+      final data = await loadDashboardFeeds(
+        widget.api,
+        canRegister: widget.profile.canRegister,
+      );
       if (!mounted) return;
       setState(() {
-        _events = events;
-        _registrations = regs;
-        _announcements = announcements;
+        _events = data.events;
+        _registrations = data.registrations;
+        _announcements = data.announcements;
+        _error = data.failures.isEmpty ? null : data.failures.join(' · ');
       });
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Unable to refresh campus content.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

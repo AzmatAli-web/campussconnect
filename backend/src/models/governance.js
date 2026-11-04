@@ -9,7 +9,6 @@ const bootstrapSchema=new Schema({
   firebaseUid:{type:String,required:true},
   createdAt:{type:Date,default:Date.now}
 },{collection:'admin_bootstraps',versionKey:false});
-bootstrapSchema.index({universityId:1},{unique:true});
 
 const auditSchema=new Schema({
   universityId:objectId,

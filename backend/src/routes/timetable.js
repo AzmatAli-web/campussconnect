@@ -32,7 +32,8 @@ export function timetableRouter(deps) {
     const cohort = timetableGroupFilter(req.query);
     const items = await TimetableSlot.find({
       universityId: req.currentUser.universityId, status: 'published', ...cohort
-    }).sort({dayOfWeek: 1, startMinute: 1, _id: 1}).limit(200).lean();
+    }).select('term program semester section dayOfWeek startTime endTime courseCode courseTitle instructorName room')
+      .sort({dayOfWeek: 1, startMinute: 1, _id: 1}).limit(200).lean();
     return res.json({data: items.map(timetableView)});
   }));
 

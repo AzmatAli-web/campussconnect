@@ -196,4 +196,109 @@ class PreviewCampusApi extends CampusApi {
     _registrations.add(registration);
     return registration;
   }
+
+  final List<CampusMarketplaceItem> _demoMarketplace=[
+    const CampusMarketplaceItem(
+      id:'preview-item-1',title:'Sample second-hand textbook',
+      description:'Fictional textbook listing for the offline CampusConnect Marketplace demo.',
+      category:'books',condition:'good',pricePkr:1200,
+      status:'published',hasImage:false,contactAvailable:false,createdAt:null,
+    ),
+  ];
+  final List<String> _ownMarketplaceIds=[];
+
+  @override
+  Future<List<CampusMarketplaceItem>> getMarketplace({
+    String? query,String? category,
+  }) async => _demoMarketplace.where((item)=>
+    item.status=='published' &&
+    (category==null||category.isEmpty||item.category==category) &&
+    (query==null||query.trim().isEmpty||
+      item.title.toLowerCase().contains(query.trim().toLowerCase())||
+      item.description.toLowerCase().contains(query.trim().toLowerCase()))
+  ).toList(growable:false);
+
+  @override
+  Future<List<CampusMarketplaceItem>> getMyMarketplace() async =>
+    _demoMarketplace.where((item)=>_ownMarketplaceIds.contains(item.id))
+      .toList(growable:false);
+
+  @override
+  Future<CampusMarketplaceItem> createMarketplaceItem({
+    required String title,required String description,
+    required String category,required String condition,
+    required int pricePkr,required bool contactConsent,
+  }) async {
+    final item=CampusMarketplaceItem(
+      id:'preview-market-${_demoMarketplace.length+1}',title:title,
+      description:description,category:category,condition:condition,
+      pricePkr:pricePkr,status:'published',hasImage:false,
+      contactAvailable:contactConsent,createdAt:DateTime.now(),
+    );
+    _demoMarketplace.insert(0,item);
+    _ownMarketplaceIds.add(item.id);
+    return item;
+  }
+  @override
+  Future<CampusMarketplaceItem> updateMarketplaceItem(
+    String id,Json body,
+  ) async {
+    if(!_ownMarketplaceIds.contains(id)) {
+      throw const CampusApiException('FORBIDDEN','Not your demo listing.');
+    }
+    final i=_demoMarketplace.indexWhere((item)=>item.id==id);
+    if(i<0||_demoMarketplace[i].status!='published') {
+      throw const CampusApiException('NOT_FOUND','Demo listing unavailable.');
+    }
+    final old=_demoMarketplace[i];
+    final updated=CampusMarketplaceItem(
+      id:old.id,title:body['title'] as String? ?? old.title,
+      description:body['description'] as String? ?? old.description,
+      category:body['category'] as String? ?? old.category,
+      condition:body['condition'] as String? ?? old.condition,
+      pricePkr:body['pricePkr'] as int? ?? old.pricePkr,
+      status:old.status,hasImage:false,
+      contactAvailable:body['contactConsent'] as bool? ?? old.contactAvailable,
+      createdAt:old.createdAt,
+    );
+    _demoMarketplace[i]=updated;
+    return updated;
+  }
+  @override
+  Future<CampusMarketplaceItem> setMarketplaceStatus(String id,String status) async {
+    if(!_ownMarketplaceIds.contains(id)||!['sold','archived'].contains(status)){
+      throw const CampusApiException('FORBIDDEN','Invalid demo listing update.');
+    }
+    final i=_demoMarketplace.indexWhere((item)=>item.id==id);
+    if(i<0)throw const CampusApiException('NOT_FOUND','Demo listing unavailable.');
+    final old=_demoMarketplace[i];
+    final updated=CampusMarketplaceItem(
+      id:old.id,title:old.title,description:old.description,category:old.category,
+      condition:old.condition,pricePkr:old.pricePkr,status:status,
+      hasImage:false,contactAvailable:old.contactAvailable,createdAt:old.createdAt,
+    );
+    _demoMarketplace[i]=updated;
+    return updated;
+  }
+  @override
+  Future<String> getMarketplaceContact(String id) async {
+    throw const CampusApiException('OFFLINE_PREVIEW',
+      'Fictional listings do not have real seller contacts.');
+  }
+  @override
+  Future<void> reportMarketplaceItem(
+    String id,{required String reason,String detail='',
+  }) async {
+    // Preview intentionally does not send a real report.
+  }
+  @override
+  Future<Uint8List> downloadMarketplacePhoto(String id) async {
+    throw const CampusApiException('OFFLINE_PREVIEW','No photo in offline preview.');
+  }
+  @override
+  Future<void> uploadMarketplacePhoto(
+    String id,Uint8List bytes,String filename,
+  ) async {
+    throw const CampusApiException('OFFLINE_PREVIEW','No photo upload in preview.');
+  }
 }

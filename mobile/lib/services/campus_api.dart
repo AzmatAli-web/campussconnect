@@ -461,5 +461,27 @@ class CampusApi {
   ) async => CampusLostFoundItem.fromJson(asJson(await _request(
     '/lost-found-items/${Uri.encodeComponent(id)}',method:'PATCH',body:changes)));
 
+
+  /// Authenticated campus society directory; permissions remain enforced by Express.
+  Future<List<CampusSociety>> getSocieties() async =>
+    asJsonList(await _request('/societies?limit=100'))
+      .map(CampusSociety.fromJson).toList(growable:false);
+
+  Future<List<CampusSocietyMembership>> getMySocietyMemberships() async =>
+    asJsonList(await _request('/me/society-memberships?limit=100'))
+      .map(CampusSocietyMembership.fromJson).toList(growable:false);
+
+  Future<CampusSocietyMembership> requestSocietyMembership(String societyId) async =>
+    CampusSocietyMembership.fromJson(asJson(await _request(
+      '/societies/${Uri.encodeComponent(societyId)}/membership-requests',
+      method:'POST',body:<String,dynamic>{},
+    )));
+
+  Future<CampusSocietyMembership> withdrawSocietyMembership(String membershipId) async =>
+    CampusSocietyMembership.fromJson(asJson(await _request(
+      '/me/society-memberships/${Uri.encodeComponent(membershipId)}/withdraw',
+      method:'POST',body:<String,dynamic>{},
+    )));
+
   void dispose() => client.close();
 }

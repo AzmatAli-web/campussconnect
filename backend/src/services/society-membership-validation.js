@@ -4,8 +4,8 @@ import {pagination,requireBody,textField} from './mvp-validation.js';
 const managerStatuses=['pending','active'];
 const actions=['approve','reject','remove'];
 export function emptySocietyBody(body){
- requireBody(body??{},[]);
- if(Object.keys(body??{}).length)throw new HttpError(422,'UNEXPECTED_FIELDS','No fields are accepted');
+ if(body===undefined)return;
+ requireBody(body,[]);
 }
 export function societyMembersFilter(query){
  if(Object.keys(query).some(k=>!['page','limit','status'].includes(k)))

@@ -216,8 +216,8 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
                   membership?.status=='removed'?'Contact campus administration':'Already requested'),
               ),
               if(canWithdraw)OutlinedButton(
-                onPressed:_busy?null:()=>_withdraw(membership),
-                child:Text(membership.status=='pending'?'Cancel request':'Leave society'),
+                onPressed:_busy?null:()=>_withdraw(membership!),
+                child:Text(membership!.status=='pending'?'Cancel request':'Leave society'),
               ),
             ]),
           ],

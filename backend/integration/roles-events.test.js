@@ -18,6 +18,7 @@ import {AcademicResource} from '../src/models/academic-resource.js';
 import {StudentComplaint} from '../src/models/complaint.js';
 import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
 import {MarketplaceListing,MarketplaceReport} from '../src/models/marketplace.js';
+import {LostFoundItem} from '../src/models/lost-found.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -73,7 +74,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -901,4 +902,77 @@ test('Marketplace: tenant isolation, student ownership, consent, private photo a
  const own=await request(app).get('/api/v1/me/marketplace').set(auth(seller));
  assert.equal(own.status,200);
  assert.equal(own.body.data.find(x=>x.id===id).status,'moderated');
+},{timeout:60000});
+
+
+test('Lost & Found: verified Student, tenant scope, owner updates, redaction and Admin moderation',async()=>{
+ const owner='fixture-student-03',reader='fixture-student-04';
+ const input={
+  kind:'lost',title:'Lost black USB drive',
+  description:'Small black USB drive misplaced near the computer science lab.',
+  category:'electronics',locationText:'Computer science lab entrance',
+  contactPreference:'helpdesk'
+ };
+ const unauth=await request(app).get('/api/v1/lost-found-items');
+ assert.equal(unauth.status,401);
+ const forbiddenBody=await request(app).post('/api/v1/lost-found-items')
+  .set(auth(owner)).send({...input,reporterId:String(admin._id)});
+ assert.equal(forbiddenBody.status,422);
+ const created=await request(app).post('/api/v1/lost-found-items').set(auth(owner)).send(input);
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ const id=created.body.data.id;
+ assert.equal(created.body.data.status,'open');
+ assert.equal(created.body.data.contactPreference,'helpdesk');
+ assert.ok(!Object.hasOwn(created.body.data,'reporterId'));
+ assert.ok(!Object.hasOwn(created.body.data,'universityId'));
+
+ await LostFoundItem.create({
+  ...input,universityId:new mongoose.Types.ObjectId(),
+  reporterId:students[1]._id,status:'open',images:[]
+ });
+ const browse=await request(app).get('/api/v1/lost-found-items')
+  .query({kind:'lost',category:'electronics',q:'black USB'})
+  .set(auth(reader));
+ assert.equal(browse.status,200,JSON.stringify(browse.body));
+ assert.equal(browse.body.data.length,1);
+ assert.equal(browse.body.data[0].id,id);
+ assert.ok(!('reporterId' in browse.body.data[0]));
+ const detail=await request(app).get('/api/v1/lost-found-items/'+id).set(auth(reader));
+ assert.equal(detail.status,200);
+ const otherHistory=await request(app).get('/api/v1/me/lost-found-items').set(auth(reader));
+ assert.equal(otherHistory.status,200);
+ assert.ok(!otherHistory.body.data.some(x=>x.id===id));
+ const denied=await request(app).patch('/api/v1/lost-found-items/'+id)
+  .set(auth(reader)).send({title:'Unauthorized new title'});
+ assert.equal(denied.status,403);
+ const updated=await request(app).patch('/api/v1/lost-found-items/'+id)
+  .set(auth(owner)).send({title:'Lost black USB stick'});
+ assert.equal(updated.status,200,JSON.stringify(updated.body));
+ assert.equal(updated.body.data.title,'Lost black USB stick');
+ const resolved=await request(app).patch('/api/v1/lost-found-items/'+id)
+  .set(auth(owner)).send({status:'resolved'});
+ assert.equal(resolved.status,200);
+ assert.equal(resolved.body.data.status,'resolved');
+ const notPublic=await request(app).get('/api/v1/lost-found-items/'+id).set(auth(reader));
+ assert.equal(notPublic.status,404);
+ const history=await request(app).get('/api/v1/me/lost-found-items').set(auth(owner));
+ assert.equal(history.status,200);
+ assert.equal(history.body.data.find(x=>x.id===id).status,'resolved');
+ const deniedModeration=await request(app).post(
+  '/api/v1/admin/lost-found-items/'+id+'/moderation')
+  .set(auth(reader)).send({action:'remove',reason:'Not an authorized reviewer'});
+ assert.equal(deniedModeration.status,403);
+ const removed=await request(app).post(
+  '/api/v1/admin/lost-found-items/'+id+'/moderation')
+  .set(auth('fixture-admin')).send({action:'remove',reason:'Fictional unsafe report for integration testing'});
+ assert.equal(removed.status,200,JSON.stringify(removed.body));
+ assert.equal(removed.body.data.status,'removed');
+ const duplicate=await request(app).post(
+  '/api/v1/admin/lost-found-items/'+id+'/moderation')
+  .set(auth('fixture-admin')).send({action:'remove',reason:'Duplicate action'});
+ assert.equal(duplicate.status,404);
+ const audit=await AuditLog.findOne({
+  universityId:UNIVERSITY_ID,action:'lost_found.report.removed',targetId:id
+ });
+ assert.ok(audit);
 },{timeout:60000});

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
@@ -299,6 +300,124 @@ class CampusApi {
     )));
     _registrationAttempts.remove(event.id);
     return registration;
+  }
+
+
+
+  /// All Marketplace calls enforce identity, tenant scope and ownership on Express.
+  Future<List<CampusMarketplaceItem>> getMarketplace({
+    String? query,String? category,
+  }) async {
+    final q=Uri(queryParameters:{
+      'limit':'100',
+      if(query!=null && query.trim().isNotEmpty)'q':query.trim(),
+      if(category!=null && category.isNotEmpty)'category':category,
+    }).query;
+    return asJsonList(await _request('/marketplace?$q'))
+      .map(CampusMarketplaceItem.fromJson).toList(growable:false);
+  }
+
+  Future<List<CampusMarketplaceItem>> getMyMarketplace() async =>
+    asJsonList(await _request('/me/marketplace?limit=100'))
+      .map(CampusMarketplaceItem.fromJson).toList(growable:false);
+
+  Future<CampusMarketplaceItem> createMarketplaceItem({
+    required String title,required String description,
+    required String category,required String condition,
+    required int pricePkr,required bool contactConsent,
+  }) async => CampusMarketplaceItem.fromJson(asJson(await _request('/marketplace',
+    method:'POST',body:{
+      'title':title.trim(),'description':description.trim(),
+      'category':category,'condition':condition,'pricePkr':pricePkr,
+      'contactConsent':contactConsent,
+    })));
+
+  Future<CampusMarketplaceItem> updateMarketplaceItem(
+    String id,Json body,
+  ) async => CampusMarketplaceItem.fromJson(asJson(await _request(
+    '/marketplace/${Uri.encodeComponent(id)}',method:'PATCH',body:body)));
+
+  Future<CampusMarketplaceItem> setMarketplaceStatus(
+    String id,String status,
+  ) async => CampusMarketplaceItem.fromJson(asJson(await _request(
+    '/marketplace/${Uri.encodeComponent(id)}/status',
+    method:'POST',body:{'status':status})));
+
+  Future<String> getMarketplaceContact(String id) async {
+    final data=asJson(await _request(
+      '/marketplace/${Uri.encodeComponent(id)}/contact'));
+    return stringField(data,'email');
+  }
+
+  Future<void> reportMarketplaceItem(
+    String id,{required String reason,String detail='',
+  }) async {
+    await _request('/marketplace/${Uri.encodeComponent(id)}/reports',
+      method:'POST',body:{'reason':reason,'detail':detail.trim()});
+  }
+
+  /// Authenticated binary image, not an open URL.
+  Future<Uint8List> downloadMarketplacePhoto(String id) async {
+    final token=await idTokenProvider();
+    if(token.isEmpty)throw const CampusApiException('AUTH_REQUIRED','Sign in again.');
+    late http.Response response;
+    try{
+      response=await client.get(_endpoint('/marketplace/${Uri.encodeComponent(id)}/image'),
+        headers:{'Authorization':'Bearer $token','Cache-Control':'no-store'})
+        .timeout(requestTimeout);
+    }on TimeoutException{
+      throw const CampusApiException('NETWORK_TIMEOUT','Photo request timed out.');
+    }on http.ClientException{
+      throw const CampusApiException('NETWORK_FAILURE','Cannot reach the photo server.');
+    }
+    if(response.statusCode!=200)throw CampusApiException(
+      'IMAGE_UNAVAILABLE','Photo is unavailable.',response.statusCode);
+    final mime=(response.headers['content-type']??'').split(';').first;
+    if(!['image/jpeg','image/png','image/webp'].contains(mime)||
+      response.bodyBytes.length>2*1024*1024){
+      throw const CampusApiException('INVALID_MARKET_IMAGE','Unexpected image response.');
+    }
+    return response.bodyBytes;
+  }
+
+  Future<void> uploadMarketplacePhoto(
+    String id,Uint8List bytes,String filename,
+  ) async {
+    if(bytes.isEmpty||bytes.length>2*1024*1024){
+      throw const CampusApiException('INVALID_MARKET_IMAGE',
+        'Choose an image up to 2 MB.');
+    }
+    final fileName=filename.split(RegExp(r'[/\\]')).last;
+    final name=fileName.toLowerCase();
+    final mime=name.endsWith('.jpg')||name.endsWith('.jpeg')?'image/jpeg':
+      name.endsWith('.png')?'image/png':
+      name.endsWith('.webp')?'image/webp':null;
+    if(mime==null)throw const CampusApiException(
+      'INVALID_MARKET_IMAGE','Choose JPEG, PNG or WebP.');
+    final token=await idTokenProvider();
+    if(token.isEmpty)throw const CampusApiException('AUTH_REQUIRED','Sign in again.');
+    final request=http.MultipartRequest('POST',
+      _endpoint('/marketplace/${Uri.encodeComponent(id)}/image'));
+    request.headers['Authorization']='Bearer $token';
+    request.files.add(http.MultipartFile.fromBytes('file',bytes,
+      filename:fileName,contentType:MediaType.parse(mime)));
+    late http.StreamedResponse response;
+    try{
+      response=await client.send(request).timeout(requestTimeout);
+    }on TimeoutException{
+      throw const CampusApiException('NETWORK_TIMEOUT','Image upload timed out.');
+    }on http.ClientException{
+      throw const CampusApiException('NETWORK_FAILURE','Cannot reach CampusConnect.');
+    }
+    final text=await response.stream.bytesToString().timeout(requestTimeout);
+    if(response.statusCode<200||response.statusCode>=300){
+      dynamic payload;
+      try{payload=jsonDecode(text);}catch(_){payload=null;}
+      final error=payload is Map && payload['error'] is Map
+        ? asJson(payload['error']):<String,dynamic>{};
+      throw CampusApiException(stringField(error,'code','UPLOAD_FAILED'),
+        stringField(error,'message','Image upload failed.'),response.statusCode);
+    }
   }
 
   void dispose() => client.close();

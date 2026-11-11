@@ -1,0 +1,6 @@
+# Local QA dependencies, browser reports, and sensitive test artifacts
+node_modules/
+playwright-report/
+test-results/
+*.archive.gz
+*.archive.gz.partial

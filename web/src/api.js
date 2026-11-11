@@ -77,3 +77,33 @@ export async function downloadAcademicPdf(user, resource) {
  anchor.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
+
+/** Marketplace photos are private authenticated resources, never public image URLs. */
+export async function downloadMarketplacePhoto(user,id){
+ if(!/^[a-f0-9]{24}$/i.test(id))throw new Error('Invalid listing identifier.');
+ const token=await user.getIdToken();
+ const response=await fetch(base+'/marketplace/'+id+'/image',{
+  cache:'no-store',headers:{Authorization:'Bearer '+token}
+ });
+ if(!response.ok)throw new Error('Marketplace image unavailable.');
+ const mime=(response.headers.get('content-type')||'').split(';')[0];
+ if(!['image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Unexpected photo format.');
+ const bytes=await response.blob();
+ if(bytes.size>2*1024*1024)throw new Error('Photo is too large.');
+ return bytes;
+}
+export async function uploadMarketplacePhoto(user,id,file){
+ if(!/^[a-f0-9]{24}$/i.test(id))throw new Error('Invalid listing identifier.');
+ if(!file||file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type))
+  throw new Error('Choose a JPEG, PNG or WebP photo up to 2 MB.');
+ const token=await user.getIdToken();
+ const data=new FormData();data.append('file',file);
+ const response=await fetch(base+'/marketplace/'+id+'/image',{
+  method:'POST',cache:'no-store',
+  headers:{Authorization:'Bearer '+token},body:data
+ });
+ const envelope=await response.json().catch(()=>null);
+ if(!response.ok)throw new Error(envelope?.error?.message||'Photo upload failed.');
+ return envelope.data;
+}

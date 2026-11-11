@@ -12,6 +12,7 @@ export function navigationFor(profile){
  items.push(['resources','Academic Resources','▤']);
  items.push(['marketplace','Marketplace','◈']);
  items.push(['lostfound','Lost & Found','⌕']);
+ items.push(['societies','Societies','♧']);
  if(hasRole(profile,'student')||hasRole(profile,'staff')||hasRole(profile,'admin'))items.push(['complaints','Complaints','✉']);
  if(hasRole(profile,'student')||hasRole(profile,'financeOfficer'))items.push(['fees','Fees & dues','▥']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);

@@ -19,6 +19,7 @@ import {StudentComplaint} from '../src/models/complaint.js';
 import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
 import {MarketplaceListing,MarketplaceReport} from '../src/models/marketplace.js';
 import {LostFoundItem} from '../src/models/lost-found.js';
+import {SocietyMembership} from '../src/models/society-membership.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -74,7 +75,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -976,3 +977,162 @@ test('Lost & Found: verified Student, tenant scope, owner updates, redaction and
  });
  assert.ok(audit);
 },{timeout:60000});
+
+
+test('Society Membership: students request safely; approved managers review; state and tenant isolation hold',async()=>{
+ const uni=UNIVERSITY_ID;
+ const mg=await User.create(person('fixture-membership-manager',['student','societyManager']));
+ const group=await Society.create({
+  universityId:uni,name:'Membership Test Society',slug:'membership-test-society',
+  description:'Dedicated membership process regression fixture',
+  createdBy:admin._id,status:'active'
+ });
+ await SocietyManagerAssignment.create({
+  universityId:uni,societyId:group._id,userId:mg._id,
+  status:'active',approvedAt:new Date(),approvedBy:admin._id
+ });
+ const owner='fixture-student-00',other='fixture-student-01';
+ const societyId=String(group._id);
+ const list=await request(app).get('/api/v1/societies').set(auth(owner));
+ assert.equal(list.status,200);
+ assert.ok(list.body.data.some(x=>x.id===societyId));
+ const unauth=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests').send({});
+ assert.equal(unauth.status,401);
+ const spoof=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({studentId:String(admin._id),status:'active'});
+ assert.equal(spoof.status,422);
+ const created=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ const id=created.body.data.id;
+ assert.equal(created.body.data.status,'pending');
+ for(const field of ['studentId','universityId','reviewedBy','firebaseUid','emailNormalized']){
+  assert.equal(Object.hasOwn(created.body.data,field),false);
+ }
+ const duplicate=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(duplicate.status,409);
+ const stranger=await request(app).get('/api/v1/managed-societies/'+societyId+'/memberships')
+  .set(auth(other));
+ assert.equal(stranger.status,403);
+ const roster=await request(app).get('/api/v1/managed-societies/'+societyId+'/memberships')
+  .set(auth('fixture-membership-manager'));
+ assert.equal(roster.status,200,JSON.stringify(roster.body));
+ assert.equal(roster.body.data.length,1);
+ assert.equal(roster.body.data[0].id,id);
+ assert.equal(roster.body.data[0].student.email,owner+'@'+DOMAIN);
+ assert.ok(!Object.hasOwn(roster.body.data[0],'studentId'));
+ const strangerReview=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth(other)).send({action:'approve'});
+ assert.equal(strangerReview.status,403);
+ const approved=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth('fixture-membership-manager'))
+  .send({action:'approve'});
+ assert.equal(approved.status,200,JSON.stringify(approved.body));
+ assert.equal(approved.body.data.status,'active');
+ const secondApproval=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth('fixture-membership-manager'))
+  .send({action:'approve'});
+ assert.equal(secondApproval.status,409);
+ const own=await request(app).get('/api/v1/me/society-memberships').set(auth(owner));
+ assert.equal(own.status,200);
+ assert.equal(own.body.data.find(x=>x.id===id).status,'active');
+ const notMine=await request(app).get('/api/v1/me/society-memberships').set(auth(other));
+ assert.equal(notMine.status,200);
+ assert.ok(!notMine.body.data.some(x=>x.id===id));
+
+ // Active membership is NOT a publishing or manager role.
+ const memberAccount=await User.findById(students[0]._id).lean();
+ assert.ok(!memberAccount.activeRoles.includes('societyManager'));
+ const forbiddenAdmin=await request(app).get('/api/v1/admin/users').set(auth(owner));
+ assert.equal(forbiddenAdmin.status,403);
+
+ const withdrew=await request(app).post('/api/v1/me/society-memberships/'+id+'/withdraw')
+  .set(auth(owner)).send({});
+ assert.equal(withdrew.status,200);
+ assert.equal(withdrew.body.data.status,'left');
+ const outsiderWithdraw=await request(app).post('/api/v1/me/society-memberships/'+id+'/withdraw')
+  .set(auth(other)).send({});
+ assert.equal(outsiderWithdraw.status,404);
+ const reapply=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(reapply.status,201);
+ assert.equal(reapply.body.data.id,id);
+ assert.equal(reapply.body.data.status,'pending');
+ const rejected=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth('fixture-membership-manager'))
+  .send({action:'reject',note:'Membership eligibility could not be verified'});
+ assert.equal(rejected.status,200);
+ assert.equal(rejected.body.data.status,'rejected');
+ const another=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(another.status,201);
+ assert.equal(another.body.data.status,'pending');
+
+ const cancel=await request(app).post('/api/v1/me/society-memberships/'+id+'/withdraw')
+  .set(auth(owner)).send({});
+ assert.equal(cancel.status,200);
+ assert.equal(cancel.body.data.status,'cancelled');
+ const repeatCancel=await request(app).post('/api/v1/me/society-memberships/'+id+'/withdraw')
+  .set(auth(owner)).send({});
+ assert.equal(repeatCancel.status,409);
+ const again=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(again.status,201);
+ const approveAgain=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth('fixture-membership-manager'))
+  .send({action:'approve'});
+ assert.equal(approveAgain.status,200);
+ const activeRoster=await request(app).get('/api/v1/managed-societies/'+societyId+
+  '/memberships?status=active').set(auth('fixture-membership-manager'));
+ assert.equal(activeRoster.status,200);
+ assert.ok(activeRoster.body.data.some(x=>x.id===id));
+ const removed=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+id+'/review').set(auth('fixture-membership-manager'))
+  .send({action:'remove',note:'Society membership ended after approved review'});
+ assert.equal(removed.status,200,JSON.stringify(removed.body));
+ assert.equal(removed.body.data.status,'removed');
+ const noRejoin=await request(app).post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(owner)).send({});
+ assert.equal(noRejoin.status,409);
+ const audited=await AuditLog.find({
+  universityId:uni,targetId:id,action:/^society\.membership\./
+ }).lean();
+ assert.ok(audited.some(x=>x.action==='society.membership.active'));
+ assert.ok(audited.some(x=>x.action==='society.membership.rejected'));
+ assert.ok(audited.some(x=>x.action==='society.membership.removed'));
+
+ // No memberships or managerial records leak across a university boundary.
+ const foreign=await Society.create({
+  universityId:new mongoose.Types.ObjectId(),name:'Foreign Society Fixture',
+  slug:'foreign-society-fixture',description:'Other university society',
+  createdBy:admin._id,status:'active'
+ });
+ const wrongCampus=await request(app).post('/api/v1/societies/'+foreign._id+
+  '/membership-requests').set(auth(owner)).send({});
+ assert.equal(wrongCampus.status,404);
+ const notManagerOfForeign=await request(app).get('/api/v1/managed-societies/'+foreign._id+
+  '/memberships').set(auth('fixture-membership-manager'));
+ assert.equal(notManagerOfForeign.status,403);
+
+ // Unique index + optimistic status transitions protect repeated parallel requests.
+ const contender='fixture-student-08';
+ const competing=await Promise.all(Array.from({length:6},()=>request(app)
+  .post('/api/v1/societies/'+societyId+'/membership-requests')
+  .set(auth(contender)).send({})));
+ assert.equal(competing.filter(x=>x.status===201).length,1,
+  JSON.stringify(competing.map(x=>({status:x.status,body:x.body}))));
+ assert.equal(await SocietyMembership.countDocuments({
+  universityId:uni,societyId:group._id,studentId:students[8]._id
+ }),1);
+ await SocietyManagerAssignment.updateOne({
+  societyId:group._id,userId:mg._id,universityId:uni
+ },{$set:{status:'revoked'}});
+ const afterRevoke=await request(app).get('/api/v1/managed-societies/'+societyId+
+  '/memberships').set(auth('fixture-membership-manager'));
+ assert.equal(afterRevoke.status,403);
+ const afterRevokeReview=await request(app).post('/api/v1/managed-societies/'+societyId+
+  '/memberships/'+competing.find(x=>x.status===201).body.data.id+'/review')
+  .set(auth('fixture-membership-manager')).send({action:'approve'});
+ assert.equal(afterRevokeReview.status,403);
+},{timeout:90000});

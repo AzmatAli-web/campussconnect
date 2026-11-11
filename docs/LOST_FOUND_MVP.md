@@ -54,7 +54,7 @@ Collection: `lost_found_items`. University/status/kind, university/reporter, uni
 
 - Backend validation unit tests and isolated `mongodb-memory-server` integration test are included (Firebase fixture identities; no live credentials).
 - Flutter model + offline lifecycle test and React lazy-bundle contract changes are included.
-- Automated CI must pass before we treat the milestone's code as complete. **Full physical-phone Firebase/Atlas acceptance remains deferred** per project plan.
+- Automated GitHub Actions **passed on 2026-11-11** (backend tests, web tests/build, Flutter analysis/tests and consolidated QA). **Full physical-phone Firebase/Atlas acceptance remains deferred** per project plan.
 - Production blockers remain: secure case handling, privacy/retention approval, real helpdesk response workflows, attachment storage, rate-limit/abuse review, user-reporting policy and governance.
 - GitHub drafts are stacked: Milestone 22 → 21 → 20 → 19 → earlier branches. No automatic merge into `main` and no production deployment.
 

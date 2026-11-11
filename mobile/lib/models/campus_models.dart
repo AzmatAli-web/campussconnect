@@ -301,3 +301,31 @@ class CampusFeePayment {
     recordedAt:parseDate(json['recordedAt']),
   );
 }
+
+
+class CampusMarketplaceItem {
+  final String id;
+  final String title;
+  final String description;
+  final String category;
+  final String condition;
+  final int pricePkr;
+  final String status;
+  final bool hasImage;
+  final bool contactAvailable;
+  final DateTime? createdAt;
+
+  const CampusMarketplaceItem({
+    required this.id,required this.title,required this.description,
+    required this.category,required this.condition,required this.pricePkr,
+    required this.status,required this.hasImage,required this.contactAvailable,
+    required this.createdAt,
+  });
+  factory CampusMarketplaceItem.fromJson(Json data) => CampusMarketplaceItem(
+    id:stringField(data,'id'),title:stringField(data,'title'),
+    description:stringField(data,'description'),category:stringField(data,'category'),
+    condition:stringField(data,'condition'),pricePkr:numberField(data,'pricePkr'),
+    status:stringField(data,'status'),hasImage:data['hasImage']==true,
+    contactAvailable:data['contactAvailable']==true,createdAt:parseDate(data['createdAt']),
+  );
+}

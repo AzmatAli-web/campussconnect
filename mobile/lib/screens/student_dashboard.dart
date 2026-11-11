@@ -11,6 +11,7 @@ import 'my_complaints_screen.dart';
 import 'my_fees_screen.dart';
 import 'marketplace_screen.dart';
 import 'lost_found_screen.dart';
+import 'societies_screen.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -135,6 +136,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => MarketplaceScreen(
         api: widget.api,profile: widget.profile,previewMode: widget.previewMode,
+      ),
+    ));
+  }
+
+  void _openSocieties() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SocietiesScreen(
+        api: widget.api,previewMode: widget.previewMode,
       ),
     ));
   }
@@ -286,6 +295,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
             onPressed: _openLostFound,
             icon: const Icon(Icons.search_outlined),
             label: const Text('Campus Lost & Found'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openSocieties,
+            icon: const Icon(Icons.groups_outlined),
+            label: const Text('Browse campus societies'),
           ),
         ),
         const SizedBox(height: 20),
@@ -565,6 +582,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       icon: const Icon(Icons.search_outlined),
                       label: const Text('Lost & Found'),
                       onPressed: widget.profile.canRegister ? _openLostFound : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.groups_outlined),
+                      label: const Text('Society memberships'),
+                      onPressed: widget.profile.canRegister ? _openSocieties : null,
                     ),
                   ),
                   const SizedBox(height: 12),

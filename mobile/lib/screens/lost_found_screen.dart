@@ -169,7 +169,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
         padding:const EdgeInsets.all(17),
         child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Row(children:[
-            Expanded(child:Text(item.kind.toUpperCase()+' · '+item.category,
+            Expanded(child:Text('${item.kind.toUpperCase()} · ${item.category}',
               style:const TextStyle(color:_teal,fontSize:11,fontWeight:FontWeight.w800))),
             Text(item.status.toUpperCase(),
               style:const TextStyle(color:_muted,fontSize:10,fontWeight:FontWeight.bold)),

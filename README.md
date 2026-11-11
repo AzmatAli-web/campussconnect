@@ -6,11 +6,11 @@ A **college campus services platform** with a Flutter Android student app, React
 
 **Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
 
-Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23 development draft: student join/leave, assigned-manager approval, member administration)**. The financial ledger is **not a bank or payment processor**.
+Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**. The financial ledger is **not a bank or payment processor**.
 
 ## Latest development branch (draft; not merged)
 
-`feature/milestone23-society-membership` builds on the CI-green Milestone 22 branch, which stacks on Milestones 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–22 passed GitHub Actions; Milestone 23 is a development draft awaiting its CI results.** None are deployed or physically accepted.
+`feature/milestone23-society-membership` builds on the CI-green Milestone 22 branch, which stacks on Milestones 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–23 have passed backend, web, Flutter and consolidated GitHub Actions checks.** All remain in draft, undeployed and not yet accepted on a physical Android device.
 
 ```powershell
 git fetch origin

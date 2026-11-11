@@ -372,4 +372,73 @@ class PreviewCampusApi extends CampusApi {
     _lostFound[index]=next;
     return next;
   }
+
+  final List<CampusSociety> _demoSocieties=[
+    const CampusSociety(
+      id:'preview-society-coding',name:'Campus Coding Society',
+      slug:'campus-coding',description:'Fictional developer workshops and study circles.',
+      status:'active',
+    ),
+    const CampusSociety(
+      id:'preview-society-art',name:'Campus Arts Society',
+      slug:'campus-arts',description:'Offline demo for arts and creative campus events.',
+      status:'active',
+    ),
+  ];
+  final List<CampusSocietyMembership> _demoSocietyMemberships=[
+    CampusSocietyMembership(
+      id:'preview-member-1',societyId:'preview-society-coding',
+      status:'active',requestedAt:DateTime.now().subtract(const Duration(days:7)),
+      reviewedAt:DateTime.now().subtract(const Duration(days:3)),
+      reviewNote:'Demo membership, not associated with a real student.',
+    ),
+  ];
+
+  @override
+  Future<List<CampusSociety>> getSocieties() async =>
+      List.unmodifiable(_demoSocieties);
+
+  @override
+  Future<List<CampusSocietyMembership>> getMySocietyMemberships() async =>
+      List.unmodifiable(_demoSocietyMemberships);
+
+  @override
+  Future<CampusSocietyMembership> requestSocietyMembership(String societyId) async {
+    if(!_demoSocieties.any((s)=>s.id==societyId)){
+      throw const CampusApiException('SOCIETY_NOT_FOUND','Demo society unavailable.');
+    }
+    final index=_demoSocietyMemberships.indexWhere((m)=>m.societyId==societyId);
+    if(index>=0&&!['rejected','cancelled','left'].contains(_demoSocietyMemberships[index].status)){
+      throw const CampusApiException('MEMBERSHIP_ALREADY_EXISTS','Already joined or requested.');
+    }
+    final created=CampusSocietyMembership(
+      id:index>=0?_demoSocietyMemberships[index].id:
+        'preview-member-${_demoSocietyMemberships.length+1}',
+      societyId:societyId,status:'pending',requestedAt:DateTime.now(),
+      reviewedAt:null,reviewNote:'',
+    );
+    if(index>=0){
+      _demoSocietyMemberships[index]=created;
+    }else{
+      _demoSocietyMemberships.add(created);
+    }
+    return created;
+  }
+
+  @override
+  Future<CampusSocietyMembership> withdrawSocietyMembership(String membershipId) async {
+    final index=_demoSocietyMemberships.indexWhere((m)=>m.id==membershipId);
+    if(index<0)throw const CampusApiException('MEMBERSHIP_NOT_FOUND','Demo membership unavailable.');
+    final prior=_demoSocietyMemberships[index];
+    if(!['active','pending'].contains(prior.status)){
+      throw const CampusApiException('MEMBERSHIP_NOT_WITHDRAWABLE','Cannot withdraw this record.');
+    }
+    final changed=CampusSocietyMembership(
+      id:prior.id,societyId:prior.societyId,
+      status:prior.status=='pending'?'cancelled':'left',
+      requestedAt:prior.requestedAt,reviewedAt:prior.reviewedAt,reviewNote:prior.reviewNote,
+    );
+    _demoSocietyMemberships[index]=changed;
+    return changed;
+  }
 }

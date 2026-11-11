@@ -361,3 +361,45 @@ class CampusLostFoundItem {
     createdAt:parseDate(data['createdAt']),
   );
 }
+
+
+class CampusSociety {
+  final String id;
+  final String name;
+  final String slug;
+  final String description;
+  final String status;
+  const CampusSociety({
+    required this.id,required this.name,required this.slug,
+    required this.description,required this.status,
+  });
+  factory CampusSociety.fromJson(Json data)=>CampusSociety(
+    id:stringField(data,'id'),
+    name:stringField(data,'name'),
+    slug:stringField(data,'slug'),
+    description:stringField(data,'description'),
+    status:stringField(data,'status'),
+  );
+}
+
+class CampusSocietyMembership {
+  final String id;
+  final String societyId;
+  final String status;
+  final DateTime? requestedAt;
+  final DateTime? reviewedAt;
+  final String reviewNote;
+  const CampusSocietyMembership({
+    required this.id,required this.societyId,required this.status,
+    required this.requestedAt,required this.reviewedAt,
+    required this.reviewNote,
+  });
+  factory CampusSocietyMembership.fromJson(Json data)=>CampusSocietyMembership(
+    id:stringField(data,'id'),
+    societyId:stringField(data,'societyId'),
+    status:stringField(data,'status'),
+    requestedAt:parseDate(data['requestedAt']),
+    reviewedAt:parseDate(data['reviewedAt']),
+    reviewNote:stringField(data,'reviewNote'),
+  );
+}

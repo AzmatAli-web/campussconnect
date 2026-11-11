@@ -424,5 +424,42 @@ class CampusApi {
     }
   }
 
+
+  /// Public-to-campus lost/found items. Reporter identity is not part of responses.
+  Future<List<CampusLostFoundItem>> getLostFoundItems({
+    String? query,String? kind,String? category,
+  }) async {
+    final params=Uri(queryParameters:{
+      'limit':'100',
+      if(query!=null&&query.trim().isNotEmpty)'q':query.trim(),
+      if(kind!=null&&kind.isNotEmpty)'kind':kind,
+      if(category!=null&&category.isNotEmpty)'category':category,
+    }).query;
+    return asJsonList(await _request('/lost-found-items?$params'))
+      .map(CampusLostFoundItem.fromJson).toList(growable:false);
+  }
+
+  Future<List<CampusLostFoundItem>> getMyLostFoundItems() async =>
+    asJsonList(await _request('/me/lost-found-items?limit=100'))
+      .map(CampusLostFoundItem.fromJson).toList(growable:false);
+
+  Future<CampusLostFoundItem> createLostFoundItem({
+    required String kind,required String title,required String description,
+    required String category,required String locationText,
+    required String contactPreference,String? occurredAt,
+  }) async => CampusLostFoundItem.fromJson(asJson(
+    await _request('/lost-found-items',method:'POST',body:{
+      'kind':kind,'title':title.trim(),
+      'description':description.trim(),'category':category,
+      'locationText':locationText.trim(),
+      'contactPreference':contactPreference,
+      if(occurredAt!=null)'occurredAt':occurredAt,
+    })));
+
+  Future<CampusLostFoundItem> updateLostFoundItem(
+    String id,Json changes,
+  ) async => CampusLostFoundItem.fromJson(asJson(await _request(
+    '/lost-found-items/${Uri.encodeComponent(id)}',method:'PATCH',body:changes)));
+
   void dispose() => client.close();
 }

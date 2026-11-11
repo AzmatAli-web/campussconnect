@@ -13,6 +13,7 @@ import {complaintsRouter} from './routes/complaints.js';
 import {feesRouter} from './routes/fees.js';
 import {marketplaceRouter} from './routes/marketplace.js';
 import {lostFoundRouter} from './routes/lost-found.js';
+import {societyMembershipsRouter} from './routes/society-memberships.js';
 import {HttpError} from './lib/http-error.js';
 export function createApp({config,firebaseAuth}) {
  const app=express();
@@ -39,6 +40,7 @@ export function createApp({config,firebaseAuth}) {
  app.use('/api/v1',feesRouter({config,firebaseAuth}));
  app.use('/api/v1',marketplaceRouter({config,firebaseAuth}));
  app.use('/api/v1',lostFoundRouter({config,firebaseAuth}));
+ app.use('/api/v1',societyMembershipsRouter({config,firebaseAuth}));
  app.use((_req,_res,next)=>next(new HttpError(404,'NOT_FOUND','Route not found')));
  app.use((err,_req,res,_next)=>{
   if (err?.type==='entity.too.large') return res.status(413).json({error:{code:'BODY_TOO_LARGE',message:'Request body too large'}});

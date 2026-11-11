@@ -5,7 +5,7 @@ const student={status:'active',activeRoles:['student']};
 const faculty={status:'active',activeRoles:['faculty'],facultyVerificationStatus:'verified'};
 const manager={status:'active',activeRoles:['societyManager']};
 test('student cannot navigate to Admin or organizer screens',()=>{
- assert.deepEqual(navigationFor(student).map(x=>x.id),['overview','events','registrations','announcements','timetable','resources','complaints','fees']);
+ assert.deepEqual(navigationFor(student).map(x=>x.id),['overview','events','registrations','announcements','timetable','resources','marketplace','complaints','fees']);
  assert.equal(hasRole(student,'admin'),false);
  assert.equal(navigationFor({...student,status:'suspended',activeRoles:['admin']}).some(x=>x.id==='admin'),false);
  assert.equal(isVerifiedFaculty({...faculty,facultyVerificationStatus:'pending'}),false);

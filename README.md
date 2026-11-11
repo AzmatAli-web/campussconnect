@@ -6,16 +6,16 @@ A **college campus services platform** with a Flutter Android student app, React
 
 **Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
 
-Implemented MVP modules: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records. The financial ledger is **not a bank or payment processor**.
+Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21; testing pending)**. The financial ledger is **not a bank or payment processor**.
 
-## Latest integrated development branch
+## Latest development branch (draft; not merged)
 
-`feature/consolidated-release-qa` includes work through the latest performance, authorization, API and full-stack QA milestones. Start from this branch when testing the latest features, not the older Milestone 1 mainline.
+`feature/milestone21-student-marketplace` builds on the Milestone 20 QA draft, which builds on the Milestone 19 full-stack baseline. Earlier milestone branches and PRs are still stacked/unmerged. **Milestone 21 has not been tested or deployed.** Do not assume this branch is production-ready.
 
 ```powershell
 git fetch origin
-git switch feature/consolidated-release-qa
-git pull --ff-only origin feature/consolidated-release-qa
+git switch feature/milestone21-student-marketplace
+git pull --ff-only origin feature/milestone21-student-marketplace
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\verify-all.ps1
 ```
@@ -43,6 +43,7 @@ For the physical Flutter app, see [USB Android live test](docs/USB_ANDROID_LIVE_
 
 ## Important docs
 
+- [Milestone 21 Marketplace scope, APIs and release gates](docs/MARKETPLACE_MVP.md)
 - [Full-stack QA and release gates](docs/RELEASE_QA.md)
 - [Backend security and roles](docs/ADMIN_BOOTSTRAP_AND_ROLES.md)
 - [Finance Officer permissions](docs/FINANCE_OFFICER_AUDIT.md)

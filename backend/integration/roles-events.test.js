@@ -17,6 +17,7 @@ import {TimetableSlot} from '../src/models/timetable.js';
 import {AcademicResource} from '../src/models/academic-resource.js';
 import {StudentComplaint} from '../src/models/complaint.js';
 import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
+import {MarketplaceListing,MarketplaceReport} from '../src/models/marketplace.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -72,7 +73,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -83,12 +84,15 @@ before(async()=>{
   ...Array.from({length:20},(_,i)=>person('fixture-student-'+i.toString().padStart(2,'0')))
  ]);
  config.resourceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-resources-test-'));
+ config.marketplaceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-marketplace-test-'));
+
  app=createApp({config,firebaseAuth:mockFirebase});
 },{timeout:180000});
 after(async()=>{
  await mongoose.disconnect();
  if(mongo) await mongo.stop();
  if(config.resourceUploadDir) await rm(config.resourceUploadDir,{recursive:true,force:true});
+ if(config.marketplaceUploadDir) await rm(config.marketplaceUploadDir,{recursive:true,force:true});
 },{timeout:60000});
 
 test('Admin is not accessible without a test fixture token or to ordinary students',async()=>{
@@ -803,3 +807,98 @@ test('finance role granting requires Admin, eligible Staff and explicit attestat
  assert.equal(history.filter(a=>a.action==='finance.officer.granted').length,1);
  assert.equal(history.filter(a=>a.action==='finance.officer.revoked').length,1);
 },{timeout:45000});
+
+
+test('Marketplace: tenant isolation, student ownership, consent, private photo and Admin moderation',async()=>{
+ const seller='fixture-student-00',reporter='fixture-student-01',visitor='fixture-student-02';
+ const input={
+  title:'Used programming textbook',
+  description:'A lightly used campus course textbook in good condition.',
+  category:'books',condition:'good',pricePkr:1400,contactConsent:false
+ };
+ const anonymous=await request(app).get('/api/v1/marketplace');
+ assert.equal(anonymous.status,401);
+ const invalid=await request(app).post('/api/v1/marketplace')
+  .set(auth(seller)).send({...input,sellerId:String(admin._id)});
+ assert.equal(invalid.status,422);
+ const created=await request(app).post('/api/v1/marketplace').set(auth(seller)).send(input);
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ const id=created.body.data.id;
+ assert.equal(created.body.data.status,'published');
+ assert.equal(created.body.data.contactAvailable,false);
+ assert.ok(!('sellerId' in created.body.data));
+ assert.ok(!('universityId' in created.body.data));
+
+ const contactDenied=await request(app).get('/api/v1/marketplace/'+id+'/contact').set(auth(visitor));
+ assert.equal(contactDenied.status,404);
+ const wrongEdit=await request(app).patch('/api/v1/marketplace/'+id)
+  .set(auth(reporter)).send({pricePkr:1});
+ assert.equal(wrongEdit.status,404);
+ const edit=await request(app).patch('/api/v1/marketplace/'+id)
+  .set(auth(seller)).send({contactConsent:true,pricePkr:1000});
+ assert.equal(edit.status,200,JSON.stringify(edit.body));
+ const contact=await request(app).get('/api/v1/marketplace/'+id+'/contact').set(auth(visitor));
+ assert.equal(contact.status,200,JSON.stringify(contact.body));
+ assert.equal(contact.body.data.email,seller+'@'+DOMAIN);
+
+ const binary=Buffer.from('89504e470d0a1a0a0000000049454e44','hex');
+ const badUpload=await request(app).post('/api/v1/marketplace/'+id+'/image')
+  .set(auth(reporter)).attach('file',binary,{filename:'photo.png',contentType:'image/png'});
+ assert.equal(badUpload.status,404);
+ const photo=await request(app).post('/api/v1/marketplace/'+id+'/image')
+  .set(auth(seller)).attach('file',binary,{filename:'photo.png',contentType:'image/png'});
+ assert.equal(photo.status,200,JSON.stringify(photo.body));
+ assert.equal(photo.body.data.hasImage,true);
+ const imageRead=await request(app).get('/api/v1/marketplace/'+id+'/image').set(auth(visitor));
+ assert.equal(imageRead.status,200);
+ assert.ok(imageRead.headers['content-type'].includes('image/png'));
+
+
+ // Another tenant's content never enters this university's browse feed.
+ await MarketplaceListing.create({
+  ...input,universityId:new mongoose.Types.ObjectId(),
+  sellerId:students[3]._id,status:'published'
+ });
+ const browse=await request(app).get('/api/v1/marketplace?category=books&q=programming')
+  .set(auth(visitor));
+ assert.equal(browse.status,200,JSON.stringify(browse.body));
+ assert.ok(browse.body.data.some(x=>x.id===id));
+ assert.equal(browse.body.data.length,1);
+ const wrongMine=await request(app).get('/api/v1/me/marketplace').set(auth(visitor));
+ assert.equal(wrongMine.status,200);
+ assert.ok(!wrongMine.body.data.some(x=>x.id===id));
+
+ const selfReport=await request(app).post('/api/v1/marketplace/'+id+'/reports')
+  .set(auth(seller)).send({reason:'spam'});
+ assert.equal(selfReport.status,403);
+ const reported=await request(app).post('/api/v1/marketplace/'+id+'/reports')
+  .set(auth(reporter)).send({reason:'scam',detail:'Suspicious test item description'});
+ assert.equal(reported.status,201,JSON.stringify(reported.body));
+ const reportAgain=await request(app).post('/api/v1/marketplace/'+id+'/reports')
+  .set(auth(reporter)).send({reason:'scam'});
+ assert.equal(reportAgain.status,409);
+ const deniedQueue=await request(app).get('/api/v1/admin/marketplace/reports')
+  .set(auth(reporter));
+ assert.equal(deniedQueue.status,403);
+ const queue=await request(app).get('/api/v1/admin/marketplace/reports?status=open')
+  .set(auth('fixture-admin'));
+ assert.equal(queue.status,200,JSON.stringify(queue.body));
+ assert.ok(queue.body.data.some(x=>x.id===reported.body.data.id));
+ const resolved=await request(app).post(
+  '/api/v1/admin/marketplace/reports/'+reported.body.data.id+'/resolve')
+  .set(auth('fixture-admin')).send({action:'archive',note:'Moderation fixture confirms removal'});
+ assert.equal(resolved.status,200,JSON.stringify(resolved.body));
+ assert.equal(resolved.body.data.status,'actioned');
+ const vanished=await request(app).get('/api/v1/marketplace/'+id).set(auth(visitor));
+ assert.equal(vanished.status,404);
+ const hiddenPhoto=await request(app).get('/api/v1/marketplace/'+id+'/image').set(auth(visitor));
+ assert.equal(hiddenPhoto.status,404);
+ const adminAudit=await AuditLog.findOne({
+  universityId:UNIVERSITY_ID,action:'marketplace.report.archived',
+  targetId:reported.body.data.id
+ });
+ assert.ok(adminAudit);
+ const own=await request(app).get('/api/v1/me/marketplace').set(auth(seller));
+ assert.equal(own.status,200);
+ assert.equal(own.body.data.find(x=>x.id===id).status,'moderated');
+},{timeout:60000});

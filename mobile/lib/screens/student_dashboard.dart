@@ -9,6 +9,7 @@ import 'timetable_panel.dart';
 import 'academic_resources_panel.dart';
 import 'my_complaints_screen.dart';
 import 'my_fees_screen.dart';
+import 'marketplace_screen.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -128,6 +129,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   void _selectTab(int value) => setState(() => _tab = value);
+
+  void _openMarketplace() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MarketplaceScreen(
+        api: widget.api,profile: widget.profile,previewMode: widget.previewMode,
+      ),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -254,6 +263,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
             style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: _navy)),
         const SizedBox(height: 4),
         const Text('Your campus at a glance', style: TextStyle(color: _muted)),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openMarketplace,
+            icon: const Icon(Icons.storefront_outlined),
+            label: const Text('Browse student Marketplace'),
+          ),
+        ),
         const SizedBox(height: 20),
         Row(
           children: [
@@ -513,6 +530,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 ),
                               )
                           : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.storefront_outlined),
+                      label: const Text('Student Marketplace'),
+                      onPressed: widget.profile.canRegister ? _openMarketplace : null,
                     ),
                   ),
                   const SizedBox(height: 12),

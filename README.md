@@ -6,11 +6,11 @@ A **college campus services platform** with a Flutter Android student app, React
 
 **Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
 
-Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 draft; testing pending)**. The financial ledger is **not a bank or payment processor**.
+Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**. The financial ledger is **not a bank or payment processor**.
 
 ## Latest development branch (draft; not merged)
 
-`feature/milestone22-lost-found` builds on Milestone 21's CI-green development branch, which stacks on Milestone 20 QA and the Milestone 19 full-stack baseline. Earlier milestone branches and PRs are still stacked/unmerged. **Milestone 21 automated CI passed; Milestone 22 requires checks.** Neither milestone is deployed or manually accepted.
+`feature/milestone22-lost-found` builds on Milestone 21's CI-green development branch, which stacks on Milestone 20 QA and the Milestone 19 full-stack baseline. Earlier milestone branches and PRs are still stacked/unmerged. **Milestones 21 and 22 have passed backend, web, Flutter and consolidated GitHub Actions checks.** Neither milestone is deployed or manually accepted.
 
 ```powershell
 git fetch origin

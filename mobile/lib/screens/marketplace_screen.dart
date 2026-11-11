@@ -57,9 +57,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         query:_search.text.trim(),category:_categoryFilter,
       );
       final mine=await widget.api.getMyMarketplace();
-      if(mounted)setState((){
-        _feed=feed;_mine=mine;_error=null;_photoCache.clear();
-      });
+      if(mounted){
+        setState((){
+          _feed=feed;_mine=mine;_error=null;_photoCache.clear();
+        });
+      }
     }on CampusApiException catch(e){
       if(mounted)setState(()=>_error=e.message);
     }catch(_){
@@ -203,10 +205,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ()=>widget.api.downloadMarketplacePhoto(item.id));
     return FutureBuilder<Uint8List>(
       future:future,builder:(context,snapshot){
-        if(snapshot.hasError)return const SizedBox(height:120,
-          child:Center(child:Icon(Icons.broken_image_outlined)));
-        if(!snapshot.hasData)return const SizedBox(height:120,
-          child:Center(child:CircularProgressIndicator()));
+        if(snapshot.hasError){
+          return const SizedBox(height:120,
+            child:Center(child:Icon(Icons.broken_image_outlined)));
+        }
+        if(!snapshot.hasData){
+          return const SizedBox(height:120,
+            child:Center(child:CircularProgressIndicator()));
+        }
         return Image.memory(snapshot.data!,height:160,width:double.infinity,
           fit:BoxFit.cover,semanticLabel:'Photo of ${item.title}');
       },
@@ -218,7 +224,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _photoWidget(item),
         const SizedBox(height:8),
         Row(children:[
-          Expanded(child:Text(item.category.toUpperCase()+' · '+item.condition,
+          Expanded(child:Text('${item.category.toUpperCase()} · ${item.condition}',
             style:const TextStyle(color:_teal,fontSize:11,fontWeight:FontWeight.w800))),
           Text(item.status.toUpperCase(),style:const TextStyle(
             fontSize:10,color:_muted,fontWeight:FontWeight.bold)),

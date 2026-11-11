@@ -51,7 +51,7 @@ The MongoDB collections are `marketplace_listings` and `marketplace_reports`. Bo
 3. **Moderation:** posts publish immediately and reports do not automatically hide items. Only Admin resolves reports; archive and audit entry use a MongoDB transaction. Broader prohibited-item rules, scam response process, takedown/appeal policy, automated abuse prevention and seller safety education still require formal review.
 4. **Payments:** there is **no transaction, order, escrow, bank payment, delivery or buyer protection** feature. Students arrange any exchange themselves; production must include a campus safety warning.
 5. **Backups:** MongoDB dumps in Milestone 20 do not include private image files. A separate storage backup/restore and retention policy is needed.
-6. **Testing pending:** unit/integration and Flutter test sources have been added but have **not been executed for Milestone 21**. Physical-phone, browser role acceptance, image-picker compatibility and Firebase/Atlas integration are explicitly deferred.
+6. **Testing pending:** backend unit/integration, web build/tests, Flutter analysis/tests and consolidated QA **passed in GitHub Actions on 2026-11-11**. Physical-device and live-service acceptance remain pending. Physical-phone, browser role acceptance, image-picker compatibility and Firebase/Atlas integration are explicitly deferred.
 7. **Draft chain:** Milestone 21 is stacked on unmerged Milestone 20 and the earlier drafts. No merge to `main`, deployment, real campus role creation or database mutation is part of this PR.
 
 ### Later local verification (not executed)

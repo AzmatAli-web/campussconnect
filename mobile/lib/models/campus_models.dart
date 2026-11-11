@@ -329,3 +329,35 @@ class CampusMarketplaceItem {
     contactAvailable:data['contactAvailable']==true,createdAt:parseDate(data['createdAt']),
   );
 }
+
+
+class CampusLostFoundItem {
+  final String id;
+  final String kind;
+  final String title;
+  final String description;
+  final String category;
+  final String locationText;
+  final DateTime? occurredAt;
+  final String contactPreference;
+  final String status;
+  final DateTime? createdAt;
+
+  const CampusLostFoundItem({
+    required this.id, required this.kind, required this.title,
+    required this.description, required this.category,
+    required this.locationText, required this.occurredAt,
+    required this.contactPreference, required this.status,
+    required this.createdAt,
+  });
+  factory CampusLostFoundItem.fromJson(Json data) => CampusLostFoundItem(
+    id:stringField(data,'id'),kind:stringField(data,'kind'),
+    title:stringField(data,'title'),description:stringField(data,'description'),
+    category:stringField(data,'category'),
+    locationText:stringField(data,'locationText'),
+    occurredAt:parseDate(data['occurredAt']),
+    contactPreference:stringField(data,'contactPreference','helpdesk'),
+    status:stringField(data,'status'),
+    createdAt:parseDate(data['createdAt']),
+  );
+}

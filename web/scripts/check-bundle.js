@@ -5,7 +5,7 @@ import {join,resolve} from 'node:path';
 const assets=resolve('dist/assets');
 const files=readdirSync(assets).filter(file=>file.endsWith('.js'));
 const featureModules=['AdminPanel','TimetablePage','AcademicResourcesPage',
-  'ComplaintsPage','FeesPage','MarketplacePage'];
+  'ComplaintsPage','FeesPage','MarketplacePage','LostFoundPage'];
 const missing=featureModules.filter(name=>
   !files.some(file=>file.startsWith(name+'-'))
 );

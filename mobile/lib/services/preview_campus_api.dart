@@ -301,4 +301,75 @@ class PreviewCampusApi extends CampusApi {
   ) async {
     throw const CampusApiException('OFFLINE_PREVIEW','No photo upload in preview.');
   }
+
+  final List<CampusLostFoundItem> _lostFound=[
+    const CampusLostFoundItem(
+      id:'demo-lost-1',kind:'found',title:'Found demo student notebook',
+      description:'Fictional lost and found notebook in the library reading room.',
+      category:'documents',locationText:'Library reading room (demo)',
+      occurredAt:null,contactPreference:'helpdesk',
+      status:'open',createdAt:null,
+    ),
+  ];
+  final List<String> _mineLostFoundIds=[];
+
+  @override
+  Future<List<CampusLostFoundItem>> getLostFoundItems({
+    String? query,String? kind,String? category,
+  }) async => _lostFound.where((i)=>
+    i.status=='open' &&
+    (kind==null||kind.isEmpty||i.kind==kind) &&
+    (category==null||category.isEmpty||i.category==category) &&
+    (query==null||query.trim().isEmpty||
+      i.title.toLowerCase().contains(query.trim().toLowerCase())||
+      i.description.toLowerCase().contains(query.trim().toLowerCase())||
+      i.locationText.toLowerCase().contains(query.trim().toLowerCase()))
+  ).toList(growable:false);
+
+  @override
+  Future<List<CampusLostFoundItem>> getMyLostFoundItems() async =>
+    _lostFound.where((i)=>_mineLostFoundIds.contains(i.id))
+      .toList(growable:false);
+
+  @override
+  Future<CampusLostFoundItem> createLostFoundItem({
+    required String kind,required String title,required String description,
+    required String category,required String locationText,
+    required String contactPreference,String? occurredAt,
+  }) async {
+    final item=CampusLostFoundItem(
+      id:'demo-lost-${_lostFound.length+1}',kind:kind,title:title,
+      description:description,category:category,locationText:locationText,
+      occurredAt:occurredAt==null?null:DateTime.tryParse(occurredAt),
+      contactPreference:contactPreference,status:'open',createdAt:DateTime.now(),
+    );
+    _lostFound.insert(0,item);
+    _mineLostFoundIds.add(item.id);
+    return item;
+  }
+
+  @override
+  Future<CampusLostFoundItem> updateLostFoundItem(
+    String id,Json changes,
+  ) async {
+    if(!_mineLostFoundIds.contains(id)){
+      throw const CampusApiException('FORBIDDEN','Not your demo report.');
+    }
+    final index=_lostFound.indexWhere((i)=>i.id==id);
+    if(index<0||_lostFound[index].status!='open'){
+      throw const CampusApiException('NOT_FOUND','Open demo report unavailable.');
+    }
+    final old=_lostFound[index];
+    final next=CampusLostFoundItem(
+      id:old.id,kind:old.kind,category:old.category,
+      title:changes['title'] as String? ?? old.title,
+      description:changes['description'] as String? ?? old.description,
+      locationText:changes['locationText'] as String? ?? old.locationText,
+      occurredAt:old.occurredAt,contactPreference:old.contactPreference,
+      status:changes['status'] as String? ?? old.status,
+      createdAt:old.createdAt,
+    );
+    _lostFound[index]=next;
+    return next;
+  }
 }

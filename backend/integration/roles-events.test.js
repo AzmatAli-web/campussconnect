@@ -851,7 +851,8 @@ test('Marketplace: tenant isolation, student ownership, consent, private photo a
  assert.equal(photo.body.data.hasImage,true);
  const imageRead=await request(app).get('/api/v1/marketplace/'+id+'/image').set(auth(visitor));
  assert.equal(imageRead.status,200);
- assert.match(imageRead.headers['content-type'],/image\\/png/);
+ assert.ok(imageRead.headers['content-type'].includes('image/png'));
+
 
  // Another tenant's content never enters this university's browse feed.
  await MarketplaceListing.create({

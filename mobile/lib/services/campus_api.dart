@@ -370,8 +370,10 @@ class CampusApi {
     }on http.ClientException{
       throw const CampusApiException('NETWORK_FAILURE','Cannot reach the photo server.');
     }
-    if(response.statusCode!=200)throw CampusApiException(
-      'IMAGE_UNAVAILABLE','Photo is unavailable.',response.statusCode);
+    if(response.statusCode!=200){
+      throw CampusApiException(
+        'IMAGE_UNAVAILABLE','Photo is unavailable.',response.statusCode);
+    }
     final mime=(response.headers['content-type']??'').split(';').first;
     if(!['image/jpeg','image/png','image/webp'].contains(mime)||
       response.bodyBytes.length>2*1024*1024){
@@ -392,8 +394,10 @@ class CampusApi {
     final mime=name.endsWith('.jpg')||name.endsWith('.jpeg')?'image/jpeg':
       name.endsWith('.png')?'image/png':
       name.endsWith('.webp')?'image/webp':null;
-    if(mime==null)throw const CampusApiException(
-      'INVALID_MARKET_IMAGE','Choose JPEG, PNG or WebP.');
+    if(mime==null){
+      throw const CampusApiException(
+        'INVALID_MARKET_IMAGE','Choose JPEG, PNG or WebP.');
+    }
     final token=await idTokenProvider();
     if(token.isEmpty)throw const CampusApiException('AUTH_REQUIRED','Sign in again.');
     final request=http.MultipartRequest('POST',

@@ -20,9 +20,10 @@ const ComplaintsPage=lazy(()=>import('./ComplaintsPage.jsx'));
 const FeesPage=lazy(()=>import('./FeesPage.jsx'));
 const MarketplacePage=lazy(()=>import('./MarketplacePage.jsx'));
 const LostFoundPage=lazy(()=>import('./LostFoundPage.jsx'));
+const SocietiesPage=lazy(()=>import('./SocietiesPage.jsx'));
 const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','events','registrations','admin'].includes(tab))requested.events='/events?limit=50';
@@ -109,6 +110,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   resources:<AcademicResourcesPage {...props}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,
+  societies:<SocietiesPage {...props}/>,
   complaints:<ComplaintsPage {...props}/>,
   fees:<FeesPage {...props}/>,
   organizer:<Organizer {...props}/>,

@@ -12,6 +12,7 @@
     "test": "node --test test/*.test.js",
     "admin:bootstrap": "node scripts/bootstrap-admin.js",
     "db:ensure-indexes": "node scripts/ensure-indexes.js",
+    "notifications:dispatch": "node scripts/dispatch-notifications.js",
     "test:integration": "node --test --test-timeout=240000 integration/*.test.js"
   },
   "dependencies": {

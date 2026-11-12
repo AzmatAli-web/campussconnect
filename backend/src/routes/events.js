@@ -4,6 +4,8 @@ import {createHash} from 'node:crypto';
 import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campus-user.js';
 import {Event,EventRegistration,IdempotencyKey,Society,SocietyManagerAssignment} from '../models/campus-content.js';
+import {CampusNotification} from '../models/notification.js';
+import {personalNotificationData} from '../services/notification-feed.js';
 import {eventInput,eventView,registrationInput,registrationView,privateRegistrationView,pagination,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
 
 const has=(req,role)=>req.roles.includes(role);
@@ -152,6 +154,16 @@ export function eventsRouter(deps){
      studentNameSnapshot:req.currentUser.fullName,
      status:'confirmed',confirmedAt:now
     }],{session});
+    // Same transaction as registration, so a failed seat reservation never
+    // creates a false confirmation and an idempotent replay never duplicates it.
+    await CampusNotification.create([personalNotificationData({
+     universityId,recipientId:studentId,
+     type:'event_registration',sourceId:event._id,
+     sourceKey:'event-registration:'+String(registration._id),
+     title:'Event registration confirmed',
+     body:'Your campus event registration was confirmed. Open My registrations for details.',
+     at:now
+    })],{session});
     responseBody={data:registrationView(registration)};
     receipt.status='completed';receipt.responseCode=201;receipt.responseBody=responseBody;
     await receipt.save({session});

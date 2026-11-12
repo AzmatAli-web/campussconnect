@@ -510,14 +510,14 @@ class CampusApi {
     return status['enabled']==true;
   }
 
-  Future<void> registerPushDevice(String token) async {
+  Future<void> registerPushDevice(String fid) async {
     await _request('/notifications/push-devices',method:'POST',
-      body:{'token':token,'consent':true});
+      body:{'fid':fid,'consent':true});
   }
 
-  Future<void> revokePushDevice(String token) async {
+  Future<void> revokePushDevice(String fid) async {
     await _request('/notifications/push-devices/revoke',method:'POST',
-      body:{'token':token});
+      body:{'fid':fid});
   }
 
   void dispose() => client.close();

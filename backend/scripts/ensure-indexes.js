@@ -12,13 +12,14 @@ import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
 import {MarketplaceListing,MarketplaceReport} from '../src/models/marketplace.js';
 import {LostFoundItem} from '../src/models/lost-found.js';
 import {SocietyMembership} from '../src/models/society-membership.js';
+import {CampusNotification,AnnouncementNotificationRead,NotificationPushDevice} from '../src/models/notification.js';
 
 async function main(){
  const config=parseEnvironment();
  if(!config.mongoUri||!config.universityId) throw new Error('Database and university must be configured first');
  await connectDatabase(config);
  try{
-  for(const model of [User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership]){
+  for(const model of [User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
    await model.createIndexes();
    console.log('Checked indexes:',model.collection.name);
   }

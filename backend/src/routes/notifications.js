@@ -13,16 +13,16 @@ import {
  notificationFeed,limitNotificationBody
 } from '../services/notification-feed.js';
 
-function tokenDigest(token){return createHash('sha256').update(token).digest('hex');}
-function requirePushToken(body,withConsent=false){
- requireBody(body,withConsent?['token','consent']:['token']);
- const token=body.token;
- if(typeof token!=='string'||token.length<80||token.length>4096||
-    !/^[a-zA-Z0-9:_.-]+$/.test(token))
-  throw new HttpError(422,'INVALID_PUSH_TOKEN','Invalid Firebase registration token');
+function fidDigest(fid){return createHash('sha256').update(fid).digest('hex');}
+function requirePushFid(body,withConsent=false){
+ requireBody(body,withConsent?['fid','consent']:['fid']);
+ const fid=body.fid;
+ if(typeof fid!=='string'||fid.length<20||fid.length>256||
+    !/^[a-zA-Z0-9:_.-]+$/.test(fid))
+  throw new HttpError(422,'INVALID_PUSH_FID','Invalid Firebase Installation ID');
  if(withConsent&&body.consent!==true)
   throw new HttpError(422,'PUSH_CONSENT_REQUIRED','Explicit notification consent is required');
- return token;
+ return fid;
 }
 export function notificationsRouter(deps){
  const router=Router(),auth=campusUserMiddleware(deps);
@@ -84,11 +84,11 @@ export function notificationsRouter(deps){
   return res.json({data:{enabled:count>0,devices:count}});
  }));
  router.post('/notifications/push-devices',auth,asyncHandler(async(req,res)=>{
-  const token=requirePushToken(req.body,true);
+  const fid=requirePushFid(req.body,true);
   const uni=req.currentUser.universityId,userId=req.currentUser._id;
-  const hash=tokenDigest(token);
+  const hash=fidDigest(fid);
   const known=await NotificationPushDevice.findOne({
-   universityId:uni,tokenHash:hash
+   universityId:uni,fidHash:hash
   }).select('_id').lean();
   if(!known){
    const count=await NotificationPushDevice.countDocuments({universityId:uni,userId});
@@ -98,7 +98,7 @@ export function notificationsRouter(deps){
   try{
    await NotificationPushDevice.findOneAndUpdate({
     universityId:uni,tokenHash:hash
-   },{$set:{userId,token,platform:'android',lastSeenAt:new Date()}},
+   },{$set:{userId,fid,platform:'android',lastSeenAt:new Date()}},
    {upsert:true,new:true,runValidators:true,setDefaultsOnInsert:true});
   }catch(error){
    if(error?.code!==11000)throw error;

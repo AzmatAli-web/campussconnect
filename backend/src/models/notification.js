@@ -35,12 +35,12 @@ readSchema.index({expiresAt:1},{expireAfterSeconds:0});
 
 const deviceSchema=new Schema({
  universityId:oid,userId:oid,
- tokenHash:{type:String,required:true,match:/^[a-f0-9]{64}$/},
- token:{type:String,required:true,minlength:80,maxlength:4096,select:false},
+ fidHash:{type:String,required:true,match:/^[a-f0-9]{64}$/},
+ fid:{type:String,required:true,minlength:20,maxlength:256,select:false},
  platform:{type:String,enum:['android'],required:true,default:'android'},
  lastSeenAt:{type:Date,default:Date.now,required:true}
 },{timestamps:true,collection:'notification_push_devices',versionKey:false});
-deviceSchema.index({universityId:1,tokenHash:1},{unique:true});
+deviceSchema.index({universityId:1,fidHash:1},{unique:true});
 deviceSchema.index({universityId:1,userId:1,lastSeenAt:-1});
 
 export const CampusNotification=mongoose.models.CampusNotification||

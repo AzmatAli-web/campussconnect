@@ -453,7 +453,7 @@ class CampusApi {
       'description':description.trim(),'category':category,
       'locationText':locationText.trim(),
       'contactPreference':contactPreference,
-      if(occurredAt!=null)'occurredAt':occurredAt,
+      'occurredAt': ?occurredAt,
     })));
 
   Future<CampusLostFoundItem> updateLostFoundItem(

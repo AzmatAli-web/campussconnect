@@ -480,8 +480,10 @@ class PreviewCampusApi extends CampusApi {
   Future<DateTime> markNotificationRead(CampusNotification item) async {
     final index=_demoNotifications.indexWhere(
       (n)=>n.kind==item.kind&&n.id==item.id);
-    if(index<0)throw const CampusApiException(
-      'NOTIFICATION_NOT_FOUND','Offline notification unavailable.');
+    if(index<0){
+      throw const CampusApiException(
+        'NOTIFICATION_NOT_FOUND','Offline notification unavailable.');
+    }
     final at=_demoNotifications[index].readAt??DateTime.now();
     _demoNotifications[index]=_demoNotifications[index].markRead(at);
     return at;

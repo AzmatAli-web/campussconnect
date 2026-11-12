@@ -7,6 +7,8 @@ import {Society,SocietyManagerAssignment} from '../models/campus-content.js';
 import {SocietyMembership} from '../models/society-membership.js';
 import {User} from '../models/user.js';
 import {AuditLog} from '../models/governance.js';
+import {CampusNotification} from '../models/notification.js';
+import {personalNotificationData} from '../services/notification-feed.js';
 import {
  emptySocietyBody,societyMembersFilter,reviewSocietyMembership,
  societyMembershipView,privateSocietyMemberView
@@ -170,6 +172,17 @@ export function societyMembershipsRouter(deps){
      },{$set:set},{new:true,session,runValidators:true});
      if(!result)throw new HttpError(409,'MEMBERSHIP_CHANGED',
       'Concurrent membership review; refresh before trying again');
+     await CampusNotification.create([personalNotificationData({
+      universityId:uni,recipientId:before.studentId,
+      type:action==='approve'?'membership_approved':action==='reject'?
+       'membership_rejected':'membership_removed',
+      sourceId:societyId,
+      sourceKey:'society-review:'+String(membershipId)+':'+next+':'+timestamp.getTime(),
+      title:action==='approve'?'Society membership approved':
+       action==='reject'?'Society membership decision':'Society membership ended',
+      body:'Your society membership status has changed. Open Societies for details.',
+      at:timestamp
+     })],{session});
      await AuditLog.create([{
       universityId:uni,actorId:req.currentUser._id,
       action:'society.membership.'+next,

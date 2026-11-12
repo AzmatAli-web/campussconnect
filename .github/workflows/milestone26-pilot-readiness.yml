@@ -1,0 +1,57 @@
+name: Milestone 26 — Controlled Pilot Readiness
+
+on:
+  push:
+    branches:
+      - feature/milestone26-controlled-pilot-readiness
+    paths:
+      - 'backend/**'
+      - '.github/workflows/milestone26-pilot-readiness.yml'
+      - 'docs/STAGING_PILOT_RUNBOOK.md'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/milestone26-pilot-readiness.yml'
+      - 'docs/STAGING_PILOT_RUNBOOK.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-secrets-pilot-gates:
+    name: Fail-closed staging guards and read-only mock acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without accessing campus services
+        run: npm install --no-audit --no-fund
+      - name: Validate isolated staging configuration and HTTP contract
+        run: npm run test:pilot
+      - name: Confirm unconfigured pilot preflight refuses to run
+        run: |
+          if env -u MONGODB_URI -u FIREBASE_PROJECT_ID -u UNIVERSITY_ID \
+                 -u CAMPUS_PILOT_STAGE -u CAMPUS_PILOT_DATA_POLICY \
+                 -u CAMPUS_PILOT_API_BASE_URL -u CAMPUS_PILOT_OWNER \
+                 -u CAMPUS_PILOT_ROLLBACK_OWNER -u CAMPUS_PILOT_APPROVED_TEST_ACCOUNTS \
+                 npm run pilot:preflight; then
+            echo "ERROR: unconfigured pilot preflight accepted invalid environment"
+            exit 1
+          else
+            echo "PASS: incomplete staging configuration blocked"
+          fi
+      - name: Confirm live smoke requires explicit approval
+        run: |
+          if env -u CAMPUS_PILOT_SMOKE_ACK npm run pilot:smoke; then
+            echo "ERROR: live staging probe executed without explicit opt-in"
+            exit 1
+          else
+            echo "PASS: live staging probe blocked"
+          fi

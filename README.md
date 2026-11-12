@@ -6,16 +6,16 @@ A **college campus services platform** with a Flutter Android student app, React
 
 **Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
 
-Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (integration, announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI pending)**. The financial ledger is **not a bank or payment processor**.
+Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
 ## Latest development branch (draft; not merged)
 
-`feature/milestone25-integration-security-performance` builds on the CI-green Milestone 24 branch, which stacks on Milestones 23, 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–24 have passed automated QA; Milestone 25 is pending its new security/performance checks.** Physical device and production acceptance remain pending. All remain in draft, undeployed and not yet accepted on a physical Android device.
+`feature/milestone26-controlled-pilot-readiness` builds on the CI-green Milestone 25 branch, which stacks on Milestones 24, 23, 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–26 passed automated CI, including Milestone 26's fail-closed pilot guards, backend regression, React and Flutter tests. Live staging has not been deployed, tested or approved.** Physical device and production acceptance remain pending. All remain in draft, undeployed and not yet accepted on a physical Android device.
 
 ```powershell
 git fetch origin
-git switch feature/milestone25-integration-security-performance
-git pull --ff-only origin feature/milestone25-integration-security-performance
+git switch feature/milestone26-controlled-pilot-readiness
+git pull --ff-only origin feature/milestone26-controlled-pilot-readiness
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\verify-all.ps1
 ```
@@ -43,6 +43,8 @@ For the physical Flutter app, see [USB Android live test](docs/USB_ANDROID_LIVE_
 
 ## Important docs
 
+- [Milestone 26 Controlled Staging Pilot Runbook](docs/STAGING_PILOT_RUNBOOK.md)
+- [Pilot Acceptance Record (NO-GO by default)](docs/PILOT_ACCEPTANCE_RECORD.md)
 - [Milestone 25 Security & Performance QA](docs/MILESTONE25_SECURITY_PERFORMANCE.md)
 - [Milestone 24 Notifications and performance optimization](docs/NOTIFICATIONS_OPTIMIZATION.md)
 - [Milestone 23 Society Membership scope, APIs and authorization](docs/SOCIETY_MEMBERSHIP_MVP.md)

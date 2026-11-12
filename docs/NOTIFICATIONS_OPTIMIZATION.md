@@ -21,8 +21,8 @@ All routes are `/api/v1`, authenticated via Firebase and university-scoped.
 | GET | `/notifications?limit=20&cursor=...` | `{data:{items,nextCursor,hasMore,limit,unreadOnPage}}`. Default 20, max 40. Stable reverse chronological keyset cursor. |
 | POST | `/notifications/:kind/:id/read` | Body `{}`; `kind=personal|announcement`. Owner/audience enforced. |
 | GET | `/notifications/push-status` | Own opt-in device count, not tokens. |
-| POST | `/notifications/push-devices` | Android Firebase registration `{token:"...",consent:true}`; up to five opted-in devices per campus user. Never returns token. |
-| POST | `/notifications/push-devices/revoke` | `{token:"..."}`; revokes only a token currently registered to this user. |
+| POST | `/notifications/push-devices` | Android Firebase Installation ID `{fid:"...",consent:true}`; up to five opted-in devices per campus user. Never returns FID. |
+| POST | `/notifications/push-devices/revoke` |  `{fid:"..."}`; revokes only a FID currently registered to this user. |
 
 Inbox example:
 ```json
@@ -58,7 +58,7 @@ Inbox example:
 
 ## Optional Android push worker
 
-The Flutter screen requests notification permission only after an explicit user action and registers the FCM token through the authenticated backend. Offline-preview mode never initializes Firebase Messaging or sends device registration requests. Tokens are stored privately in `notification_push_devices` and **must be treated as secrets**. A token reused by a different logged-in user is reassigned; token revocation on sign-out/account change should be added before production.
+The Flutter screen requests notification permission only after an explicit user action and registers the Firebase Installation ID (FID) through the authenticated backend. Offline-preview mode never initializes Firebase Messaging or sends device registration requests. Tokens are stored privately in `notification_push_devices` and **must be treated as private identifiers**. A FID re-registered to a different account is reassigned; FID revocation on sign-out/account change should be added before production.
 
 Push is **opt-in and not automatically scheduled**. The server-side dispatcher uses Firebase Admin application-default credentials and must be invoked by an operator or a protected scheduler from a configured service, for example:
 
@@ -73,12 +73,18 @@ Each invocation processes at most 25 pending personal notifications (limit 50). 
 
 An enabled push button **does not** guarantee a message will be delivered until a secure dispatch scheduler and Firebase Admin credentials exist. The in-app inbox is the primary reliable record. Server-side FCM delivery and Android notification permissions still need actual staging/physical-device verification.
 
+## Android / Flutter compatibility
+
+- The Android manifest explicitly enables FID-based Firebase Messaging registration (`firebase_messaging_installation_id_enabled=true`) and Android 13+ system notification permission.
+- The project uses `firebase_messaging ^17.0.1`, `firebase_core ^5.1.0` and `firebase-admin ^14.2.0` because Firebase 17 registration is FID-based, not token-based. The server dispatcher passes `fids` to `sendEachForMulticast()`.
+- Flutter 3.50 deprecated in-framework Material imports. The app has migrated to `material_ui ^1.11.0` and a Dart SDK floor of 3.13; **developers need Flutter 3.50+** to build this branch. CI is the first compatibility gate; physical Android acceptance remains deferred. These changes deliberately avoid silencing analyzer warnings.
+
 ## Explicit release limitations
 
 - Push dispatcher is opt-in manual/scheduler-driven; not a continuously deployed service.
 - No FCM broadcasting to all announcement subscribers, no automatic local reminders, and no user-configured per-category quiet hours.
 - The old `GET /announcements` society audience policy is broader than the notification inbox and should be aligned separately.
-- Device token cleanup on sign-out, privacy retention approval, push abuse limits, delivery monitoring, real-device tests, and cross-role acceptance remain pending.
+- Installation ID cleanup on sign-out, privacy retention approval, push abuse limits, delivery monitoring, real-device tests, and cross-role acceptance remain pending.
 - CI tests cover unit, isolated integration, React build and Flutter; there is no authenticated real Firebase/Atlas acceptance or production deployment.
 - This branch is stacked on unmerged drafts and should remain a draft PR pending release review.
 

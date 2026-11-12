@@ -491,13 +491,13 @@ class PreviewCampusApi extends CampusApi {
   Future<bool> hasRegisteredPushDevice() async =>false;
 
   @override
-  Future<void> registerPushDevice(String token) async {
+  Future<void> registerPushDevice(String fid) async {
     throw const CampusApiException('OFFLINE_PREVIEW',
       'Firebase push is disabled in offline preview.');
   }
 
   @override
-  Future<void> revokePushDevice(String token) async {
+  Future<void> revokePushDevice(String fid) async {
     throw const CampusApiException('OFFLINE_PREVIEW',
       'Firebase push is disabled in offline preview.');
   }

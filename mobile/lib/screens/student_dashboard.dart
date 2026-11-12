@@ -753,7 +753,7 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Expanded(child: Text(title,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _navy))),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       );
 }

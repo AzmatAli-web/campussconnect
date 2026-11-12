@@ -403,3 +403,50 @@ class CampusSocietyMembership {
     reviewNote:stringField(data,'reviewNote'),
   );
 }
+
+
+class CampusNotification {
+  final String id;
+  final String kind;
+  final String type;
+  final String title;
+  final String body;
+  final String sourceId;
+  final DateTime? createdAt;
+  final DateTime? readAt;
+
+  const CampusNotification({
+    required this.id,required this.kind,required this.type,
+    required this.title,required this.body,required this.sourceId,
+    required this.createdAt,required this.readAt,
+  });
+  factory CampusNotification.fromJson(Json value)=>CampusNotification(
+    id:stringField(value,'id'),kind:stringField(value,'kind'),
+    type:stringField(value,'type'),title:stringField(value,'title'),
+    body:stringField(value,'body'),sourceId:stringField(value,'sourceId'),
+    createdAt:parseDate(value['createdAt']),
+    readAt:parseDate(value['readAt']),
+  );
+  CampusNotification markRead(DateTime when)=>CampusNotification(
+    id:id,kind:kind,type:type,title:title,body:body,sourceId:sourceId,
+    createdAt:createdAt,readAt:when,
+  );
+}
+
+class CampusNotificationPage {
+  final List<CampusNotification> items;
+  final String? nextCursor;
+  final bool hasMore;
+  final int unreadOnPage;
+  const CampusNotificationPage({
+    required this.items,required this.nextCursor,
+    required this.hasMore,required this.unreadOnPage,
+  });
+  factory CampusNotificationPage.fromJson(Json data)=>CampusNotificationPage(
+    items:asJsonList(data['items']).map(CampusNotification.fromJson)
+      .toList(growable:false),
+    nextCursor:data['nextCursor'] is String?data['nextCursor'] as String:null,
+    hasMore:data['hasMore']==true,
+    unreadOnPage:numberField(data,'unreadOnPage'),
+  );
+}

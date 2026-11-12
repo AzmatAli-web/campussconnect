@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../models/campus_models.dart';
 import '../services/campus_api.dart';
@@ -12,6 +12,7 @@ import 'my_fees_screen.dart';
 import 'marketplace_screen.dart';
 import 'lost_found_screen.dart';
 import 'societies_screen.dart';
+import 'notifications_screen.dart';
 
 const _navy = Color(0xFF142A3F);
 const _teal = Color(0xFF10AC99);
@@ -136,6 +137,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => MarketplaceScreen(
         api: widget.api,profile: widget.profile,previewMode: widget.previewMode,
+      ),
+    ));
+  }
+
+  void _openNotifications() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NotificationsScreen(
+        api: widget.api,previewMode: widget.previewMode,
       ),
     ));
   }
@@ -303,6 +312,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
             onPressed: _openSocieties,
             icon: const Icon(Icons.groups_outlined),
             label: const Text('Browse campus societies'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openNotifications,
+            icon: const Icon(Icons.notifications_outlined),
+            label: const Text('My campus notifications'),
           ),
         ),
         const SizedBox(height: 20),
@@ -597,6 +614,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.notifications_outlined),
+                      label: const Text('Notification inbox'),
+                      onPressed: _openNotifications,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
                       icon: const Icon(Icons.account_balance_wallet_outlined),
                       label: const Text('My fees & dues'),
                       onPressed: widget.profile.canRegister
@@ -727,7 +753,7 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Expanded(child: Text(title,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _navy))),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       );
 }

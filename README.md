@@ -10,7 +10,7 @@ Implemented MVP modules on the stacked development branches: university email au
 
 ## Latest development branch (draft; not merged)
 
-`feature/milestone24-notifications-optimization` builds on the CI-green Milestone 23 branch, which stacks on Milestones 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–23 have passed backend, web, Flutter and consolidated GitHub Actions checks; Milestone 24 is awaiting CI.** All remain in draft, undeployed and not yet accepted on a physical Android device.
+`feature/milestone24-notifications-optimization` builds on the CI-green Milestone 23 branch, which stacks on Milestones 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–23 have passed all CI checks. Milestone 24 backend/web and latest Flutter checks have passed; consolidated QA is being rechecked after Firebase 17 and Material UI compatibility fixes.** All remain in draft, undeployed and not yet accepted on a physical Android device.
 
 ```powershell
 git fetch origin

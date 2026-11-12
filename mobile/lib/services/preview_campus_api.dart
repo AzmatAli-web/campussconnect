@@ -465,8 +465,8 @@ class PreviewCampusApi extends CampusApi {
     String? cursor,int limit=20,
   }) async {
     final offset=cursor==null?0:int.tryParse(cursor)??0;
-    final start=offset.clamp(0,_demoNotifications.length);
-    final end=(start+limit).clamp(0,_demoNotifications.length);
+    final start=offset<0?0:(offset>_demoNotifications.length?_demoNotifications.length:offset);
+    final end=start+limit>_demoNotifications.length?_demoNotifications.length:start+limit;
     final page=_demoNotifications.sublist(start,end);
     return CampusNotificationPage(
       items:List.unmodifiable(page),

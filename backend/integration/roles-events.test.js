@@ -20,6 +20,7 @@ import {FeeInvoice,FeePaymentRecord} from '../src/models/fees.js';
 import {MarketplaceListing,MarketplaceReport} from '../src/models/marketplace.js';
 import {LostFoundItem} from '../src/models/lost-found.js';
 import {SocietyMembership} from '../src/models/society-membership.js';
+import {CampusNotification,AnnouncementNotificationRead,NotificationPushDevice} from '../src/models/notification.js';
 
 const UNIVERSITY_ID=new mongoose.Types.ObjectId();
 const DOMAIN='cuiatd.edu.pk';
@@ -75,7 +76,7 @@ before(async()=>{
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
  for(const model of [User,Event,EventRegistration,Announcement,
-  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership]){
+  Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
   await model.createIndexes();
  }
  [admin,manager,faculty,unauthorized,...students]=await User.insertMany([
@@ -1136,3 +1137,163 @@ test('Society Membership: students request safely; approved managers review; sta
   .set(auth('fixture-membership-manager')).send({action:'approve'});
  assert.equal(afterRevokeReview.status,403);
 },{timeout:90000});
+
+
+test('Notifications: one shared announcement, personal ownership, indexed pagination and read tracking',async()=>{
+ const studentA='fixture-student-13',studentB='fixture-student-14',uni=UNIVERSITY_ID;
+ const now=new Date();
+ const a=await Announcement.create({
+  universityId:uni,authorId:admin._id,scope:'university',
+  title:'Campus-wide timetable change',
+  body:'This integration announcement is campus-wide but stored only once in announcements.',
+  status:'published',publishedAt:now
+ });
+ await CampusNotification.create({
+  universityId:uni,recipientId:students[13]._id,
+  type:'event_registration',sourceId:a._id,
+  sourceKey:'notification-isolation-test-'+a._id,
+  title:'Private registration update',body:'This is private to student 13.',
+  expiresAt:new Date(now.getTime()+90*86400_000),
+  pushState:'pending',pushNextAt:now
+ });
+ const unauthorized=await request(app).get('/api/v1/notifications');
+ assert.equal(unauthorized.status,401);
+ const first=await request(app).get('/api/v1/notifications?limit=1').set(auth(studentA));
+ assert.equal(first.status,200,JSON.stringify(first.body));
+ assert.equal(first.body.data.items.length,1);
+ assert.equal(first.body.data.hasMore,true);
+ assert.ok(first.body.data.nextCursor);
+ const next=await request(app).get('/api/v1/notifications?limit=1&cursor='+
+  encodeURIComponent(first.body.data.nextCursor)).set(auth(studentA));
+ assert.equal(next.status,200,JSON.stringify(next.body));
+ assert.notEqual(first.body.data.items[0].id,next.body.data.items[0].id);
+ const all=await request(app).get('/api/v1/notifications?limit=40').set(auth(studentA));
+ assert.equal(all.status,200,JSON.stringify(all.body));
+ const privateNote=all.body.data.items.find(x=>x.title==='Private registration update');
+ assert.ok(privateNote);
+ assert.equal(privateNote.kind,'personal');
+ for(const forbidden of ['recipientId','universityId','pushState','sourceKey']){
+  assert.ok(!Object.hasOwn(privateNote,forbidden));
+ }
+ assert.ok(all.body.data.items.some(x=>x.id===String(a._id)&&x.kind==='announcement'));
+ const other=await request(app).get('/api/v1/notifications?limit=40').set(auth(studentB));
+ assert.equal(other.status,200);
+ assert.ok(!other.body.data.items.some(x=>x.title==='Private registration update'));
+ const foreignRead=await request(app).post('/api/v1/notifications/personal/'+privateNote.id+'/read')
+  .set(auth(studentB)).send({});
+ assert.equal(foreignRead.status,404);
+ const marked=await request(app).post('/api/v1/notifications/personal/'+privateNote.id+'/read')
+  .set(auth(studentA)).send({});
+ assert.equal(marked.status,200);
+ assert.ok(marked.body.data.readAt);
+ const announcementRead=await request(app).post('/api/v1/notifications/announcement/'+a._id+'/read')
+  .set(auth(studentA)).send({});
+ assert.equal(announcementRead.status,200);
+ const again=await request(app).post('/api/v1/notifications/announcement/'+a._id+'/read')
+  .set(auth(studentA)).send({});
+ assert.equal(again.status,200);
+ assert.equal(await AnnouncementNotificationRead.countDocuments({
+  universityId:uni,recipientId:students[13]._id,announcementId:a._id
+ }),1);
+ const after=await request(app).get('/api/v1/notifications?limit=40').set(auth(studentA));
+ assert.equal(after.status,200);
+ assert.ok(after.body.data.items.find(x=>x.id===String(a._id)).readAt);
+ assert.ok(after.body.data.items.find(x=>x.id===privateNote.id).readAt);
+ const otherStillUnread=await request(app).get('/api/v1/notifications?limit=40').set(auth(studentB));
+ assert.equal(otherStillUnread.body.data.items.find(x=>x.id===String(a._id)).readAt,null);
+
+ const foreign=await Announcement.create({
+  universityId:new mongoose.Types.ObjectId(),authorId:admin._id,
+  scope:'university',title:'Foreign campus announcement',
+  body:'This report is part of another university and must be invisible.',
+  status:'published',publishedAt:new Date()
+ });
+ const shouldNotAppear=await request(app).get('/api/v1/notifications?limit=40').set(auth(studentB));
+ assert.ok(!shouldNotAppear.body.data.items.some(x=>x.id===String(foreign._id)));
+ for(const bad of ['!', 'foo', 'abc']) {
+  const res=await request(app).get('/api/v1/notifications?cursor='+encodeURIComponent(bad))
+   .set(auth(studentA));
+  assert.equal(res.status,400);
+ }
+},{timeout:60000});
+
+test('Notifications: confirmed events and manager reviews write one private transactional record',async()=>{
+ const student='fixture-student-15',uni=UNIVERSITY_ID;
+ const event=await Event.create({
+  ...makeEvent('Event for notification verification'),universityId:uni,
+  organizerId:admin._id,organizerType:'faculty',
+  confirmedCount:0,status:'published'
+ });
+ const key=idem(9899),endpoint='/api/v1/events/'+event._id+'/registrations';
+ const input={universityEmail:students[15].emailNormalized};
+ const registered=await request(app).post(endpoint).set(auth(student))
+  .set('Idempotency-Key',key).send(input);
+ assert.equal(registered.status,201,JSON.stringify(registered.body));
+ const replay=await request(app).post(endpoint).set(auth(student))
+  .set('Idempotency-Key',key).send(input);
+ assert.equal(replay.status,201);
+ assert.equal(await CampusNotification.countDocuments({
+  universityId:uni,recipientId:students[15]._id,
+  type:'event_registration',sourceId:event._id
+ }),1);
+
+ const m=await User.create(person('fixture-notification-reviewer',['student','societyManager']));
+ const group=await Society.create({
+  universityId:uni,name:'Notification Society',slug:'notification-society',
+  description:'A dedicated fixture for private membership updates',
+  createdBy:admin._id,status:'active'
+ });
+ await SocietyManagerAssignment.create({
+  universityId:uni,societyId:group._id,userId:m._id,
+  status:'active',approvedAt:new Date(),approvedBy:admin._id
+ });
+ const membership=await SocietyMembership.create({
+  universityId:uni,societyId:group._id,studentId:students[16]._id,status:'pending'
+ });
+ const res=await request(app).post('/api/v1/managed-societies/'+group._id+
+  '/memberships/'+membership._id+'/review')
+  .set(auth('fixture-notification-reviewer')).send({action:'approve'});
+ assert.equal(res.status,200,JSON.stringify(res.body));
+ const note=await CampusNotification.findOne({
+  universityId:uni,recipientId:students[16]._id,
+  type:'membership_approved',sourceId:group._id
+ }).lean();
+ assert.ok(note);
+ assert.equal(await CampusNotification.countDocuments({
+  recipientId:students[16]._id,type:'membership_approved',sourceId:group._id
+ }),1);
+ const outsider=await request(app).get('/api/v1/notifications?limit=40')
+  .set(auth('fixture-student-17'));
+ assert.ok(!outsider.body.data.items.some(x=>x.id===String(note._id)));
+},{timeout:60000});
+
+test('Notifications: Android push tokens are opt-in, hashed, private and revocable',async()=>{
+ const token='fcm:token-'+('Z'.repeat(108)),uni=UNIVERSITY_ID;
+ const studentA='fixture-student-18',studentB='fixture-student-19';
+ const bad=await request(app).post('/api/v1/notifications/push-devices')
+  .set(auth(studentA)).send({token,consent:false});
+ assert.equal(bad.status,422);
+ const registered=await request(app).post('/api/v1/notifications/push-devices')
+  .set(auth(studentA)).send({token,consent:true});
+ assert.equal(registered.status,200);
+ assert.ok(!JSON.stringify(registered.body).includes(token));
+ const firstStatus=await request(app).get('/api/v1/notifications/push-status')
+  .set(auth(studentA));
+ assert.equal(firstStatus.body.data.enabled,true);
+ const record=await NotificationPushDevice.findOne({universityId:uni,userId:students[18]._id})
+  .select('+token').lean();
+ assert.equal(record.token,token);
+ assert.notEqual(record.tokenHash,token);
+ // A token moved to a new signed-in account does not stay assigned to the old account.
+ const moved=await request(app).post('/api/v1/notifications/push-devices')
+  .set(auth(studentB)).send({token,consent:true});
+ assert.equal(moved.status,200);
+ assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,userId:students[18]._id}),0);
+ const wrongRevoke=await request(app).post('/api/v1/notifications/push-devices/revoke')
+  .set(auth(studentA)).send({token});
+ assert.equal(wrongRevoke.body.data.revoked,false);
+ const revoked=await request(app).post('/api/v1/notifications/push-devices/revoke')
+  .set(auth(studentB)).send({token});
+ assert.equal(revoked.body.data.revoked,true);
+ assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,tokenHash:record.tokenHash}),0);
+},{timeout:60000});

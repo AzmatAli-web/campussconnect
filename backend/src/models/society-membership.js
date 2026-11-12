@@ -21,6 +21,7 @@ const schema=new Schema({
 schema.index({universityId:1,societyId:1,studentId:1},{unique:true});
 schema.index({universityId:1,societyId:1,status:1,requestedAt:-1,_id:-1});
 schema.index({universityId:1,studentId:1,updatedAt:-1,_id:-1});
+schema.index({universityId:1,studentId:1,status:1,societyId:1});
 
 export const SocietyMembership=mongoose.models.SocietyMembership??
  mongoose.model('SocietyMembership',schema);

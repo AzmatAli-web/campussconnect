@@ -34,7 +34,8 @@ export function notificationsRouter(deps){
  router.get('/notifications',auth,asyncHandler(async(req,res)=>{
   const limit=notificationLimit(req.query);
   const cursor=notificationCursor(req.query.cursor);
-  return res.json(await notificationFeed(req,{limit,cursor}));
+  const page=await notificationFeed(req,{limit,cursor});
+  return res.json({data:{items:page.data,...page.meta}});
  }));
  router.post('/notifications/:kind/:id/read',auth,asyncHandler(async(req,res)=>{
   limitNotificationBody(req.body);

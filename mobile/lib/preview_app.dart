@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'models/campus_models.dart';
 import 'screens/student_dashboard.dart';

@@ -3,11 +3,10 @@ import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campus-user.js';
 import {Announcement,Society,SocietyManagerAssignment} from '../models/campus-content.js';
 import {announcementInput,announcementView,pagination,requireObjectId,requireBody,textField} from '../services/mvp-validation.js';
+import {notificationAudience} from '../services/notification-feed.js';
 
-const audience=req=>({$or:[
- {scope:'university'},{scope:'society'},
- ...(req.currentUser.departmentId?[{scope:'department',departmentId:req.currentUser.departmentId}]:[])
-]});
+// Reuse the inbox audience contract: membership, assigned management and
+// department determine read access to shared announcements, never a public flag.
 async function mayPublish(req,content,universityId){
  if(content.scope==='society'){
   needRole(req,'societyManager');
@@ -25,7 +24,7 @@ export function announcementsRouter(deps){
  const router=Router(),auth=campusUserMiddleware(deps);
  router.get('/announcements',auth,asyncHandler(async(req,res)=>{
   const {page,limit,skip}=pagination(req.query);
-  const filter={universityId:deps.config.universityId,status:'published',...audience(req)};
+  const filter={universityId:deps.config.universityId,status:'published',...await notificationAudience(req)};
   const [items,total]=await Promise.all([
    Announcement.find(filter).sort({publishedAt:-1,_id:-1}).skip(skip).limit(limit).lean(),
    Announcement.countDocuments(filter)
@@ -40,7 +39,7 @@ export function announcementsRouter(deps){
  }));
  router.get('/announcements/:id',auth,asyncHandler(async(req,res)=>{
   const id=requireObjectId(req.params.id);
-  const doc=await Announcement.findOne({_id:id,universityId:deps.config.universityId,status:'published',...audience(req)}).lean();
+  const doc=await Announcement.findOne({_id:id,universityId:deps.config.universityId,status:'published',...await notificationAudience(req)}).lean();
   if(!doc) throw new HttpError(404,'ANNOUNCEMENT_NOT_FOUND','Announcement not found');
   return res.json({data:announcementView(doc)});
  }));

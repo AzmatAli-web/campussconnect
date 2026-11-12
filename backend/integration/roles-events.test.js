@@ -1297,3 +1297,104 @@ test('Notifications: Android push FIDs are opt-in, hashed, private and revocable
  assert.equal(revoked.body.data.revoked,true);
  assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,fidHash:record.fidHash}),0);
 },{timeout:60000});
+
+
+test('Milestone 25: announcements and inbox enforce identical membership, department and assignment boundaries',async()=>{
+ const uni=UNIVERSITY_ID;
+ const member='fixture-student-05';
+ const outsider='fixture-student-06';
+ const dpt=new mongoose.Types.ObjectId();
+ const otherDpt=new mongoose.Types.ObjectId();
+ await User.updateOne({_id:students[5]._id},{$set:{departmentId:dpt}});
+ await User.updateOne({_id:students[6]._id},{$set:{departmentId:otherDpt}});
+ const mgr=await User.create(person('fixture-qa25-manager',['student','societyManager']));
+ const society=await Society.create({
+  universityId:uni,name:'QA25 Privacy Society',slug:'qa25-privacy-society',
+  description:'Isolated cross-module announcement audience fixture',
+  createdBy:admin._id,status:'active'
+ });
+ const societyId=society._id;
+ await SocietyMembership.create({
+  universityId:uni,societyId,studentId:students[5]._id,status:'active'
+ });
+ await SocietyManagerAssignment.create({
+  universityId:uni,societyId,userId:mgr._id,
+  status:'active',approvedAt:new Date(),approvedBy:admin._id
+ });
+ const sample=(scope,title,fields={})=>({
+  universityId:uni,authorId:admin._id,scope,title,
+  body:'This announcement is restricted by verified campus policy.',
+  status:'published',publishedAt:new Date(),...fields
+ });
+ const [campus,societyNote,departmentNote]=await Announcement.insertMany([
+  sample('university','QA25 shared university news'),
+  sample('society','QA25 restricted society news',{societyId}),
+  sample('department','QA25 private department news',{departmentId:dpt})
+ ]);
+ const path='/api/v1/announcements?limit=100';
+ const fetchIds=async uid=>{
+  const list=await request(app).get(path).set(auth(uid));
+  assert.equal(list.status,200,JSON.stringify(list.body));
+  return list.body.data.map(x=>x.id);
+ };
+ const outsiders=await fetchIds(outsider);
+ assert.ok(outsiders.includes(String(campus._id)));
+ assert.ok(!outsiders.includes(String(societyNote._id)));
+ assert.ok(!outsiders.includes(String(departmentNote._id)));
+ const members=await fetchIds(member);
+ assert.ok(members.includes(String(campus._id)));
+ assert.ok(members.includes(String(societyNote._id)));
+ assert.ok(members.includes(String(departmentNote._id)));
+ const managers=await fetchIds('fixture-qa25-manager');
+ assert.ok(managers.includes(String(societyNote._id)));
+ assert.ok(!managers.includes(String(departmentNote._id)));
+ const admins=await fetchIds('fixture-admin');
+ assert.ok(admins.includes(String(societyNote._id)));
+ const deniedSociety=await request(app).get('/api/v1/announcements/'+societyNote._id)
+  .set(auth(outsider));
+ assert.equal(deniedSociety.status,404);
+ const permittedSociety=await request(app).get('/api/v1/announcements/'+societyNote._id)
+  .set(auth(member));
+ assert.equal(permittedSociety.status,200);
+ const deniedDepartment=await request(app).get('/api/v1/announcements/'+departmentNote._id)
+  .set(auth(outsider));
+ assert.equal(deniedDepartment.status,404);
+
+ const inbox=await request(app).get('/api/v1/notifications?limit=40').set(auth(outsider));
+ assert.equal(inbox.status,200);
+ assert.ok(!inbox.body.data.items.some(x=>x.id===String(societyNote._id)));
+ assert.ok(!inbox.body.data.items.some(x=>x.id===String(departmentNote._id)));
+ const blockedRead=await request(app).post(
+  '/api/v1/notifications/announcement/'+societyNote._id+'/read')
+  .set(auth(outsider)).send({});
+ assert.equal(blockedRead.status,404);
+ assert.equal(await AnnouncementNotificationRead.countDocuments({
+  universityId:uni,recipientId:students[6]._id,announcementId:societyNote._id
+ }),0);
+
+ // Removing a membership and revoking an assignment immediately removes
+ // both the legacy announcement GET and notification inbox access.
+ await SocietyMembership.updateOne({
+  universityId:uni,societyId,studentId:students[5]._id
+ },{$set:{status:'left'}});
+ await SocietyManagerAssignment.updateOne({
+  universityId:uni,societyId,userId:mgr._id
+ },{$set:{status:'revoked'}});
+ const afterLeave=await fetchIds(member);
+ assert.ok(!afterLeave.includes(String(societyNote._id)));
+ assert.ok(afterLeave.includes(String(departmentNote._id)));
+ const afterRevocation=await fetchIds('fixture-qa25-manager');
+ assert.ok(!afterRevocation.includes(String(societyNote._id)));
+ const memberReadAfterLeave=await request(app).post(
+  '/api/v1/notifications/announcement/'+societyNote._id+'/read')
+  .set(auth(member)).send({});
+ assert.equal(memberReadAfterLeave.status,404);
+
+ // A second university is never visible, even for an Admin of the first one.
+ const another=await Announcement.create({
+  universityId:new mongoose.Types.ObjectId(),authorId:admin._id,
+  scope:'university',title:'QA25 foreign university news',
+  body:'Different university.',status:'published',publishedAt:new Date()
+ });
+ assert.ok(!(await fetchIds('fixture-admin')).includes(String(another._id)));
+},{timeout:90000});

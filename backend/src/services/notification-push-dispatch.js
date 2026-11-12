@@ -33,19 +33,20 @@ export async function dispatchNotificationBatch({
    }
    const devices=await NotificationPushDevice.find({
     universityId,userId:claim.recipientId
-   }).select('+token tokenHash').sort({lastSeenAt:-1}).limit(5).lean();
+   }).select('+fid fidHash').sort({lastSeenAt:-1}).limit(5).lean();
    if(!devices.length){
     await CampusNotification.updateOne(filter,{$set:{pushState:'skipped',pushLastError:'NO_OPTED_IN_DEVICE'}});
     skipped++;continue;
    }
    const response=await messaging.sendEachForMulticast({
-    tokens:devices.map(d=>d.token),
+    fids:devices.map(d=>d.fid),
     notification:{title:'CampusConnect update',
       body:'Open your private campus inbox to view the latest update.'},
     data:{kind:'personal',notificationId:String(claim._id)},
     android:{priority:'normal'}
    });
    const invalidCodes=new Set([
+    'messaging/installation-id-not-registered','messaging/invalid-installation-id',
     'messaging/registration-token-not-registered','messaging/invalid-registration-token'
    ]);
    const dead=devices.filter((d,index)=>
@@ -54,7 +55,7 @@ export async function dispatchNotificationBatch({
    if(dead.length){
     await NotificationPushDevice.deleteMany({
      universityId,userId:claim.recipientId,
-     tokenHash:{$in:dead.map(d=>d.tokenHash)}
+     fidHash:{$in:dead.map(d=>d.fidHash)}
     });
    }
    if(response.successCount>0){

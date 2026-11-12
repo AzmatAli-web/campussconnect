@@ -34,6 +34,7 @@ const assignmentSchema=new Schema({
  approvedAt:{type:Date,required:true},approvedBy:{type:Schema.Types.ObjectId,default:null}
 },{timestamps:true,collection:'society_manager_assignments',versionKey:false});
 assignmentSchema.index({societyId:1,userId:1},{unique:true});
+assignmentSchema.index({universityId:1,userId:1,status:1,societyId:1});
 const societySchema=new Schema({
  universityId:oid,name:{type:String,required:true},slug:{type:String,required:true},
  description:{type:String,required:true},createdBy:oid,status:{type:String,enum:['active','archived'],required:true,default:'active'}

@@ -441,4 +441,64 @@ class PreviewCampusApi extends CampusApi {
     _demoSocietyMemberships[index]=changed;
     return changed;
   }
+
+  final List<CampusNotification> _demoNotifications=[
+    CampusNotification(
+      id:'000000000000000000000001',kind:'personal',type:'event_registration',
+      title:'Demo event registration',
+      body:'Your fictional campus meetup registration was confirmed in this offline preview.',
+      sourceId:'preview-dev-meetup',createdAt:DateTime.now(),
+      readAt:null,
+    ),
+    CampusNotification(
+      id:'000000000000000000000002',kind:'announcement',type:'announcement',
+      title:'Welcome to CampusConnect',
+      body:'This is a fictional announcement notification for the offline student preview.',
+      sourceId:'preview-announcement-1',
+      createdAt:DateTime.now().subtract(const Duration(hours:1)),
+      readAt:null,
+    ),
+  ];
+
+  @override
+  Future<CampusNotificationPage> getNotificationPage({
+    String? cursor,int limit=20,
+  }) async {
+    final offset=cursor==null?0:int.tryParse(cursor)??0;
+    final start=offset.clamp(0,_demoNotifications.length);
+    final end=(start+limit).clamp(0,_demoNotifications.length);
+    final page=_demoNotifications.sublist(start,end);
+    return CampusNotificationPage(
+      items:List.unmodifiable(page),
+      nextCursor:end<_demoNotifications.length?'$end':null,
+      hasMore:end<_demoNotifications.length,
+      unreadOnPage:page.where((n)=>n.readAt==null).length,
+    );
+  }
+
+  @override
+  Future<DateTime> markNotificationRead(CampusNotification item) async {
+    final index=_demoNotifications.indexWhere(
+      (n)=>n.kind==item.kind&&n.id==item.id);
+    if(index<0)throw const CampusApiException(
+      'NOTIFICATION_NOT_FOUND','Offline notification unavailable.');
+    final at=_demoNotifications[index].readAt??DateTime.now();
+    _demoNotifications[index]=_demoNotifications[index].markRead(at);
+    return at;
+  }
+
+  @override
+  Future<bool> hasRegisteredPushDevice() async =>false;
+
+  @override
+  Future<void> registerPushDevice(String token) async {
+    throw const CampusApiException('OFFLINE_PREVIEW',
+      'Firebase push is disabled in offline preview.');
+  }
+
+  @override
+  Future<void> revokePushDevice(String token) async {
+    throw const CampusApiException('OFFLINE_PREVIEW',
+      'Firebase push is disabled in offline preview.');
+  }
 }

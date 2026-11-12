@@ -483,5 +483,42 @@ class CampusApi {
       method:'POST',body:<String,dynamic>{},
     )));
 
+
+  /// Loads a bounded inbox page only on demand, not during dashboard startup.
+  Future<CampusNotificationPage> getNotificationPage({
+    String? cursor,int limit=20,
+  }) async {
+    if(limit<1||limit>40){
+      throw const CampusApiException('INVALID_LIMIT','Notification limit must be 1-40.');
+    }
+    final query=Uri(queryParameters:{
+      'limit':'$limit',if(cursor!=null&&cursor.isNotEmpty)'cursor':cursor,
+    }).query;
+    return CampusNotificationPage.fromJson(asJson(
+      await _request('/notifications?$query')));
+  }
+
+  Future<DateTime> markNotificationRead(CampusNotification item) async {
+    final result=asJson(await _request(
+      '/notifications/${Uri.encodeComponent(item.kind)}/${Uri.encodeComponent(item.id)}/read',
+      method:'POST',body:<String,dynamic>{}));
+    return parseDate(result['readAt'])??DateTime.now();
+  }
+
+  Future<bool> hasRegisteredPushDevice() async {
+    final status=asJson(await _request('/notifications/push-status'));
+    return status['enabled']==true;
+  }
+
+  Future<void> registerPushDevice(String token) async {
+    await _request('/notifications/push-devices',method:'POST',
+      body:{'token':token,'consent':true});
+  }
+
+  Future<void> revokePushDevice(String token) async {
+    await _request('/notifications/push-devices/revoke',method:'POST',
+      body:{'token':token});
+  }
+
   void dispose() => client.close();
 }

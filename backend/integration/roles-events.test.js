@@ -1267,33 +1267,33 @@ test('Notifications: confirmed events and manager reviews write one private tran
  assert.ok(!outsider.body.data.items.some(x=>x.id===String(note._id)));
 },{timeout:60000});
 
-test('Notifications: Android push tokens are opt-in, hashed, private and revocable',async()=>{
- const token='fcm:token-'+('Z'.repeat(108)),uni=UNIVERSITY_ID;
+test('Notifications: Android push FIDs are opt-in, hashed, private and revocable',async()=>{
+ const fid='c'+('Z'.repeat(23)),uni=UNIVERSITY_ID;
  const studentA='fixture-student-18',studentB='fixture-student-19';
  const bad=await request(app).post('/api/v1/notifications/push-devices')
-  .set(auth(studentA)).send({token,consent:false});
+  .set(auth(studentA)).send({fid,consent:false});
  assert.equal(bad.status,422);
  const registered=await request(app).post('/api/v1/notifications/push-devices')
-  .set(auth(studentA)).send({token,consent:true});
+  .set(auth(studentA)).send({fid,consent:true});
  assert.equal(registered.status,200);
- assert.ok(!JSON.stringify(registered.body).includes(token));
+ assert.ok(!JSON.stringify(registered.body).includes(fid));
  const firstStatus=await request(app).get('/api/v1/notifications/push-status')
   .set(auth(studentA));
  assert.equal(firstStatus.body.data.enabled,true);
  const record=await NotificationPushDevice.findOne({universityId:uni,userId:students[18]._id})
-  .select('+token').lean();
- assert.equal(record.token,token);
- assert.notEqual(record.tokenHash,token);
+  .select('+fid').lean();
+ assert.equal(record.fid,fid);
+ assert.notEqual(record.fidHash,fid);
  // A token moved to a new signed-in account does not stay assigned to the old account.
  const moved=await request(app).post('/api/v1/notifications/push-devices')
-  .set(auth(studentB)).send({token,consent:true});
+  .set(auth(studentB)).send({fid,consent:true});
  assert.equal(moved.status,200);
  assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,userId:students[18]._id}),0);
  const wrongRevoke=await request(app).post('/api/v1/notifications/push-devices/revoke')
-  .set(auth(studentA)).send({token});
+  .set(auth(studentA)).send({fid});
  assert.equal(wrongRevoke.body.data.revoked,false);
  const revoked=await request(app).post('/api/v1/notifications/push-devices/revoke')
-  .set(auth(studentB)).send({token});
+  .set(auth(studentB)).send({fid});
  assert.equal(revoked.body.data.revoked,true);
- assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,tokenHash:record.tokenHash}),0);
+ assert.equal(await NotificationPushDevice.countDocuments({universityId:uni,fidHash:record.fidHash}),0);
 },{timeout:60000});

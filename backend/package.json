@@ -14,7 +14,10 @@
     "db:ensure-indexes": "node scripts/ensure-indexes.js",
     "notifications:dispatch": "node scripts/dispatch-notifications.js",
     "test:integration": "node --test --test-timeout=240000 integration/*.test.js",
-    "qa:benchmark": "node scripts/benchmark-qa25.js"
+    "qa:benchmark": "node scripts/benchmark-qa25.js",
+    "pilot:preflight": "node scripts/pilot-preflight.js",
+    "pilot:smoke": "node scripts/pilot-smoke.js",
+    "test:pilot": "node --test test/pilot-readiness.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

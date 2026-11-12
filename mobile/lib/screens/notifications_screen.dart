@@ -21,9 +21,11 @@ class NotificationsScreen extends StatefulWidget{
 }
 class _NotificationsScreenState extends State<NotificationsScreen>{
   List<CampusNotification> _items=const [];
-  String? _cursor,_error;
-  bool _loading=true,_paging=false,_hasMore=false,_busyPush=false,_pushOn=false;
-  StreamSubscription<String>? _rotation;
+  String? _cursor,_error,_currentFid;
+  bool _loading=true,_paging=false,_hasMore=false,_busyPush=false;
+  bool _pushOn=false,_accountHasPush=false;
+  StreamSubscription<String>? _registration;
+  Completer<String>? _waitingForFid;
 
   @override
   void initState(){
@@ -36,7 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
 
   @override
   void dispose(){
-    _rotation?.cancel();
+    _registration?.cancel();
     super.dispose();
   }
 
@@ -44,23 +46,31 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
     try{
       final enabled=await widget.api.hasRegisteredPushDevice();
       if(mounted){
-        setState(()=>_pushOn=enabled);
-        if(enabled){
-          _watchRotation();
-        }
+        setState(()=>_accountHasPush=enabled);
       }
     }catch(_){
-      // An unavailable FCM device endpoint does not prevent reading the inbox.
+      // An unavailable FCM endpoint does not prevent inbox reading.
     }
   }
 
-  void _watchRotation(){
-    _rotation ??= FirebaseMessaging.instance.onTokenRefresh.listen((token) async{
-      if(!_pushOn){return;}
-      try{
-        await widget.api.registerPushDevice(token);
-      }catch(_){
-        // The inbox still works. User can retry consent after backend recovery.
+  void _watchRegistration(){
+    _registration ??= FirebaseMessaging.instance.onRegistered.listen((fid) async{
+      if(_waitingForFid case final pending?){
+        if(!pending.isCompleted){
+          pending.complete(fid);
+        }
+      }
+      if(_pushOn){
+        final previous=_currentFid;
+        _currentFid=fid;
+        try{
+          await widget.api.registerPushDevice(fid);
+          if(previous!=null&&previous!=fid){
+            await widget.api.revokePushDevice(previous);
+          }
+        }catch(_){
+          // Refreshes can be retried when the backend is available.
+        }
       }
     });
   }
@@ -77,15 +87,18 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
         throw const CampusApiException('PUSH_DENIED',
           'Please allow notifications in Android settings.');
       }
-      final token=await FirebaseMessaging.instance.getToken();
-      if(token==null||token.isEmpty){
-        throw const CampusApiException('PUSH_NOT_READY',
-          'Firebase Messaging registration is not ready on this device.');
-      }
-      await widget.api.registerPushDevice(token);
+      final pending=Completer<String>();
+      _waitingForFid=pending;
+      _watchRegistration();
+      await FirebaseMessaging.instance.register();
+      final fid=await pending.future.timeout(const Duration(seconds:15));
+      await widget.api.registerPushDevice(fid);
+      _currentFid=fid;
       if(mounted){
-        setState(()=>_pushOn=true);
-        _watchRotation();
+        setState((){
+          _pushOn=true;
+          _accountHasPush=true;
+        });
         _notify('Android push notifications enabled.');
       }
     }on CampusApiException catch(error){
@@ -94,6 +107,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
       _notify('Could not enable Firebase notifications. Inbox remains available.',
         error:true);
     }finally{
+      _waitingForFid=null;
       if(mounted){setState(()=>_busyPush=false);}
     }
   }
@@ -102,13 +116,16 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
     if(widget.previewMode||_busyPush){return;}
     setState(()=>_busyPush=true);
     try{
-      final token=await FirebaseMessaging.instance.getToken();
-      if(token!=null&&token.isNotEmpty){
-        await widget.api.revokePushDevice(token);
+      final fid=_currentFid;
+      if(fid==null){
+        throw const CampusApiException('DEVICE_NOT_REGISTERED',
+          'Enable this device first to manage its registration.');
       }
-      await FirebaseMessaging.instance.deleteToken();
-      await _rotation?.cancel();
-      _rotation=null;
+      await widget.api.revokePushDevice(fid);
+      await FirebaseMessaging.instance.unregister();
+      await _registration?.cancel();
+      _registration=null;
+      _currentFid=null;
       if(mounted){
         setState(()=>_pushOn=false);
         _notify('Push delivery disabled for this device.');
@@ -245,6 +262,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>{
                   'Optional: enable system alerts for personal updates. Campus announcements remain in this inbox. Push requires a configured server dispatcher.',
                   style:TextStyle(fontSize:11,height:1.5,color:_muted),
                 ),
+                if(_accountHasPush&&!_pushOn)
+                  const Text('Your account has a registered push device. Enable again to register this phone.',
+                    style:TextStyle(fontSize:11,color:_muted)),
                 const SizedBox(height:9),
                 OutlinedButton.icon(
                   icon:Icon(_pushOn?Icons.notifications_off_outlined:

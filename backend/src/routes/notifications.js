@@ -97,23 +97,23 @@ export function notificationsRouter(deps){
   }
   try{
    await NotificationPushDevice.findOneAndUpdate({
-    universityId:uni,tokenHash:hash
+    universityId:uni,fidHash:hash
    },{$set:{userId,fid,platform:'android',lastSeenAt:new Date()}},
    {upsert:true,new:true,runValidators:true,setDefaultsOnInsert:true});
   }catch(error){
    if(error?.code!==11000)throw error;
-   // Concurrent registration/rotation, retry on the unique token hash.
+   // Concurrent registration/rotation, retry on the unique installation ID hash.
    await NotificationPushDevice.updateOne({
-    universityId:uni,tokenHash:hash
-   },{$set:{userId,token,platform:'android',lastSeenAt:new Date()}});
+    universityId:uni,fidHash:hash
+   },{$set:{userId,fid,platform:'android',lastSeenAt:new Date()}});
   }
   return res.json({data:{enabled:true}});
  }));
  router.post('/notifications/push-devices/revoke',auth,asyncHandler(async(req,res)=>{
-  const token=requirePushToken(req.body);
+  const fid=requirePushFid(req.body);
   const removed=await NotificationPushDevice.deleteOne({
    universityId:req.currentUser.universityId,
-   userId:req.currentUser._id,tokenHash:tokenDigest(token)
+   userId:req.currentUser._id,fidHash:fidDigest(fid)
   });
   return res.json({data:{revoked:removed.deletedCount>0}});
  }));

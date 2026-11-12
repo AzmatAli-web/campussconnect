@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 test('sensitive and large feature screens use route-level lazy imports',()=>{
  const source=readFileSync(new URL('../src/CampusWorkspace.jsx',import.meta.url),'utf8');
  const files=['AdminPanel','TimetablePage','AcademicResourcesPage',
-   'ComplaintsPage','FeesPage','MarketplacePage','LostFoundPage','SocietiesPage'];
+   'ComplaintsPage','FeesPage','MarketplacePage','LostFoundPage','SocietiesPage','NotificationsPage'];
  for(const file of files){
   assert.ok(source.includes("lazy(()=>import('./"+file+".jsx'))"),
    file+' must be code-split and downloaded on demand');

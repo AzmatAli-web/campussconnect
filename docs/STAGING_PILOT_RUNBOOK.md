@@ -85,6 +85,8 @@ Record each test in `docs/PILOT_ACCEPTANCE_RECORD.md` with the exact branch/comm
 
 Use **fictional university records only**, with named authorization from the actual university administrators. No real bank payments, private medical cases, live student ID photos or real disciplinary complaints.
 
+Milestone 27 adds an [offline checker for the gate evidence record](MILESTONE27_STAGING_ACCEPTANCE.md). It is independent of preflight and smoke, and cannot convert a fixture run into staging evidence.
+
 ## 5. Objective performance and acceptance gates
 
 Synthetic Milestone 25 metrics are baselines for comparative CI only, **not** production SLOs. Before piloting, measure an authorized HTTPS staging workload across multiple representative network conditions. Capture sample counts, error rate, p50/p95 latency, traffic patterns, app cold start, Android battery/network behavior, MongoDB index plans and client memory. Define numeric service objectives with the team after representative data exists, and attach evidence to the acceptance record.

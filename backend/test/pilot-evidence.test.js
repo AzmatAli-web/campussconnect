@@ -52,6 +52,23 @@ test('fixture data, wrong evidence source, failures and blockers cannot make evi
   }
 });
 
+test('staging review requires a separate live event roster privacy check', () => {
+  const gateId = 'event-roster-privacy';
+  const missing = complete();
+  missing.gates = missing.gates.filter(gate => gate.id !== gateId);
+  assert.ok(evaluate(missing).errors.includes('GATE_MISSING:' + gateId));
+  assert.equal(evaluate(missing).readyForReview, false);
+
+  const pending = complete();
+  pending.gates[pending.gates.findIndex(gate => gate.id === gateId)] = {id: gateId, status: 'not-run'};
+  assert.equal(evaluate(pending).readyForReview, false);
+
+  const fixtureOnly = complete();
+  fixtureOnly.gates.find(gate => gate.id === gateId).source = 'fixture';
+  assert.equal(evaluate(fixtureOnly).gates.find(gate => gate.id === gateId).state, 'wrong-source');
+  assert.equal(evaluate(fixtureOnly).readyForReview, false);
+});
+
 test('rejects missing, duplicate and unknown gates without printing untrusted gate IDs', () => {
   const record = complete();
   record.gates.splice(0, 3, record.gates[3], {id: 'private@school.example', status: 'not-run'});

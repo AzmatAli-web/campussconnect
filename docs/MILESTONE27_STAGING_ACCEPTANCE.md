@@ -40,6 +40,7 @@ Use `reviewer-` plus 2–6 digits and `EV-` plus 4–10 digits. Keep the mapping
 | `https-readonly-smoke` | staging | Approved HTTPS staging origin passes live/ready and unauthenticated protection checks |
 | `firebase-atlas-isolation` | staging | Dedicated staging Firebase and Atlas resources, approved fictional accounts, no production access |
 | `student-data-isolation` | staging | Synthetic student accounts stay within their own records and university |
+| `event-roster-privacy` | staging | [Two students can browse and register for the same event without seeing each other’s records](MILESTONE28_EVENT_PRIVACY_ACCEPTANCE.md) |
 | `staff-role-acceptance` | staging | Assigned Faculty, Manager, Admin and Finance roles work only within their scope |
 | `moderation-acceptance` | staging | Marketplace and Lost & Found reports reach the authorized moderator and are handled as expected |
 | `finance-complaints-governance` | review | Owners review reconciliation, audit, corrections and confidential-case routing |

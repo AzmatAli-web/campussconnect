@@ -9,6 +9,7 @@ import {personalNotificationData} from '../services/notification-feed.js';
 import {eventInput,eventView,registrationInput,registrationView,privateRegistrationView,pagination,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
 
 const has=(req,role)=>req.roles.includes(role);
+const noStore=(_req,res,next)=>{res.set('Cache-Control','no-store');next();};
 const organizer=async(req,universityId,societyId)=>{
  if(societyId){
   needRole(req,'societyManager');
@@ -64,7 +65,7 @@ export function eventsRouter(deps){
   res.set('Cache-Control','no-store');
   return res.json({data:items.map(e=>eventView(e)),meta:{page,limit,total}});
  }));
- router.get('/me/event-registrations',auth,asyncHandler(async(req,res)=>{
+ router.get('/me/event-registrations',noStore,auth,asyncHandler(async(req,res)=>{
   needRole(req,'student');
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,studentId:req.currentUser._id};
@@ -72,7 +73,6 @@ export function eventsRouter(deps){
    EventRegistration.find(filter).sort({confirmedAt:-1,_id:-1}).skip(skip).limit(limit).lean(),
    EventRegistration.countDocuments(filter)
   ]);
-  res.set('Cache-Control','no-store');
   return res.json({data:items.map(registrationView),meta:{page,limit,total}});
  }));
  router.get('/events',auth,asyncHandler(async(req,res)=>{
@@ -119,7 +119,7 @@ export function eventsRouter(deps){
   if(!changed) throw new HttpError(409,'EVENT_FROZEN','Event was registered for or changed');
   return res.json({data:eventView(changed)});
  }));
- router.post('/events/:id/registrations',auth,asyncHandler(async(req,res)=>{
+ router.post('/events/:id/registrations',noStore,auth,asyncHandler(async(req,res)=>{
   needRole(req,'student');
   const id=requireObjectId(req.params.id);
   const key=idempotencyHeader(req);
@@ -179,7 +179,7 @@ export function eventsRouter(deps){
   }finally{await session.endSession();}
   return res.status(201).json(responseBody);
  }));
- router.get('/events/:id/registrations',auth,asyncHandler(async(req,res)=>{
+ router.get('/events/:id/registrations',noStore,auth,asyncHandler(async(req,res)=>{
   const id=requireObjectId(req.params.id);
   const event=await Event.findOne({_id:id,universityId:deps.config.universityId}).lean();
   if(!event) throw new HttpError(404,'EVENT_NOT_FOUND','Event not found');
@@ -187,7 +187,6 @@ export function eventsRouter(deps){
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,eventId:id};
   const [items,total]=await Promise.all([EventRegistration.find(filter).sort({confirmedAt:-1}).skip(skip).limit(limit).lean(),EventRegistration.countDocuments(filter)]);
-  res.set('Cache-Control','no-store');
   return res.json({data:items.map(privateRegistrationView),meta:{page,limit,total}});
  }));
  router.post('/admin/events/:id/cancel',auth,asyncHandler(async(req,res)=>{

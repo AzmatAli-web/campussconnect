@@ -372,6 +372,64 @@ test('cross-client contract: organizer publishes on React, student registers on 
  assert.equal(organizerRoster.body.data[0].studentId,String(students[10]._id));
 },{timeout:90000});
 
+test('students see the same published event and totals but never each other’s registrations',async()=>{
+ const owner=await User.create(person('fixture-privacy-owner',['faculty'],{facultyVerificationStatus:'verified'}));
+ const otherFaculty=await User.create(person('fixture-privacy-nonowner',['faculty'],{facultyVerificationStatus:'verified'}));
+ const organizerUid=owner.firebaseUid;
+ const studentUids=['fixture-student-18','fixture-student-19'];
+ const created=await request(app).post('/api/v1/events').set(auth(organizerUid))
+  .send(makeEvent('Event roster privacy acceptance',3));
+ assert.equal(created.status,201);
+ const eventId=created.body.data.id,detail='/api/v1/events/'+eventId,roster=detail+'/registrations';
+ const ownReceipts=[];
+ for(const [index,uid] of studentUids.entries()){
+  const headers={...auth(uid),'Idempotency-Key':idem(9150+index)};
+  const payload={universityEmail:uid+'@'+DOMAIN};
+  const receipt=await request(app).post(roster).set(headers).send(payload);
+  assert.equal(receipt.status,201);
+  assert.equal(receipt.headers['cache-control'],'no-store');
+  assert.equal(receipt.body.data.eventId,eventId);
+  assert.equal(receipt.body.data.status,'confirmed');
+  const replay=await request(app).post(roster).set(headers).send(payload);
+  assert.equal(replay.status,201);
+  assert.equal(replay.headers['cache-control'],'no-store');
+  assert.deepEqual(replay.body,receipt.body);
+  ownReceipts.push(receipt.body.data);
+ }
+ assert.notEqual(ownReceipts[0].id,ownReceipts[1].id);
+
+ const eventFields=['capacity','confirmedCount','description','endsAt','id','isFull','registrationClosesAt',
+  'registrationOpen','registrationOpensAt','startsAt','status','title','venue'].sort();
+ for(const [index,uid] of studentUids.entries()){
+  const list=await request(app).get('/api/v1/events?limit=100').set(auth(uid));
+  const event=await request(app).get(detail).set(auth(uid));
+  assert.equal(list.status,200);
+  assert.equal(event.status,200);
+  assert.deepEqual(list.body.data.find(row=>row.id===eventId),event.body.data);
+  assert.deepEqual(Object.keys(event.body.data).sort(),eventFields);
+  assert.equal(event.body.data.confirmedCount,2);
+  assert.equal(event.body.data.capacity,3);
+
+  const mine=await request(app).get('/api/v1/me/event-registrations?limit=100').set(auth(uid));
+  assert.equal(mine.status,200);
+  assert.equal(mine.headers['cache-control'],'no-store');
+  assert.deepEqual(mine.body.data.filter(row=>row.eventId===eventId),[ownReceipts[index]]);
+  assert.ok(!mine.body.data.some(row=>row.id===ownReceipts[1-index].id));
+ }
+ for(const [uid,status] of [[studentUids[0],403],[studentUids[1],403],[otherFaculty.firebaseUid,403],[null,401]]){
+  const denied=await request(app).get(roster).set(uid?auth(uid):{});
+  assert.equal(denied.status,status);
+  assert.equal(denied.headers['cache-control'],'no-store');
+  assert.deepEqual(Object.keys(denied.body),['error']);
+ }
+ for(const uid of [organizerUid,'fixture-admin']){
+  const allowed=await request(app).get(roster).set(auth(uid));
+  assert.equal(allowed.status,200);
+  assert.equal(allowed.headers['cache-control'],'no-store');
+  assert.deepEqual(allowed.body.data.map(row=>row.id).sort(),ownReceipts.map(row=>row.id).sort());
+ }
+},{timeout:90000});
+
 test('official timetable: only staff/admin publish and conflicting quarter-hour slots are blocked', async () => {
  const payload=(changes={})=>({
   term:'Fall 2026',program:'BSE',semester:7,section:'A',dayOfWeek:1,

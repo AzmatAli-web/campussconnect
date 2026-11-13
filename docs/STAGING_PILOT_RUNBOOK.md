@@ -74,6 +74,7 @@ Record each test in `docs/PILOT_ACCEPTANCE_RECORD.md` with the exact branch/comm
 | Role / area | Positive test | Negative/security test |
 | --- | --- | --- |
 | Student | Campus email login and profile; events registration; timetable and resources; own complaints, fees, marketplace, lost/found, societies, notifications | Cannot see another student's records or staff workflows |
+| Event privacy | Two students can both browse and register for the same published event, and each sees their own confirmation | No student can access another student’s registration or the attendee list. See [Milestone 28](MILESTONE28_EVENT_PRIVACY_ACCEPTANCE.md). |
 | Faculty | Verified faculty posts permitted announcements, events and resources | Cannot self-verify or post for unrelated department |
 | Society Manager | Assigned society manages events and member decisions | Revoked manager cannot view private roster or approve |
 | Admin | Approved role provisioning, report moderation and auditing | Other users cannot call Admin endpoints |

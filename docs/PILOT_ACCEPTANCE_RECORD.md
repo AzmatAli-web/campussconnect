@@ -30,6 +30,7 @@ For Milestone 27, use the [offline staging evidence checker](MILESTONE27_STAGING
 | Read-only HTTPS `npm run pilot:smoke` | Not executed | |
 | Auth and role negative cases | Not executed | |
 | Student personal and cross-tenant data isolation | Not executed | |
+| [Event roster privacy](MILESTONE28_EVENT_PRIVACY_ACCEPTANCE.md) | Not executed | |
 | Admin, Faculty, Manager and Finance role tests | Not executed | |
 | Marketplace and Lost & Found moderation | Not executed | |
 | Confidential complaints and fees governance | Not executed | |

@@ -5,6 +5,7 @@ export const pilotEvidenceGates = Object.freeze({
   'https-readonly-smoke': 'staging',
   'firebase-atlas-isolation': 'staging',
   'student-data-isolation': 'staging',
+  'event-roster-privacy': 'staging',
   'staff-role-acceptance': 'staging',
   'moderation-acceptance': 'staging',
   'finance-complaints-governance': 'review',

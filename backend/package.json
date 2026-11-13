@@ -17,7 +17,9 @@
     "qa:benchmark": "node scripts/benchmark-qa25.js",
     "pilot:preflight": "node scripts/pilot-preflight.js",
     "pilot:smoke": "node scripts/pilot-smoke.js",
-    "test:pilot": "node --test test/pilot-readiness.test.js"
+    "test:pilot": "node --test test/pilot-readiness.test.js",
+    "pilot:evidence": "node scripts/pilot-evidence.js",
+    "test:pilot:evidence": "node --test test/pilot-evidence.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

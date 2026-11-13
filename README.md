@@ -8,7 +8,11 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
-## Latest development branch (draft; not merged)
+## Milestone 27 staging acceptance evidence (draft)
+
+`feature/milestone27-staging-acceptance-evidence` builds on Milestone 26. Its offline checker tracks each acceptance gate against an immutable candidate and reports whether the record is ready for human review. It does not run live tests or approve the pilot. See the [Milestone 27 acceptance guide](docs/MILESTONE27_STAGING_ACCEPTANCE.md).
+
+## Milestone 26 baseline (draft; not merged)
 
 `feature/milestone26-controlled-pilot-readiness` builds on the CI-green Milestone 25 branch, which stacks on Milestones 24, 23, 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–26 passed automated CI, including Milestone 26's fail-closed pilot guards, backend regression, React and Flutter tests. Live staging has not been deployed, tested or approved.** Physical device and production acceptance remain pending. All remain in draft, undeployed and not yet accepted on a physical Android device.
 

@@ -2,6 +2,8 @@
 
 > **Status: NOT EXECUTED.** Do not mark an untested item as passed. Do not enter real student information, full token strings, DB connection strings or screenshots containing personal data.
 
+For Milestone 27, use the [offline staging evidence checker](MILESTONE27_STAGING_ACCEPTANCE.md) to check that gate metadata is complete for the same candidate. Keep this decision record and the supporting evidence in the approved private location when filling them in. The checker does not verify evidence or change the decision below.
+
 ## Build and environment identity
 
 | Field | Value |

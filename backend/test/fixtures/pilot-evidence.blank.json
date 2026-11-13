@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "stage": "fixture",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "gates": [
+    {
+      "id": "source-review-ci",
+      "status": "not-run"
+    },
+    {
+      "id": "staging-preflight",
+      "status": "not-run"
+    },
+    {
+      "id": "https-readonly-smoke",
+      "status": "not-run"
+    },
+    {
+      "id": "firebase-atlas-isolation",
+      "status": "not-run"
+    },
+    {
+      "id": "student-data-isolation",
+      "status": "not-run"
+    },
+    {
+      "id": "staff-role-acceptance",
+      "status": "not-run"
+    },
+    {
+      "id": "moderation-acceptance",
+      "status": "not-run"
+    },
+    {
+      "id": "finance-complaints-governance",
+      "status": "not-run"
+    },
+    {
+      "id": "private-storage-privacy",
+      "status": "not-run"
+    },
+    {
+      "id": "android-device-fcm",
+      "status": "not-run"
+    },
+    {
+      "id": "browser-accessibility",
+      "status": "not-run"
+    },
+    {
+      "id": "staging-performance",
+      "status": "not-run"
+    },
+    {
+      "id": "backup-restore-rollback",
+      "status": "not-run"
+    },
+    {
+      "id": "incident-support-retention",
+      "status": "not-run"
+    }
+  ]
+}

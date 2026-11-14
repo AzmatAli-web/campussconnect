@@ -39,6 +39,9 @@ test('real React workspace: two students share event counts, never receipts or r
     : {});
   const receipts = new Map();
   const traffic = [];
+  let sections = ['A', 'B'];
+  const group = section => ({term: 'Fall 2026', program: 'BSE', semester: 7, section});
+  const sectionLabel = section => 'Fall 2026 · BSE · Semester 7 · Section ' + section;
   const unexpected = [];
   const row = () => ({...event, confirmedCount: receipts.size});
   const send = (route, data, status = 200) => route.fulfill({status, json: {data}});
@@ -47,9 +50,10 @@ test('real React workspace: two students share event counts, never receipts or r
     return route.fulfill({status: 403, json: {error: {message: 'Unexpected fixture request'}}});
   };
 
-  async function pageFor(actor, options = {}) {
-    const context = await browser.newContext({serviceWorkers: 'block', ...options});
-    await context.route('**/*', async route => {
+  async function pageFor(actor, options = {}, sharedContext) {
+    const context = sharedContext ?? await browser.newContext({serviceWorkers: 'block', ...options});
+    const page = await context.newPage();
+    await page.route('**/*', async route => {
       const req = route.request();
       const url = new URL(req.url());
       if (url.origin !== origin) {
@@ -63,6 +67,14 @@ test('real React workspace: two students share event counts, never receipts or r
       if (req.headers().authorization !== 'Bearer fixture-' + actor) return deny(route, 'wrong fixture persona');
       if (method === 'GET' && path === eventsPath) return send(route, [row()]);
       if (method === 'GET' && path === '/api/v1/announcements') return send(route, []);
+      if (method === 'GET' && path === '/api/v1/timetable/groups') return send(route, sections.map(group));
+      if (method === 'GET' && path === '/api/v1/timetable/slots') {
+        const section = url.searchParams.get('section');
+        if (!sections.includes(section)) return deny(route, 'unavailable timetable group requested');
+        return send(route, [{...group(section), id: 'class-' + section, dayOfWeek: 1,
+          startTime: '09:00', endTime: '10:30', courseCode: 'CSC494',
+          courseTitle: 'Timetable fixture ' + section, instructorName: 'Fixture Teacher', room: 'Room ' + section}]);
+      }
       if (method === 'GET' && path === ownPath && actor !== 'organizer') {
         return send(route, receipts.has(actor) ? [receipts.get(actor)] : []);
       }
@@ -85,7 +97,6 @@ test('real React workspace: two students share event counts, never receipts or r
       }
       return deny(route, actor + ' ' + method + ' ' + path);
     });
-    const page = await context.newPage();
     page.setDefaultTimeout(10_000);
     page.on('pageerror', () => unexpected.push('uncaught page error for ' + actor));
     await page.goto(origin + '/test/browser/?actor=' + actor);
@@ -158,6 +169,30 @@ test('real React workspace: two students share event counts, never receipts or r
 
   assert.equal(traffic.filter(r => r.path === receiptPath && r.method === 'POST').length, 2);
   assert.deepEqual(traffic.filter(r => r.path === receiptPath && r.method === 'GET').map(r => r.actor), ['organizer']);
+  const schedule = page => page.getByRole('combobox', {name: 'Available class group'});
+  const showSection = async (page, section) => {
+    await page.getByText('Timetable fixture ' + section, {exact: false}).waitFor();
+    assert.equal(await schedule(page).inputValue(), JSON.stringify(Object.values(group(section))));
+  };
+  await navigate(a, /Timetable/);
+  await showSection(a, 'A');
+  await schedule(a).selectOption({label: sectionLabel('B')});
+  await showSection(a, 'B');
+  await navigate(a, /Explore events/);
+  await navigate(a, /Timetable/);
+  await showSection(a, 'B');
+  await a.reload();
+  await navigate(a, /Timetable/);
+  await showSection(a, 'B');
+
+  const sameBrowserB = await pageFor('b', {}, a.context());
+  await navigate(sameBrowserB, /Timetable/);
+  await showSection(sameBrowserB, 'A');
+  sections = ['A'];
+  await a.reload();
+  await navigate(a, /Timetable/);
+  await showSection(a, 'A');
+
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {
     const url = new URL(route.request().url());

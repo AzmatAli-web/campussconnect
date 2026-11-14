@@ -1,8 +1,8 @@
 import React,{useEffect,useState} from 'react';
 import {hasRole} from './dashboard-domain.js';
+import {chooseTimetableGroup,groupId,readTimetablePreference,saveTimetablePreference} from './timetable-preference.js';
 
 const days=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const groupId=g=>JSON.stringify([g.term,g.program,g.semester,g.section]);
 const initialForm={
  term:'Fall 2026',program:'BSE',semester:'7',section:'A',dayOfWeek:'1',
  startTime:'08:00',endTime:'09:30',courseCode:'',courseTitle:'',
@@ -10,75 +10,77 @@ const initialForm={
 };
 const label=g=>g.term+' · '+g.program+' · Semester '+g.semester+' · Section '+g.section;
 
-export default function TimetablePage({profile,call,act,busy}){
+export default function TimetablePage({profile,call,act,busy,preferenceKey}){
  const canPublish=hasRole(profile,'admin')||hasRole(profile,'staff');
  const [groups,setGroups]=useState([]);
- const [selected,setSelected]=useState('');
- const [slots,setSlots]=useState([]);
+ const [preferred,setPreferred]=useState(()=>readTimetablePreference(preferenceKey));
+ const [slotResult,setSlotResult]=useState(null);
+ const [slotRevision,setSlotRevision]=useState(0);
  const [loading,setLoading]=useState(true);
- const [slotsLoading,setSlotsLoading]=useState(false);
- const [error,setError]=useState('');
+ const [groupError,setGroupError]=useState('');
  const [form,setForm]=useState(initialForm);
- const chosen=groups.find(g=>groupId(g)===selected);
+ const chosen=chooseTimetableGroup(groups,preferred);
+ const selected=chosen?groupId(chosen):'';
+ const slotKey=JSON.stringify([selected,slotRevision]);
+ const slots=slotResult?.key===slotKey?slotResult.rows:[];
+ const slotsLoading=Boolean(chosen)&&slotResult?.key!==slotKey;
+ const error=groupError||(slotResult?.key===slotKey?slotResult.error:'');
 
- async function loadGroups(){
+ async function loadGroups(isCurrent=()=>true){
   setLoading(true);
   try{
    const found=await call('/timetable/groups');
-   setGroups(Array.isArray(found)?found:[]);
-   setSelected(previous=>{
-    const next=Array.isArray(found)?found:[];
-    return next.some(g=>groupId(g)===previous)
-      ? previous : next.length?groupId(next[0]):'';
-   });
-   setError('');
-  }catch(e){setError(e.message||'Unable to load official timetables.');}
-  finally{setLoading(false);}
+   if(isCurrent()){
+    setGroups(Array.isArray(found)?found:[]);
+    setGroupError('');
+   }
+  }catch(e){if(isCurrent())setGroupError(e.message||'Unable to load official timetables.');}
+  finally{if(isCurrent())setLoading(false);}
  }
- useEffect(()=>{loadGroups();},[]);
-
  useEffect(()=>{
   let live=true;
-  if(!chosen){setSlots([]);return()=>{live=false;};}
-  setSlotsLoading(true);
+  loadGroups(()=>live);
+  return()=>{live=false;};
+ },[]);
+
+ useEffect(()=>{
+  if(!chosen)return;
+  let live=true;
   const query=new URLSearchParams({
    term:chosen.term,program:chosen.program,
    semester:String(chosen.semester),section:chosen.section
   });
   call('/timetable/slots?'+query.toString())
-   .then(rows=>{if(live){setSlots(Array.isArray(rows)?rows:[]);setError('');}})
-   .catch(e=>{if(live)setError(e.message||'Unable to load timetable classes.');})
-   .finally(()=>{if(live)setSlotsLoading(false);});
+   .then(rows=>{if(live)setSlotResult({key:slotKey,rows:Array.isArray(rows)?rows:[],error:''});})
+   .catch(e=>{if(live)setSlotResult({key:slotKey,rows:[],error:e.message||'Unable to load timetable classes.'});});
   return()=>{live=false;};
- },[selected]);
+ },[slotKey]);
 
+ function selectGroup(id){
+  const group=groups.find(item=>groupId(item)===id);
+  if(!group)return;
+  setPreferred(id);
+  setSlotRevision(n=>n+1);
+  saveTimetablePreference(preferenceKey,group);
+ }
+
+ async function reloadSchedule(){
+  await loadGroups();
+  setSlotRevision(n=>n+1);
+ }
  const set=(field,value)=>setForm(previous=>({...previous,[field]:value}));
  async function publish(event){
   event.preventDefault();
   const payload={...form,semester:Number(form.semester),dayOfWeek:Number(form.dayOfWeek)};
   const saved=await act(()=>call('/timetable/slots',{method:'POST',body:payload}),
     'Timetable class published for this section.');
-  if(saved){
-   await loadGroups();
-   if(chosen&&groupId(chosen)===groupId(payload)){
-    const q=new URLSearchParams({term:chosen.term,program:chosen.program,
-      semester:String(chosen.semester),section:chosen.section});
-    setSlots(await call('/timetable/slots?'+q.toString()));
-   }
-  }
+  if(saved)await reloadSchedule();
  }
  async function archive(slot){
   if(!window.confirm('Archive this published class? Students will no longer see it.'))return;
   const saved=await act(()=>call('/timetable/slots/'+slot.id+'/archive',
     {method:'POST',body:{}}),'Class archived.');
-  if(saved){
-   await loadGroups();
-   if(chosen){
-    const q=new URLSearchParams({term:chosen.term,program:chosen.program,
-      semester:String(chosen.semester),section:chosen.section});
-    setSlots(await call('/timetable/slots?'+q.toString()));
-   }
-  }
+  if(saved)await reloadSchedule();
  }
  return <div className="wc-stack">
   <section className="wc-panel">
@@ -93,10 +95,11 @@ export default function TimetablePage({profile,call,act,busy}){
     <>
      <label className="wc-timetable-picker">Available class group
       <select aria-label="Available class group" value={selected}
-       onChange={e=>setSelected(e.target.value)}>
+       onChange={e=>selectGroup(e.target.value)}>
        {groups.map(g=><option key={groupId(g)} value={groupId(g)}>{label(g)}</option>)}
       </select>
      </label>
+     {preferenceKey&&<p>Your selection is remembered in this browser for this account.</p>}
      {slotsLoading?<p>Loading classes…</p>:slots.length===0?
       <div className="wc-empty"><h3>No classes for this group</h3></div>:
       <div className="wc-timetable-days">{[1,2,3,4,5,6,7].map(day=>{

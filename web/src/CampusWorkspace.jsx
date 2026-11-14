@@ -1,5 +1,6 @@
 import React,{Suspense,lazy,useEffect,useMemo,useRef,useState} from 'react';
 import {callApi} from './api.js';
+import {timetablePreferenceKey} from './timetable-preference.js';
 import {activeRoles,displayRole,hasRole,navigationFor,registrationAttemptKey} from './dashboard-domain.js';
 import {Overview,Events,Registrations,Announcements,Organizer} from './WorkspacePages.jsx';
 import './workspace.css';
@@ -101,13 +102,14 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  async function refreshProfile(){
   await act(async()=>{const next=await call('/me');onProfileChange(next);},'Account permissions refreshed.');
  }
+ const timetableKey=timetablePreferenceKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
   overview:<Overview {...props}/>,
   events:<Events {...props}/>,
   registrations:<Registrations {...props}/>,
   announcements:<Announcements {...props}/>,
-  timetable:<TimetablePage {...props}/>,
+  timetable:<TimetablePage key={timetableKey??'timetable'} preferenceKey={timetableKey} {...props}/>,
   resources:<AcademicResourcesPage {...props}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,

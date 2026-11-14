@@ -7,6 +7,7 @@ on:
 jobs:
   web-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: web
@@ -18,3 +19,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build
+      - name: Install Chromium for fixture-only browser QA
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Rehearse event privacy on desktop and mobile web
+        run: npm run test:browser

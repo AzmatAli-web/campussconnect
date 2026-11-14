@@ -4,6 +4,8 @@ Students can see published campus events, including the time, venue, and total s
 
 The API integration test exercises two fixture students registered for the same event. It also checks that registration responses, their replays, and roster responses are marked `Cache-Control: no-store`. The public-to-campus event projection remains unchanged. Fixture results do not count as live staging evidence.
 
+A separate [browser rehearsal](MILESTONE29_BROWSER_PRIVACY_REHEARSAL.md) exercises the real React workspace with fictional sessions and intercepted API responses. It does not replace this live walkthrough.
+
 ## Authorized staging walkthrough
 
 Before running this check, confirm the reviewed commit, staging HTTPS origin, isolated Firebase and Atlas resources, and fictional test accounts. Start with the [staging preflight and read-only smoke](STAGING_PILOT_RUNBOOK.md). Do not run the registration exercise on real campus events or with real student accounts.

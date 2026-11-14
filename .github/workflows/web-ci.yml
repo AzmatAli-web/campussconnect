@@ -1,0 +1,25 @@
+name: Web tests and build
+on:
+  push:
+    paths: ['web/**', '.github/workflows/web-ci.yml']
+  pull_request:
+    paths: ['web/**', '.github/workflows/web-ci.yml']
+jobs:
+  web-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Install Chromium for fixture-only browser QA
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Rehearse event privacy on desktop and mobile web
+        run: npm run test:browser

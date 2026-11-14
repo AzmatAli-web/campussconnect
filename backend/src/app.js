@@ -4,6 +4,17 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import {databaseReady} from './config/database.js';
 import {identityRouter} from './routes/identity.js';
+import {eventsRouter} from './routes/events.js';
+import {announcementsRouter} from './routes/announcements.js';
+import {governanceRouter} from './routes/governance.js';
+import {timetableRouter} from './routes/timetable.js';
+import {resourcesRouter} from './routes/resources.js';
+import {complaintsRouter} from './routes/complaints.js';
+import {feesRouter} from './routes/fees.js';
+import {marketplaceRouter} from './routes/marketplace.js';
+import {lostFoundRouter} from './routes/lost-found.js';
+import {societyMembershipsRouter} from './routes/society-memberships.js';
+import {notificationsRouter} from './routes/notifications.js';
 import {HttpError} from './lib/http-error.js';
 export function createApp({config,firebaseAuth}) {
  const app=express();
@@ -11,7 +22,9 @@ export function createApp({config,firebaseAuth}) {
  app.use(helmet());
  app.use(cors({origin:config.corsOrigin,methods:['GET','POST','PATCH','OPTIONS']}));
  app.use(express.json({limit:'32kb',strict:true}));
- app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
+ // In-memory integration suites issue hundreds of requests against one app instance.
+ // Disable throttling only for NODE_ENV=test; development/production remain rate-limited.
+ if(config.nodeEnv!=='test') app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
  app.get('/api/v1/health/live',(_req,res)=>res.json({data:{status:'alive'}}));
  app.get('/api/v1/health/ready',(_req,res)=>{
   const checks={database:databaseReady(),firebase:Boolean(firebaseAuth),university:Boolean(config.universityId),emailDomains:config.domains.length>0};
@@ -19,6 +32,17 @@ export function createApp({config,firebaseAuth}) {
   res.status(ready?200:503).json({data:{status:ready?'ready':'not_ready',checks}});
  });
  app.use('/api/v1',identityRouter({config,firebaseAuth}));
+ app.use('/api/v1',eventsRouter({config,firebaseAuth}));
+ app.use('/api/v1',announcementsRouter({config,firebaseAuth}));
+ app.use('/api/v1',governanceRouter({config,firebaseAuth}));
+ app.use('/api/v1',timetableRouter({config,firebaseAuth}));
+ app.use('/api/v1',resourcesRouter({config,firebaseAuth}));
+ app.use('/api/v1',complaintsRouter({config,firebaseAuth}));
+ app.use('/api/v1',feesRouter({config,firebaseAuth}));
+ app.use('/api/v1',marketplaceRouter({config,firebaseAuth}));
+ app.use('/api/v1',lostFoundRouter({config,firebaseAuth}));
+ app.use('/api/v1',societyMembershipsRouter({config,firebaseAuth}));
+ app.use('/api/v1',notificationsRouter({config,firebaseAuth}));
  app.use((_req,_res,next)=>next(new HttpError(404,'NOT_FOUND','Route not found')));
  app.use((err,_req,res,_next)=>{
   if (err?.type==='entity.too.large') return res.status(413).json({error:{code:'BODY_TOO_LARGE',message:'Request body too large'}});

@@ -1,10 +1,79 @@
 # CampusConnect
 
-CampusConnect MVP: Flutter mobile client, React web dashboards and Node.js/Express/MongoDB API.
+A **college campus services platform** with a Flutter Android student app, React web portal, Node.js/Express API, Firebase email authentication and MongoDB.
 
-**Current status:** Backend Foundation Milestone 1. Firebase and MongoDB Atlas are not yet provisioned; this is not a deployed application.
+## Current status
 
-- [Backend setup](backend/README.md)
-- [Cloud and security checklist](docs/SETUP_CHECKLIST.md)
+**Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
 
-No secrets belong in GitHub. The full v1.4 SRS/API/database documentation is maintained as the design baseline. Other modules will be implemented in subsequent milestones.
+Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
+
+## Milestone 31 MVP release candidate (draft)
+
+Use `feature/milestone31-mvp-release-candidate` for one checkout of the milestone stack for review. The [setup and demo guide](docs/MILESTONE31_MVP_RELEASE_CANDIDATE.md) covers the credential-free web demo and the separate connected portal. Live web and Android acceptance remains deferred.
+
+## Milestone 30 event calendar export (draft)
+
+Upcoming published events in the React portal can be downloaded as an iCalendar file. It includes event details only and does not register the student or expose any attendee data. Live staging acceptance remains deferred.
+
+## Milestone 29 browser privacy rehearsal (draft)
+
+The React workspace now has a repeatable Chromium test for two fictional student sessions and an organizer, including a mobile-width browser. See the [browser rehearsal guide](docs/MILESTONE29_BROWSER_PRIVACY_REHEARSAL.md). This test does not connect to staging services.
+
+## Milestone 28 event privacy acceptance (draft)
+
+Students can browse published events and see aggregate seat counts and their own registration. The attendee list is restricted to the authorized organizer or an administrator. Milestone 28 adds a two-student regression and a required staging evidence gate. See the [event privacy acceptance guide](docs/MILESTONE28_EVENT_PRIVACY_ACCEPTANCE.md).
+
+## Milestone 27 staging acceptance evidence (draft)
+
+`feature/milestone27-staging-acceptance-evidence` builds on Milestone 26. Its offline checker tracks each acceptance gate against an immutable candidate and reports whether the record is ready for human review. It does not run live tests or approve the pilot. See the [Milestone 27 acceptance guide](docs/MILESTONE27_STAGING_ACCEPTANCE.md).
+
+## Milestone 26 baseline (draft; not merged)
+
+`feature/milestone26-controlled-pilot-readiness` builds on the CI-green Milestone 25 branch, which stacks on Milestones 24, 23, 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–26 passed automated CI, including Milestone 26's fail-closed pilot guards, backend regression, React and Flutter tests. Live staging has not been deployed, tested or approved.** Physical device and production acceptance remain pending. All remain in draft, undeployed and not yet accepted on a physical Android device.
+
+```powershell
+git fetch origin
+git switch feature/milestone26-controlled-pilot-readiness
+git pull --ff-only origin feature/milestone26-controlled-pilot-readiness
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\verify-all.ps1
+```
+
+If tracked local files prevent switching, preserve them before checkout; **do not overwrite local backend credentials**.
+
+## Local run
+
+```powershell
+# Terminal 1
+cd backend
+npm.cmd install
+npm.cmd run db:ensure-indexes
+npm.cmd run dev
+
+# Terminal 2
+cd web
+npm.cmd install
+npm.cmd run dev
+```
+
+Default development web address: `http://localhost:5173`. Backend readiness: `http://127.0.0.1:4000/api/v1/health/ready`.
+
+For the physical Flutter app, see [USB Android live test](docs/USB_ANDROID_LIVE_TEST.md). A connected phone needs an active `adb reverse tcp:4000 tcp:4000` rule for the debug API address. Empty student-side modules are expected until authorized staff publish real campus content.
+
+## Important docs
+
+- [Milestone 26 Controlled Staging Pilot Runbook](docs/STAGING_PILOT_RUNBOOK.md)
+- [Pilot Acceptance Record (NO-GO by default)](docs/PILOT_ACCEPTANCE_RECORD.md)
+- [Milestone 25 Security & Performance QA](docs/MILESTONE25_SECURITY_PERFORMANCE.md)
+- [Milestone 24 Notifications and performance optimization](docs/NOTIFICATIONS_OPTIMIZATION.md)
+- [Milestone 23 Society Membership scope, APIs and authorization](docs/SOCIETY_MEMBERSHIP_MVP.md)
+- [Milestone 22 Lost & Found scope, APIs and privacy](docs/LOST_FOUND_MVP.md)
+- [Milestone 21 Marketplace scope, APIs and release gates](docs/MARKETPLACE_MVP.md)
+- [Full-stack QA and release gates](docs/RELEASE_QA.md)
+- [Backend security and roles](docs/ADMIN_BOOTSTRAP_AND_ROLES.md)
+- [Finance Officer permissions](docs/FINANCE_OFFICER_AUDIT.md)
+- [Query/index optimization](docs/QUERY_INDEX_OPTIMIZATION.md)
+- [Academic Resources limitations](docs/ACADEMIC_RESOURCES_MVP.md)
+
+No server credentials or sensitive student records belong in this repository. Production deployment requires formal security, privacy, data-retention and infrastructure review.

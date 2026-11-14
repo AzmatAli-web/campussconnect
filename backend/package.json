@@ -1,9 +1,38 @@
 {
-  "name":"campusconnect-backend",
-  "version":"0.1.0",
-  "private":true,
-  "type":"module",
-  "engines":{"node":">=22"},
-  "scripts":{"start":"node src/server.js","dev":"node --watch src/server.js","test":"node --test"},
-  "dependencies":{"cors":"^2.8.5","dotenv":"^16.4.7","express":"^4.21.2","express-rate-limit":"^7.5.0","firebase-admin":"^13.0.2","helmet":"^8.0.0","mongoose":"^8.9.5"}
+  "name": "campusconnect-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "db:ensure-indexes": "node scripts/ensure-indexes.js",
+    "notifications:dispatch": "node scripts/dispatch-notifications.js",
+    "test:integration": "node --test --test-timeout=240000 integration/*.test.js",
+    "qa:benchmark": "node scripts/benchmark-qa25.js",
+    "pilot:preflight": "node scripts/pilot-preflight.js",
+    "pilot:smoke": "node scripts/pilot-smoke.js",
+    "test:pilot": "node --test test/pilot-readiness.test.js",
+    "pilot:evidence": "node scripts/pilot-evidence.js",
+    "test:pilot:evidence": "node --test test/pilot-evidence.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "firebase-admin": "^14.2.0",
+    "helmet": "^8.0.0",
+    "mongoose": "^8.9.5",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.3",
+    "supertest": "^7.1.3"
+  }
 }

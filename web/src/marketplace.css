@@ -1,0 +1,23 @@
+.wc-market .wc-market-search{display:grid;grid-template-columns:minmax(0,2fr) minmax(150px,1fr) auto auto;align-items:end;gap:12px;margin-bottom:23px}
+.wc-market label{min-width:0;display:grid;gap:8px;font-size:12px;font-weight:700;color:#526980}
+.wc-market input:not([type=checkbox]),.wc-market select,.wc-market textarea{width:100%;padding:11px;border:1px solid #d7e2e9;border-radius:9px;font:inherit;background:white;color:#193248}
+.wc-market-search button{height:42px}.wc-market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.wc-market-card{min-width:0;border:1px solid #e2e9ec;border-radius:14px;overflow:hidden;background:#fff}
+.wc-market-image{width:100%;height:170px;display:block;object-fit:cover;background:#e9f5f5}
+.wc-market-placeholder{display:grid;place-items:center;color:#64a8a0;font-size:60px}
+.wc-market-cardbody{padding:17px}.wc-market-cardbody h3{font-size:17px;margin:10px 0}
+.wc-market-cardbody>p{white-space:pre-wrap;overflow-wrap:anywhere;color:#708699;font-size:12px;line-height:1.6}
+.wc-market-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#648392;font-size:11px;text-transform:capitalize}
+.wc-market-price{display:block;color:#0c977f;font-size:19px;margin:14px 0}
+.wc-market-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px}
+.wc-market-actions a{font-size:12px;overflow-wrap:anywhere;color:#087d70}
+.wc-market-actions small{font-size:11px;color:#8296a5}
+.wc-market-fields{display:grid;gap:14px}
+.wc-market .wc-market-checkbox{display:flex;flex-direction:row;align-items:flex-start;line-height:1.5;font-size:12px;font-weight:500}
+.wc-market-checkbox input{width:auto;flex:0 0 auto;margin-top:3px}
+.wc-market-edit,.wc-market-report{border-top:1px solid #dae8e9;margin-top:16px;padding-top:16px}
+.wc-market-error{border-radius:10px;padding:13px;background:#fff1f2;color:#aa3744}
+.wc-market-admin{display:grid;gap:12px;padding:18px;border:1px solid #dce9ed;border-radius:13px;margin-bottom:13px}
+.wc-market-admin p{color:#6d8495;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:900px){.wc-market .wc-market-search{grid-template-columns:1fr 1fr}}
+@media(max-width:540px){.wc-market .wc-market-search{grid-template-columns:1fr}.wc-market .wc-market-search button{width:100%}}

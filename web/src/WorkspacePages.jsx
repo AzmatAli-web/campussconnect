@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {canExportEvent,downloadEventCalendar} from './event-calendar.js';
 import {buildEventPayload,buildAnnouncementPayload,canOrganize,displayRole,eventFull,formatDate,hasRole,isVerifiedFaculty,myRegistration} from './dashboard-domain.js';
 
 function Head({tag,title,detail,right}){return <div className="wc-head"><div><span className="wc-kicker">{tag}</span><h2>{title}</h2>{detail&&<p>{detail}</p>}</div>{right}</div>;}
@@ -14,6 +15,7 @@ function EventCard({event,registrations=[],profile,busy,register,showRoster,open
    <div className="wc-capacity"><div style={{width:Math.min(100,event.capacity?(event.confirmedCount/event.capacity)*100:0)+'%'}}/></div>
    <div className="wc-event-actions">
     {hasRole(profile,'student')&&!privateView&&<button disabled={busy||own||!open} className="wc-primary" onClick={()=>register(event)}>{own?'✓ Confirmed':!open?'Registration unavailable':'Register'}</button>}
+    {!privateView&&canExportEvent(event)&&<button type="button" className="wc-outline" onClick={()=>downloadEventCalendar(event)}>Add to calendar</button>}
     {privateView&&<button className="wc-outline" onClick={()=>showRoster(event.id)}>{openRoster===event.id?'Hide private roster':'View private attendees'}</button>}
    </div>
    {own&&!privateView&&<p className="wc-private-note">Your registration is visible to you and authorized organizers only.</p>}

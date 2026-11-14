@@ -1,10 +1,13 @@
 import React,{useMemo,useState} from 'react';
 import {applyDemoAction,createInitialLab,eventSeats,visibleActivity,registrantsForViewer} from './test-lab-domain.js';
+import {DemoNotes,DemoTimetable} from './TestLabAcademics.jsx';
 import './test-lab.css';
 
 const sections=[
  ['overview','Overview','◈'],
  ['events','Events','▣'],
+ ['timetable','Timetable','▦'],
+ ['notes','Faculty notes','▤'],
  ['announcements','Announcements','◉'],
  ['access','Role management','⛨']
 ];
@@ -87,6 +90,9 @@ export default function TestLab(){
       </form>:<div className="lab-locked"><span>⛨</span><strong>Publishing restricted</strong><p>Approve the Faculty applicant or assign the Society Manager using the Demo Admin persona. Ordinary Students cannot publish.</p><button type="button" onClick={()=>setSection('access')}>View role controls →</button></div>}
      </section>
     </div>}
+
+    {section==='timetable'&&<DemoTimetable/>}
+    {section==='notes'&&<DemoNotes/>}
 
     {section==='announcements'&&<div className="lab-two">
      <section className="lab-card"><div className="lab-card-head"><div><span className="lab-overline">CAMPUS BULLETIN</span><h2>Announcements</h2></div><span className="lab-counter">{data.announcements.length} notices</span></div>

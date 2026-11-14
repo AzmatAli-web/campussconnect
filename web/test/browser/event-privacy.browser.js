@@ -22,7 +22,10 @@ const email = actor => 'student-' + actor + '@campus.example';
 test('real React workspace: two students share event counts, never receipts or rosters', {timeout: 60_000}, async t => {
   const vite = await createServer({
     root, configFile: false, envFile: false,
-    define: {'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api/v1')},
+    define: {
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api/v1'),
+      'import.meta.env.VITE_ENABLE_TEST_LAB': JSON.stringify('true'),
+    },
     server: {host: '127.0.0.1', port: 0, hmr: false},
   });
   let browser;
@@ -155,5 +158,38 @@ test('real React workspace: two students share event counts, never receipts or r
 
   assert.equal(traffic.filter(r => r.path === receiptPath && r.method === 'POST').length, 2);
   assert.deepEqual(traffic.filter(r => r.path === receiptPath && r.method === 'GET').map(r => r.actor), ['organizer']);
+  const demo = await browser.newContext({serviceWorkers: 'block'});
+  await demo.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.origin === origin && !url.pathname.startsWith('/api/')) return route.continue();
+    unexpected.push('nonlocal or API request from the credential-free demo');
+    return route.abort();
+  });
+  const lab = await demo.newPage();
+  lab.setDefaultTimeout(10_000);
+  lab.on('pageerror', () => unexpected.push('uncaught demo page error'));
+  await lab.goto(origin + '/?test-lab=1');
+  await lab.getByText('Test environment — not a real login').waitFor();
+  const nav = lab.getByRole('navigation', {name: 'Lab navigation'});
+  await nav.getByRole('button', {name: /Timetable/}).click();
+  await lab.getByText('Monday · 09:00–10:30', {exact: true}).waitFor();
+  await lab.getByLabel('Class group').selectOption('b');
+  await lab.getByText('Tuesday · 10:00–11:30', {exact: true}).waitFor();
+  assert.equal(await lab.getByText('Monday · 09:00–10:30', {exact: true}).count(), 0);
+
+  await nav.getByRole('button', {name: /Faculty notes/}).click();
+  await lab.getByText('Preview sample notes', {exact: true}).click();
+  await lab.getByText(/The critical path is the longest dependency path/).waitFor();
+
+  await lab.getByRole('button', {name: /Demo Student 1/}).click();
+  await nav.getByRole('button', {name: /Events/}).click();
+  await lab.getByRole('button', {name: 'Register', exact: true}).click();
+  await lab.getByText(/Your own registration is confirmed/).waitFor();
+  await lab.getByRole('button', {name: /Demo Student 2/}).click();
+  await lab.getByText('1 / 3 confirmed', {exact: true}).waitFor();
+  assert.equal(await lab.getByText(/Your own registration is confirmed|Private attendee list/).count(), 0);
+  await lab.getByRole('button', {name: /Reset all demo data/}).click();
+  await nav.getByRole('button', {name: /Events/}).click();
+  await lab.getByText('0 / 3 confirmed', {exact: true}).waitFor();
   assert.deepEqual(unexpected, []);
 });

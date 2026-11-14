@@ -108,8 +108,11 @@ test('real React workspace: two students share event counts, never receipts or r
   async function ownRegistration(page) {
     await navigate(page, /My registrations/);
     await page.getByRole('heading', {name: 'My confirmed registrations'}).waitFor();
-    await page.locator('main').getByText(title, {exact: true}).waitFor();
-    assert.equal(await page.locator('main .wc-compact').count(), 1);
+    // Check the expected row and count in one DOM snapshot after the tab's async load.
+    await page.waitForFunction(expected => {
+      const rows = document.querySelectorAll('main .wc-compact');
+      return rows.length === 1 && rows[0].querySelector('strong')?.textContent === expected;
+    }, title);
   }
 
   const a = await pageFor('a');

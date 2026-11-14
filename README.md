@@ -8,6 +8,10 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
+## Milestone 30 event calendar export (draft)
+
+Upcoming published events in the React portal can be downloaded as an iCalendar file. It includes event details only and does not register the student or expose any attendee data. Live staging acceptance remains deferred.
+
 ## Milestone 29 browser privacy rehearsal (draft)
 
 The React workspace now has a repeatable Chromium test for two fictional student sessions and an organizer, including a mobile-width browser. See the [browser rehearsal guide](docs/MILESTONE29_BROWSER_PRIVACY_REHEARSAL.md). This test does not connect to staging services.

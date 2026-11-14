@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
@@ -12,7 +13,7 @@ const receiptPath = eventsPath + '/' + id + '/registrations';
 const ownPath = '/api/v1/me/event-registrations';
 const event = {
   id, title, description: 'Fixture for browser acceptance testing.',
-  venue: 'Fictional auditorium', startsAt: '2099-01-02T10:00:00Z',
+  venue: 'Fictional auditorium', startsAt: '2099-01-02T10:00:00Z', endsAt: '2099-01-02T11:00:00Z',
   status: 'published', capacity: 3, registrationOpen: true,
 };
 const names = {a: 'Fixture Student A', b: 'Fixture Student B'};
@@ -107,13 +108,26 @@ test('real React workspace: two students share event counts, never receipts or r
   async function ownRegistration(page) {
     await navigate(page, /My registrations/);
     await page.getByRole('heading', {name: 'My confirmed registrations'}).waitFor();
-    await page.locator('main').getByText(title, {exact: true}).waitFor();
-    assert.equal(await page.locator('main .wc-compact').count(), 1);
+    // Check the expected row and count in one DOM snapshot after the tab's async load.
+    await page.waitForFunction(expected => {
+      const rows = document.querySelectorAll('main .wc-compact');
+      return rows.length === 1 && rows[0].querySelector('strong')?.textContent === expected;
+    }, title);
   }
 
   const a = await pageFor('a');
   await navigate(a, /Explore events/);
   await seats(a, 0);
+  const [download] = await Promise.all([
+    a.waitForEvent('download', {timeout: 10_000}),
+    card(a).getByRole('button', {name: 'Add to calendar', exact: true}).click(),
+  ]);
+  assert.equal(download.suggestedFilename(), 'campusconnect-event-' + id + '.ics');
+  const calendar = await readFile(await download.path(), 'utf8');
+  assert.match(calendar, /SUMMARY:Fictional campus workshop/);
+  assert.match(calendar, /DTSTART:20990102T100000Z/);
+  assert.doesNotMatch(calendar, /ATTENDEE:|Fixture Student|receipt-|fixture-a/);
+  assert.equal(receipts.size, 0);
   await card(a).getByRole('button', {name: 'Register', exact: true}).click();
   await seats(a, 1);
   await confirm(a);

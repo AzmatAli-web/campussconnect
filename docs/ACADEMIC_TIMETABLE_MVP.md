@@ -11,6 +11,10 @@ CampusConnect now supports **weekly academic timetables** for colleges. This MVP
 - MongoDB unique multikey constraint blocks **overlapping published classes for the same cohort/day**, including simultaneous publishers. Class times are limited to 15-minute boundaries between 06:00–22:00, max four hours.
 - Archiving removes a class from public listings and permits that interval to be reused. Original history remains stored.
 
+## Remembered web timetable selection
+
+The connected React portal remembers the last group explicitly selected by an active student in the same browser and account. It stores only a local display preference, not enrollment or a restriction on browsing. It does not sync to Android or other browsers. A saved group that is no longer published falls back to the first available group without requesting the old group. If browser storage is unavailable, the timetable still works for the current visit. Staff and Admin publishing permissions are unchanged.
+
 ## Real app and no-Admin setup
 
 Since there is **no real campus Staff/Admin provisioned yet**, your currently signed-in Student will see **No official timetable has been published yet**. That is correct and secure. Do not promote a Student or bypass role authorization for a demo.

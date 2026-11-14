@@ -12,7 +12,8 @@ const profiles = {
   },
 };
 if (!Object.hasOwn(profiles, actor)) throw new Error('Unknown test persona');
-const profile = {status: 'active', ...profiles[actor]};
+const ids = {a: '1'.repeat(24), b: '2'.repeat(24), organizer: '3'.repeat(24)};
+const profile = {status: 'active', universityId: 'a'.repeat(24), _id: ids[actor], ...profiles[actor]};
 
 createRoot(document.getElementById('root')).render(
   <CampusWorkspace user={{getIdToken: async () => 'fixture-' + actor}} profile={profile} />,

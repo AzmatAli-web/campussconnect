@@ -23,3 +23,8 @@ jobs:
         run: npx --no-install playwright install --with-deps chromium
       - name: Rehearse event privacy on desktop and mobile web
         run: npm run test:browser
+      - name: Install backend dependencies for the isolated Admin Lab
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+      - name: Test the Admin Lab with Chromium and disposable MongoDB
+        run: npm run test:admin:lab

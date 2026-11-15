@@ -8,6 +8,10 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
+## Milestone 33 isolated Admin Lab (draft)
+
+Use the [Admin Lab guide](docs/ADMIN_TEST_LAB.md) to test the real Admin dashboard and API locally with fictional accounts. It runs separately from the connected app and does not use Firebase or Atlas.
+
 ## Milestone 32 remembered timetable selection (draft)
 
 The connected web timetable remembers the last group a student explicitly chose in the same browser and account. This is a viewing preference only and does not set enrollment or affect access. See the [timetable guide](docs/ACADEMIC_TIMETABLE_MVP.md).

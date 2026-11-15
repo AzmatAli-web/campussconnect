@@ -38,7 +38,7 @@ export default function AdminPanel({data,call,act,busy,showRoster,openRoster,ros
   if(ok)setFinance({mode:finance.mode,userId:'',reason:'',evidenceReference:'',attested:false});
  }
  return <div className="wc-stack">
-  <div className="wc-admin-banner"><strong>Restricted Admin workspace</strong><small>Every operation is checked by the backend against a real Firebase identity and an active Admin role. The Demo Administrator cannot enter this screen.</small></div>
+  <div className="wc-admin-banner"><strong>Restricted Admin workspace</strong><small>Every operation is checked by the backend against an authenticated identity and an active Admin role.</small></div>
   <div className="wc-metrics"><div className="wc-metric"><small>Campus users</small><strong>{users.length}</strong><em>First 100 records</em></div><div className="wc-metric"><small>Published events</small><strong>{events.length}</strong><em>Campus records</em></div><div className="wc-metric"><small>Societies</small><strong>{societies.length}</strong><em>Active groups</em></div><div className="wc-metric"><small>Audit entries</small><strong>{audits.length}</strong><em>Recent actions</em></div></div>
   <div className="wc-columns">
    <section className="wc-panel"><Header kicker="FACULTY VERIFICATION" title="Approve faculty" desc="Review official faculty evidence independently before approving."/>

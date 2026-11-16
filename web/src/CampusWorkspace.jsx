@@ -1,4 +1,4 @@
-import React,{Suspense,lazy,useEffect,useMemo,useRef,useState} from 'react';
+import React,{Suspense,lazy,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {callApi} from './api.js';
 import {timetablePreferenceKey} from './timetable-preference.js';
 import {savedNotesKey} from './saved-notes.js';
@@ -47,7 +47,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const [rosters,setRosters]=useState({}),[openRoster,setOpenRoster]=useState(null);
  const idempotencyKeys=useRef(new Map());
  const activeTab=nav.some(item=>item.id===tab)?tab:'overview';
- const call=(path,opts)=>callApi(path,user,opts);
+ const call=useCallback((path,opts)=>callApi(path,user,opts),[user]);
  useEffect(()=>{
   if(profile.status!=='active'){setLoading(false);return;}
   let current=true;
@@ -115,7 +115,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,
-  societies:<SocietiesPage {...props}/>,
+  societies:<SocietiesPage key={user.uid??profile.id} {...props} revision={revision}/>,
   notifications:<NotificationsPage {...props}/>,
   complaints:<ComplaintsPage {...props}/>,
   fees:<FeesPage {...props}/>,
@@ -135,7 +135,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
    <main className="wc-content">
     <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
-    {loading&&!['events','registrations','announcements'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
+    {loading&&!['events','registrations','announcements','societies'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
      <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>
       {page}
      </Suspense>}

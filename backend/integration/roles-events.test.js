@@ -1119,6 +1119,28 @@ test('Lost & Found: verified Student, tenant scope, owner updates, redaction and
 },{timeout:60000});
 
 
+test('Society discovery matches names and descriptions, paginates and leaves hidden campus records out',async()=>{
+ const fixture={universityId:UNIVERSITY_ID,description:'Directory regression fixture',createdBy:admin._id};
+ await Society.insertMany([
+  {...fixture,name:'Directory RC (A+B)',slug:'directory-rc-first'},
+  {...fixture,name:'Directory RC second',description:'Includes (A+B)',slug:'directory-rc-second'},
+  {...fixture,name:'Directory RC third',description:'Other match AXB',slug:'directory-rc-third'},
+  {...fixture,name:'Directory RC archived (A+B)',slug:'directory-rc-archived',status:'archived'},
+  {...fixture,universityId:new mongoose.Types.ObjectId(),name:'Directory RC foreign (A+B)',slug:'directory-rc-foreign'}
+ ]);
+ const browse=(q,page)=>request(app).get('/api/v1/societies')
+  .query({q,page,limit:1}).set(auth('fixture-student-00'));
+ const first=await browse('(a+b)',1),second=await browse('(a+b)',2);
+ assert.equal(first.status,200,JSON.stringify(first.body));
+ assert.deepEqual(first.body.meta,{page:1,limit:1,total:2});
+ assert.equal(first.body.data[0].name,'Directory RC (A+B)');
+ assert.deepEqual(Object.keys(first.body.data[0]).sort(),['description','id','name','slug','status']);
+ assert.equal(second.status,200);
+ assert.deepEqual(second.body.meta,{page:2,limit:1,total:2});
+ assert.equal(second.body.data[0].name,'Directory RC second');
+ assert.equal((await browse('does not match any society',1)).body.meta.total,0);
+});
+
 test('Society Membership: students request safely; approved managers review; state and tenant isolation hold',async()=>{
  const uni=UNIVERSITY_ID;
  const mg=await User.create(person('fixture-membership-manager',['student','societyManager']));
@@ -1180,6 +1202,18 @@ test('Society Membership: students request safely; approved managers review; sta
  const notMine=await request(app).get('/api/v1/me/society-memberships').set(auth(other));
  assert.equal(notMine.status,200);
  assert.ok(!notMine.body.data.some(x=>x.id===id));
+ const directory='/api/v1/societies?q=membership%20test&includeMembership=1';
+ const ownerDirectory=await request(app).get(directory).set(auth(owner));
+ assert.equal(ownerDirectory.status,200);
+ assert.deepEqual(ownerDirectory.body.data[0].membership,{id,status:'active'});
+ assert.match(ownerDirectory.headers['cache-control'],/no-store/);
+ const otherDirectory=await request(app).get(directory).set(auth(other));
+ assert.equal(otherDirectory.status,200);
+ assert.equal(otherDirectory.body.data[0].membership,null);
+ const enrichedOwn=await request(app).get('/api/v1/me/society-memberships?includeSociety=1').set(auth(owner));
+ assert.equal(enrichedOwn.body.data.find(x=>x.id===id).societyName,group.name);
+ assert.equal(Object.hasOwn(own.body.data.find(x=>x.id===id),'societyName'),false);
+ assert.equal(Object.hasOwn(list.body.data.find(x=>x.id===societyId),'membership'),false);
 
  // Active membership is NOT a publishing or manager role.
  const memberAccount=await User.findById(students[0]._id).lean();

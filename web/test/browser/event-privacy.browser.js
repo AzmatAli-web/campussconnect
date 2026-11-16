@@ -43,6 +43,12 @@ test('real React workspace: two students share event counts, never receipts or r
   const note = {id: '000000000000000000000051', title: 'Fixture project notes', program: 'BSE', semester: 7,
     courseCode: 'CSC494', fileName: 'notes.pdf', status: 'published', sizeBytes: 1000};
   let publishedNote = true;
+  const societyRows = Array.from({length: 13}, (_, index) => ({
+    id: 'robotics-' + (index + 1), name: 'Robotics society ' + (index + 1),
+    description: 'Build and learn together.', status: 'active',
+  }));
+  const memberships = new Map([['a', [{id: 'past-membership-a', societyId: 'archived-fixture',
+    societyName: 'Archived fixture group', status: 'left', requestedAt: '2026-01-02T10:00:00Z'}]]]);
 
   let sections = ['A', 'B'];
   const group = section => ({term: 'Fall 2026', program: 'BSE', semester: 7, section});
@@ -95,6 +101,30 @@ test('real React workspace: two students share event counts, never receipts or r
         return route.fulfill({status: 200, json: {data: notes, meta: {total: notes.length ? 13 : 0}}});
       }
       if (method === 'GET' && path === '/api/v1/resources') return send(route, publishedNote ? [note] : []);
+      if (method === 'GET' && path === '/api/v1/societies' && actor !== 'organizer') {
+        if (url.searchParams.get('includeMembership') !== '1') return deny(route, 'missing personal membership option');
+        const pageNumber = Number(url.searchParams.get('page'));
+        const limit = Number(url.searchParams.get('limit'));
+        const q = url.searchParams.get('q');
+        const matches = !q || q === 'robotics' ? societyRows : [];
+        const data = matches.slice((pageNumber - 1) * limit, pageNumber * limit).map(society => {
+          const own = memberships.get(actor)?.find(x => x.societyId === society.id);
+          return {...society, membership: own ? {id: own.id, status: own.status} : null};
+        });
+        return route.fulfill({status: 200, json: {data, meta: {total: matches.length}}});
+      }
+      if (method === 'GET' && path === '/api/v1/me/society-memberships' && actor !== 'organizer') {
+        if (url.searchParams.get('includeSociety') !== '1') return deny(route, 'missing receipt society name');
+        const data = memberships.get(actor) ?? [];
+        return route.fulfill({status: 200, json: {data, meta: {total: data.length}}});
+      }
+      if (method === 'POST' && path === '/api/v1/societies/robotics-13/membership-requests' && actor === 'a') {
+        assert.deepEqual(req.postDataJSON(), {});
+        const receipt = {id: 'pending-membership-a', societyId: 'robotics-13', societyName: 'Robotics society 13',
+          status: 'pending', requestedAt: '2026-11-16T10:00:00Z'};
+        memberships.set(actor, [receipt, ...memberships.get(actor)]);
+        return send(route, receipt, 201);
+      }
       if (method === 'GET' && path === '/api/v1/me/saved-resources' && ['a','b'].includes(actor)) {
         return send(route, publishedNote && url.searchParams.get('ids') === note.id ? [note] : []);
       }
@@ -221,6 +251,29 @@ test('real React workspace: two students share event counts, never receipts or r
     await page.getByText('Timetable fixture ' + section, {exact: false}).waitFor();
     assert.equal(await schedule(page).inputValue(), JSON.stringify(Object.values(group(section))));
   };
+  await navigate(a, /Societies/);
+  const findSocieties = a.getByRole('searchbox', {name: 'Search societies'});
+  const history = a.getByRole('region', {name: 'My memberships'});
+  await history.getByText('Archived fixture group', {exact: true}).waitFor();
+  await findSocieties.fill('robotics');
+  await findSocieties.press('Enter');
+  await a.getByText('13 societies found', {exact: true}).waitFor();
+  await a.getByRole('navigation', {name: 'Society directory pages'}).getByRole('button', {name: 'Next'}).click();
+  await a.getByText('Page 2 of 2', {exact: true}).waitFor();
+  const society13 = a.locator('article').filter({has: a.getByRole('heading', {name: 'Robotics society 13', exact: true})});
+  await society13.getByRole('button', {name: 'Request to join'}).click();
+  await society13.getByText('Awaiting review', {exact: true}).waitFor();
+  assert.equal(await findSocieties.inputValue(), 'robotics');
+  await a.getByText('Page 2 of 2', {exact: true}).waitFor();
+  await history.getByText('Robotics society 13', {exact: true}).waitFor();
+  await findSocieties.fill('no matches');
+  await findSocieties.press('Enter');
+  await a.getByRole('heading', {name: 'No societies match your search'}).waitFor();
+  await history.getByText('Archived fixture group', {exact: true}).waitFor();
+  await navigate(b, /Societies/);
+  await b.getByRole('heading', {name: 'No membership history yet'}).waitFor();
+  assert.equal(await b.getByText('Archived fixture group', {exact: true}).count(), 0);
+
   await navigate(a, /Timetable/);
   await showSection(a, 'A');
   // The browser's local time is irrelevant: 04:30 UTC is Monday 09:30 in Karachi.

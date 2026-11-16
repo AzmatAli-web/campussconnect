@@ -2,8 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  emptySocietyBody,societyMembersFilter,reviewSocietyMembership,
- societyMembershipView,privateSocietyMemberView
+ societyDirectoryQuery,societyMembershipView,privateSocietyMemberView
 } from '../src/services/society-membership-validation.js';
+
+test('society search is bounded, literal, and cannot accept tenant or student selectors',()=>{
+ const query=societyDirectoryQuery({q:'  Robotics (A+B)  ',page:'2',limit:'12',includeMembership:'1'});
+ assert.deepEqual(query,{
+  page:2,limit:12,skip:12,includeMembership:true,
+  filter:{$or:['name','description'].map(k=>({[k]:{$regex:'Robotics \\(A\\+B\\)',$options:'i'}}))}
+ });
+ assert.deepEqual(societyDirectoryQuery({q:'  '}).filter,{});
+ for(const input of [{q:['one','two']},{q:'x'.repeat(81)},{studentId:'other'},
+  {universityId:'other'},{status:'archived'},{limit:'101'},{includeMembership:'true'}])
+  assert.throws(()=>societyDirectoryQuery(input));
+});
 
 test('student membership requests do not accept spoofed owner or role fields',()=>{
  assert.doesNotThrow(()=>emptySocietyBody({}));

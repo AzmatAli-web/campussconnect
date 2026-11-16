@@ -42,7 +42,9 @@ export function societyMembershipsRouter(deps){
 
  router.get('/me/society-memberships',auth,asyncHandler(async(req,res)=>{
   needRole(req,'student');
-  if(Object.keys(req.query).some(k=>!['page','limit'].includes(k)))
+  if(Object.keys(req.query).some(k=>!['page','limit','includeSociety'].includes(k)||
+   typeof req.query[k]!=='string')||
+   (req.query.includeSociety!==undefined&&req.query.includeSociety!=='1'))
    throw new HttpError(400,'INVALID_MEMBERSHIP_QUERY','Unsupported filter');
   const {page,limit,skip}=pagination(req.query);
   const filter={universityId:deps.config.universityId,studentId:req.currentUser._id};
@@ -51,7 +53,15 @@ export function societyMembershipsRouter(deps){
     .skip(skip).limit(limit).lean(),
    SocietyMembership.countDocuments(filter)
   ]);
-  return res.json({data:rows.map(societyMembershipView),meta:{page,limit,total}});
+  const data=rows.map(societyMembershipView);
+  if(req.query.includeSociety==='1'){
+   const societies=rows.length?await Society.find({
+    universityId:deps.config.universityId,_id:{$in:rows.map(m=>m.societyId)}
+   }).select('_id name').lean():[];
+   const names=new Map(societies.map(s=>[String(s._id),s.name]));
+   for(const row of data)row.societyName=names.get(row.societyId)??null;
+  }
+  return res.json({data,meta:{page,limit,total}});
  }));
 
  // Students cannot select their own status, membership ID, university or role.

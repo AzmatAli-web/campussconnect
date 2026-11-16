@@ -11,6 +11,10 @@ CampusConnect now supports **weekly academic timetables** for colleges. This MVP
 - MongoDB unique multikey constraint blocks **overlapping published classes for the same cohort/day**, including simultaneous publishers. Class times are limited to 15-minute boundaries between 06:00–22:00, max four hours.
 - Archiving removes a class from public listings and permits that interval to be reused. Original history remains stored.
 
+## Today and Full week on the web
+
+The **Today** view shows classes for the selected group in Pakistan Standard Time (PKT), with the current class and next class starting today highlighted above the list. It rechecks time while the page is open and when the tab returns to view. **Full week** retains the regular Monday-to-Sunday schedule. This view reflects the published recurring schedule and does not infer holidays or cancellations.
+
 ## Remembered web timetable selection
 
 The connected React portal remembers the last group explicitly selected by an active student in the same browser and account. It stores only a local display preference, not enrollment or a restriction on browsing. It does not sync to Android or other browsers. A saved group that is no longer published falls back to the first available group without requesting the old group. If browser storage is unavailable, the timetable still works for the current visit. Staff and Admin publishing permissions are unchanged.

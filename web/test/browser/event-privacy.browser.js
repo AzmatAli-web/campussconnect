@@ -103,9 +103,13 @@ test('real React workspace: two students share event counts, never receipts or r
       if (method === 'GET' && path === '/api/v1/timetable/slots') {
         const section = url.searchParams.get('section');
         if (!sections.includes(section)) return deny(route, 'unavailable timetable group requested');
-        return send(route, [{...group(section), id: 'class-' + section, dayOfWeek: 1,
+        const primary = {...group(section), id: 'class-' + section, dayOfWeek: 1,
           startTime: '09:00', endTime: '10:30', courseCode: 'CSC494',
-          courseTitle: 'Timetable fixture ' + section, instructorName: 'Fixture Teacher', room: 'Room ' + section}]);
+          courseTitle: 'Timetable fixture ' + section, instructorName: 'Fixture Teacher', room: 'Room ' + section};
+        return send(route, [primary,
+          {...primary, id: 'class-next-' + section, startTime: '11:00', endTime: '12:00', courseTitle: 'Later seminar'},
+          {...primary, id: 'class-wed-' + section, dayOfWeek: 3, courseTitle: 'Wednesday lecture'}
+        ]);
       }
       if (method === 'GET' && path === ownPath && actor !== 'organizer') {
         const receipt = receipts.get(actor);
@@ -219,6 +223,20 @@ test('real React workspace: two students share event counts, never receipts or r
   };
   await navigate(a, /Timetable/);
   await showSection(a, 'A');
+  // The browser's local time is irrelevant: 04:30 UTC is Monday 09:30 in Karachi.
+  await a.clock.setFixedTime(new Date('2026-11-16T04:30:00Z'));
+  const timetableView = a.getByRole('group', {name: 'Timetable view'});
+  await timetableView.getByRole('button', {name: 'Today', exact: true}).click();
+  await a.getByRole('heading', {name: 'Today · Monday'}).waitFor();
+  await a.getByText(/In progress · Timetable fixture A · Ends 10:30 PKT/).waitFor();
+  await a.getByText(/Next today · Later seminar · 11:00 PKT/).waitFor();
+  assert.equal(await a.getByText('Wednesday lecture', {exact: false}).count(), 0);
+  await timetableView.getByRole('button', {name: 'Full week'}).click();
+  await a.getByText('Wednesday lecture', {exact: false}).waitFor();
+  await a.clock.setFixedTime(new Date('2026-11-17T04:30:00Z'));
+  await timetableView.getByRole('button', {name: 'Today', exact: true}).click();
+  await a.getByText('No classes scheduled for this group today.').waitFor();
+  await timetableView.getByRole('button', {name: 'Full week'}).click();
   await schedule(a).selectOption({label: sectionLabel('B')});
   await showSection(a, 'B');
   await navigate(a, /Explore events/);

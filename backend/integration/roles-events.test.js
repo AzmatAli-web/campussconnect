@@ -430,6 +430,37 @@ test('students see the same published event and totals but never each other’s 
  }
 },{timeout:90000});
 
+test('private receipt details remain available for cancelled events and never join another campus',async()=>{
+ const uid='fixture-registration-history';
+ const student=await User.create(person(uid));
+ const [cancelled,foreign]=await Event.create([
+  {...makeEvent('Cancelled workshop on a private receipt',3),universityId:UNIVERSITY_ID,
+   organizerType:'faculty',organizerId:faculty._id,status:'cancelled',cancelReason:'Internal reason'},
+  {...makeEvent('Workshop at another campus',3),universityId:new mongoose.Types.ObjectId(),
+   organizerType:'faculty',organizerId:faculty._id}
+ ]);
+ const fields={universityId:UNIVERSITY_ID,studentId:student._id,
+  universityEmailNormalized:student.emailNormalized,studentNameSnapshot:student.fullName,status:'confirmed'};
+ await EventRegistration.create([
+  {...fields,eventId:cancelled._id,confirmedAt:new Date()},
+  {...fields,eventId:foreign._id,confirmedAt:new Date(Date.now()-1000)}
+ ]);
+ const get=(actor,query)=>request(app).get('/api/v1/me/event-registrations').query(query).set(auth(actor));
+ const first=await get(uid,{includeEvent:'1',limit:'1'});
+ assert.equal(first.status,200);
+ assert.equal(first.headers['cache-control'],'no-store');
+ assert.deepEqual(first.body.meta,{page:1,limit:1,total:2});
+ assert.deepEqual(first.body.data[0].event,{title:cancelled.title,venue:cancelled.venue,
+  startsAt:cancelled.startsAt.toISOString(),endsAt:cancelled.endsAt.toISOString(),status:'cancelled'});
+ const next=await get(uid,{includeEvent:'1',limit:'1',page:'2'});
+ assert.equal(next.body.data[0].event,null);
+ const other=await get('fixture-student-16',{includeEvent:'1',limit:'100'});
+ assert.ok(other.body.data.every(row=>row.eventId!==cancelled.id));
+ assert.equal(Object.hasOwn((await get(uid,{limit:'1'})).body.data[0],'event'),false);
+ assert.equal((await get(uid,{includeEvent:'true'})).status,400);
+ assert.equal((await request(app).get('/api/v1/events/'+cancelled.id).set(auth(uid))).status,404);
+},{timeout:30000});
+
 test('event discovery filters published campus events before pagination and keeps registrations private',async()=>{
  const user='fixture-student-00', now=Date.now();
  const date=hours=>new Date(now+hours*3600000);

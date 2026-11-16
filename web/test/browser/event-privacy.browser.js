@@ -38,6 +38,7 @@ test('real React workspace: two students share event counts, never receipts or r
     ? {executablePath: process.env.CAMPUS_BROWSER_EXECUTABLE}
     : {});
   const receipts = new Map();
+  let sampleHistory = false;
   const traffic = [];
   const note = {id: '000000000000000000000051', title: 'Fixture project notes', program: 'BSE', semester: 7,
     courseCode: 'CSC494', fileName: 'notes.pdf', status: 'published', sizeBytes: 1000};
@@ -96,7 +97,18 @@ test('real React workspace: two students share event counts, never receipts or r
           courseTitle: 'Timetable fixture ' + section, instructorName: 'Fixture Teacher', room: 'Room ' + section}]);
       }
       if (method === 'GET' && path === ownPath && actor !== 'organizer') {
-        return send(route, receipts.has(actor) ? [receipts.get(actor)] : []);
+        const receipt = receipts.get(actor);
+        if (!url.searchParams.has('includeEvent')) return send(route, receipt ? [receipt] : []);
+        let rows = receipt ? [{...receipt, event: row()}] : [];
+        let total = rows.length;
+        if (sampleHistory && actor === 'a') {
+          total = 13;
+          rows = url.searchParams.get('page') === '2' ? [{
+            ...receipt, id: 'receipt-old-a', event: {...event, title: 'Old campus fair',
+              endsAt: '2000-01-01T11:00:00Z', startsAt: '2000-01-01T10:00:00Z'}
+          }] : [{...receipt, event: {...event, title: 'Cancelled campus workshop', status: 'cancelled'}}];
+        }
+        return route.fulfill({status: 200, json: {data: rows, meta: {total}}});
       }
       if (method === 'GET' && path === '/api/v1/me/organized-events' && actor === 'organizer') {
         return send(route, [row()]);
@@ -247,6 +259,17 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByLabel('Search events').fill('no such event');
   await a.getByRole('button', {name: 'Search', exact: true}).click();
   await a.getByRole('heading', {name: 'No matching events'}).waitFor();
+
+  const catalogReads = traffic.filter(r => r.actor === 'a' && r.path === eventsPath && r.method === 'GET').length;
+  sampleHistory = true;
+  await navigate(a, /My registrations/);
+  await a.getByText('Cancelled campus workshop', {exact: true}).waitFor();
+  await a.getByText('Event cancelled', {exact: true}).waitFor();
+  const registrationPages = a.getByRole('navigation', {name: 'Registration pages'});
+  await registrationPages.getByRole('button', {name: 'Next', exact: true}).click();
+  await a.getByText('Old campus fair', {exact: true}).waitFor();
+  await a.getByText('Past event', {exact: true}).waitFor();
+  assert.equal(traffic.filter(r => r.actor === 'a' && r.path === eventsPath && r.method === 'GET').length, catalogReads);
 
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {

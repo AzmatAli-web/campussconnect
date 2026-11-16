@@ -29,9 +29,9 @@ const Admin=lazy(()=>import('./AdminPanel.jsx'));
 const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
- if(['overview','registrations','admin'].includes(tab))requested.events='/events?limit=50';
+ if(['overview','admin'].includes(tab))requested.events='/events?limit=50';
  if(['overview','announcements'].includes(tab))requested.announcements='/announcements?limit=50';
- if(hasRole(profile,'student')&&['overview','events','registrations'].includes(tab))requested.registrations='/me/event-registrations?limit=100';
+ if(hasRole(profile,'student')&&['overview','events'].includes(tab))requested.registrations='/me/event-registrations?limit=100';
  if(tab==='organizer'){
   requested.organized='/me/organized-events?limit=100';
   if(hasRole(profile,'societyManager'))requested.managed='/me/managed-societies';
@@ -109,7 +109,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const page={
   overview:<Overview {...props}/>,
   events:<Events {...props} busy={busy||loading} revision={revision}/>,
-  registrations:<Registrations {...props}/>,
+  registrations:<Registrations {...props} revision={revision}/>,
   announcements:<Announcements {...props}/>,
   timetable:<TimetablePage key={timetableKey??'timetable'} preferenceKey={timetableKey} {...props}/>,
   resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
@@ -135,7 +135,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
    <main className="wc-content">
     <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
-    {loading&&activeTab!=='events'?<div className="wc-loading"><div/><div/><div/></div>:
+    {loading&&!['events','registrations'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
      <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>
       {page}
      </Suspense>}

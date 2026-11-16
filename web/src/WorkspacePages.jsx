@@ -87,9 +87,59 @@ export function Events({data,profile,user,busy,register,revision}){
    </>}
  </section>;
 }
-export function Registrations({data,choose}){
- const regs=data.registrations||[],events=data.events||[];
- return <section className="wc-panel"><Head tag="ONLY YOU CAN SEE THIS" title="My confirmed registrations" detail="This view is filtered by your authenticated student ID on the backend." right={<Tag kind="good">{regs.length} confirmed</Tag>}/>{regs.length?regs.map(r=>{const e=events.find(x=>x.id===r.eventId);return <div className="wc-compact" key={r.id}><span>✓</span><div><strong>{e?.title||'Event unavailable or cancelled'}</strong><small>Confirmed {formatDate(r.confirmedAt)} · {e?formatDate(e.startsAt):'Contact organizer'}</small></div><Tag kind="good">Confirmed</Tag></div>}):<Empty title="Nothing registered yet" detail="Browse events and register during an open registration window."/>}<button className="wc-outline" onClick={()=>choose('events')}>Browse events ↗</button></section>;
+export function Registrations({user,choose,revision}){
+ const [page,setPage]=useState(1);
+ const [retry,setRetry]=useState(0);
+ const [result,setResult]=useState(null);
+ const key=JSON.stringify([page,revision,retry]);
+ const current=result?.key===key?result:null;
+ useEffect(()=>{
+  let active=true;
+  const query=new URLSearchParams({page:String(page),limit:String(pageSize),includeEvent:'1'});
+  callApi('/me/event-registrations?'+query,user,{includeMeta:true})
+   .then(({data:rows,meta})=>{
+    if(!active)return;
+    if(!Array.isArray(rows))throw new Error('Invalid registration response');
+    const total=Number.isInteger(meta?.total)?meta.total:rows.length;
+    if(page>1&&total<=(page-1)*pageSize){
+     setPage(Math.max(1,Math.ceil(total/pageSize)));
+     return;
+    }
+    setResult({key,rows,total});
+   })
+   .catch(()=>{if(active)setResult({key,error:true});});
+  return()=>{active=false;};
+ },[key,user]);
+ return <section className="wc-panel">
+  <Head tag="PRIVATE REGISTRATION HISTORY" title="My confirmed registrations"
+   detail="Your own confirmations, including past events and events cancelled by the campus."/>
+  {!current?<p role="status">Loading registrations…</p>:current.error?
+   <p role="alert">Could not load registrations. <button type="button" className="wc-outline" onClick={()=>setRetry(n=>n+1)}>Retry</button></p>:
+   current.rows.length?<>
+    {current.rows.map(receipt=>{
+     const event=receipt.event;
+     const cancelled=event?.status==='cancelled';
+     const ended=event?.status==='completed'||Date.parse(event?.endsAt)<=Date.now();
+     const state=!event?'Event unavailable':cancelled?'Event cancelled':ended?'Past event':
+      Date.parse(event.startsAt)<=Date.now()?'In progress':'Upcoming';
+     return <div className="wc-compact wc-registration-row" key={receipt.id}>
+      <span aria-hidden="true">✓</span>
+      <div>
+       <strong>{event?.title||'Event details unavailable'}</strong>
+       {event&&<small>{formatDate(event.startsAt)} · {event.venue}</small>}
+       <small>Registration confirmed {formatDate(receipt.confirmedAt)}</small>
+      </div>
+      <Tag kind={cancelled?'warn':state==='Upcoming'?'good':'neutral'}>{state}</Tag>
+     </div>;
+    })}
+    <nav className="wc-event-pagination" aria-label="Registration pages">
+     <button type="button" className="wc-outline" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</button>
+     <span role="status">Page {page} of {Math.max(1,Math.ceil(current.total/pageSize))} · {current.total} registrations</span>
+     <button type="button" className="wc-outline" disabled={page*pageSize>=current.total} onClick={()=>setPage(p=>p+1)}>Next</button>
+    </nav>
+   </>:<Empty title="Nothing registered yet" detail="Browse events and register during an open registration window."/>}
+  <button type="button" className="wc-outline" onClick={()=>choose('events')}>Browse events ↗</button>
+ </section>;
 }
 export function Announcements({data}){
  const notes=data.announcements||[];

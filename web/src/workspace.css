@@ -18,3 +18,8 @@
 .wc-event-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin-top:18px;color:#335266;font-size:13px}
 .wc-event-pagination button:disabled{opacity:.55;cursor:default}
 .wc-resource-filter select{width:100%;min-height:41px;padding:8px 10px;border:1px solid #d1e3e8;border-radius:10px;background:#fff;color:#24445a}
+
+.wc-registration-row{margin-bottom:9px}
+.wc-registration-row>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.wc-registration-row>.wc-tag{margin-left:auto}
+@media(max-width:540px){.wc-registration-row{flex-wrap:wrap}.wc-registration-row>div{flex-basis:70%}}

@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {isVerifiedFaculty,hasRole} from './dashboard-domain.js';
 import {uploadAcademicPdf,downloadAcademicPdf} from './api.js';
+import {MAX_SAVED_NOTES,readSavedNotes,toggleSavedNote,writeSavedNotes} from './saved-notes.js';
 
 const emptyUpload={
  title:'',description:'',program:'BSE',semester:'7',courseCode:''
@@ -8,7 +9,7 @@ const emptyUpload={
 const formatSize=n=>n<1024*1024
  ? Math.round(n/1024)+' KB' : (n/1024/1024).toFixed(1)+' MB';
 
-export default function AcademicResourcesPage({profile,user,call,act,busy}){
+export default function AcademicResourcesPage({profile,user,call,act,busy,notesKey}){
  const isTeacher=isVerifiedFaculty(profile);
  const isAdmin=hasRole(profile,'admin');
  const fileRef=useRef(null);
@@ -21,6 +22,15 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
  const [upload,setUpload]=useState(emptyUpload);
  const [selectedFile,setSelectedFile]=useState(null);
  const [downloading,setDownloading]=useState(null);
+ const [savedIds,setSavedIds]=useState(()=>readSavedNotes(notesKey));
+ const [showSaved,setShowSaved]=useState(false);
+ const [savedStatus,setSavedStatus]=useState('');
+ const [savedResult,setSavedResult]=useState(null);
+ const [savedRevision,setSavedRevision]=useState(0);
+ const savedQuery=savedIds.join(',');
+ const savedKey=JSON.stringify([savedQuery,savedRevision]);
+ const savedRows=savedResult?.key===savedKey?savedResult.rows:[];
+ const unavailable=savedIds.filter(id=>!savedRows.some(row=>row.id===id));
  const setField=(key,value)=>setUpload(s=>({...s,[key]:value}));
  async function load(query=selectedFilter){
   setLoading(true);
@@ -39,6 +49,39 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
   finally{setLoading(false);}
  }
  useEffect(()=>{load({});},[]);
+
+ useEffect(()=>{
+  if(!showSaved||!savedQuery)return;
+  let current=true;
+  call('/me/saved-resources?'+new URLSearchParams({ids:savedQuery}))
+   .then(rows=>{if(current)setSavedResult({key:savedKey,rows:Array.isArray(rows)?rows:[]});})
+   .catch(()=>{if(current)setSavedResult({key:savedKey,rows:[],error:true});});
+  return()=>{current=false;};
+ },[showSaved,savedKey]);
+
+ function openSaved(){
+  setSavedRevision(n=>n+1);
+  setShowSaved(true);
+ }
+
+ function updateSaved(next){
+  if(!writeSavedNotes(notesKey,next)){
+   setSavedStatus('Could not save changes. Check that this browser allows site storage.');
+   return;
+  }
+  setSavedIds(next);
+  setSavedStatus('');
+ }
+
+ function toggleNote(item){
+  const next=toggleSavedNote(savedIds,item.id);
+  if(next===savedIds){
+   setSavedStatus('You can save up to '+MAX_SAVED_NOTES+' notes. Remove one to add another.');
+   return;
+  }
+  updateSaved(next);
+ }
+
 
  async function publish(event){
   event.preventDefault();
@@ -76,7 +119,10 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
   const ok=await act(()=>call('/resources/'+resource.id+'/archive',{
     method:'POST',body:{}
   }),'Resource archived.');
-  if(ok)await load();
+  if(ok){
+   await load();
+   setSavedRevision(n=>n+1);
+  }
  }
 
  const list=items=><div className="wc-resource-grid">
@@ -96,6 +142,9 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
       disabled={downloading===item.id} onClick={()=>openFile(item)}>
       {downloading===item.id?'Downloading…':'Download PDF'}
     </button>}
+    {notesKey&&item.status==='published'&&<button type="button" className="wc-outline"
+      aria-label={(savedIds.includes(item.id)?'Remove saved note: ':'Save note: ')+item.title}
+      onClick={()=>toggleNote(item)}>{savedIds.includes(item.id)?'Remove from saved':'Save note'}</button>}
     {item.status==='archived'&&<span className="wc-tag warn">Archived</span>}
     {(isAdmin||isTeacher&&myFiles.some(x=>x.id===item.id))&&item.status==='published'&&
       <button type="button" className="wc-outline dangerous"
@@ -108,7 +157,14 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
    <div className="wc-head"><div><span className="wc-kicker">CAMPUS LEARNING LIBRARY</span>
     <h2>Academic Resources</h2>
     <p>Find notes and course PDFs published by verified Faculty. Downloads require an authenticated university account.</p>
-   </div><span className="wc-tag blue">{resources.length} PDF(s)</span></div>
+   </div><span className="wc-tag blue">{showSaved?savedIds.length:resources.length} {showSaved?'saved':'PDF(s)'}</span></div>
+   {notesKey&&<div className="wc-resource-actions wc-resource-view-switch" role="group" aria-label="Notes view">
+    <button type="button" className="wc-outline" aria-pressed={!showSaved} onClick={()=>setShowSaved(false)}>All notes</button>
+    <button type="button" className="wc-outline" aria-pressed={showSaved} onClick={openSaved}>Saved notes ({savedIds.length})</button>
+   </div>}
+   {savedStatus&&<p role="status">{savedStatus}</p>}
+   {error&&<div role="alert" className="wc-resource-error">{error}</div>}
+   {!showSaved&&<>
    <form className="wc-resource-filter" onSubmit={e=>{e.preventDefault();
      setSelectedFilter({...filter});load(filter);}}>
     <label>Program<input value={filter.program} maxLength={24} placeholder="BSE"
@@ -120,12 +176,23 @@ export default function AcademicResourcesPage({profile,user,call,act,busy}){
     <button className="wc-primary" type="submit">Search</button>
     <button type="button" className="wc-outline" onClick={()=>{setFilter({program:'',semester:'',courseCode:''});setSelectedFilter({});load({});}}>Clear</button>
    </form>
-   {error&&<div role="alert" className="wc-resource-error">{error}</div>}
    {loading?<p className="wc-resource-muted">Loading course resources…</p>:
     resources.length?list(resources):
     <div className="wc-empty"><span>▤</span><h3>No course PDFs published yet</h3>
      <p>Once verified Faculty upload their notes, students can find and download them here.</p>
     </div>}
+   </>}
+   {showSaved&&<>
+    <p>Bookmarks are saved for this account in this browser. PDFs still require campus access.</p>
+    {!savedIds.length?<p>No saved notes yet. Use Save note on any published PDF.</p>:
+     savedResult?.key!==savedKey?<p>Checking saved notes…</p>:
+     savedResult.error?<p role="alert">Could not check saved notes. <button type="button" className="wc-outline" onClick={openSaved}>Retry</button></p>:
+     <>
+      {savedRows.length>0&&list(savedRows)}
+      {unavailable.length>0&&<p>{unavailable.length} saved {unavailable.length===1?'note is':'notes are'} no longer available.{' '}
+       <button type="button" className="wc-outline" onClick={()=>updateSaved(savedIds.filter(id=>!unavailable.includes(id)))}>Remove unavailable bookmarks</button></p>}
+     </>}
+   </>}
   </section>
   {isTeacher&&<section className="wc-panel">
    <div className="wc-head"><div><span className="wc-kicker">VERIFIED FACULTY</span>

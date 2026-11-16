@@ -1,6 +1,7 @@
 import React,{Suspense,lazy,useEffect,useMemo,useRef,useState} from 'react';
 import {callApi} from './api.js';
 import {timetablePreferenceKey} from './timetable-preference.js';
+import {savedNotesKey} from './saved-notes.js';
 import {activeRoles,displayRole,hasRole,navigationFor,registrationAttemptKey} from './dashboard-domain.js';
 import {Overview,Events,Registrations,Announcements,Organizer} from './WorkspacePages.jsx';
 import './workspace.css';
@@ -103,6 +104,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   await act(async()=>{const next=await call('/me');onProfileChange(next);},'Account permissions refreshed.');
  }
  const timetableKey=timetablePreferenceKey(profile);
+ const notesKey=savedNotesKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
   overview:<Overview {...props}/>,
@@ -110,7 +112,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   registrations:<Registrations {...props}/>,
   announcements:<Announcements {...props}/>,
   timetable:<TimetablePage key={timetableKey??'timetable'} preferenceKey={timetableKey} {...props}/>,
-  resources:<AcademicResourcesPage {...props}/>,
+  resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,
   societies:<SocietiesPage {...props}/>,

@@ -8,7 +8,7 @@ import {campusUserMiddleware, needRole, verifiedFaculty} from '../middleware/cam
 import {requireObjectId} from '../services/mvp-validation.js';
 import {AcademicResource} from '../models/academic-resource.js';
 import {validateResourceMetadata, validatePdf, safeDownloadName,
-  validateResourceFilter, resourceView} from '../services/resource-validation.js';
+  validateResourceFilter, parseSavedResourceIds, resourceView} from '../services/resource-validation.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -66,6 +66,16 @@ export function resourcesRouter(deps) {
     }).select('title description program semester courseCode fileName sizeBytes status createdAt')
       .sort({createdAt: -1, _id: -1}).limit(limit).lean();
     return res.json({data: rows.map(resourceView)});
+  }));
+
+  router.get('/me/saved-resources', auth, asyncHandler(async(req, res) => {
+    needRole(req, 'student');
+    const ids = parseSavedResourceIds(req.query);
+    const rows = await AcademicResource.find({
+      _id: {$in: ids}, universityId: deps.config.universityId, status: 'published'
+    }).select('title description program semester courseCode fileName sizeBytes status createdAt').lean();
+    const byId = new Map(rows.map(row => [String(row._id), resourceView(row)]));
+    return res.json({data: ids.map(id => byId.get(id)).filter(Boolean)});
   }));
 
   router.get('/me/resources', auth, asyncHandler(async(req, res) => {

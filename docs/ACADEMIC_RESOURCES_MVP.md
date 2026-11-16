@@ -34,6 +34,12 @@ PDF magic/header validation is not antivirus scanning. University approval for s
 
 Open **Academic Resources** from the sidebar. Active users can filter and download. After a real university administrator verifies a Faculty user, that account also sees a PDF upload form and its own archive controls. All downloads use the Firebase token in an HTTP header, never in a public URL.
 
+### Saved notes on the web
+
+Students can use **Save note** in Academic Resources, then open **Saved notes** to revisit bookmarks. Up to 50 resource IDs are stored in this browser for this campus account. Bookmarks are not synced to other devices and do not store PDF files.
+
+The authenticated `GET /api/v1/me/saved-resources?ids=…` lookup returns only currently published resources from the student's campus. Old bookmarks can be removed if a note is no longer available. Downloads still use the existing authenticated PDF route.
+
 ### Flutter
 
 Open the **Notes** tab to browse/filter Faculty material. Select **Open PDF** to fetch it privately using the Firebase ID token, save a short-lived copy in the app's temporary directory and open it in a compatible installed PDF viewer. This does **not** copy PDFs into the user's persistent public Downloads folder.

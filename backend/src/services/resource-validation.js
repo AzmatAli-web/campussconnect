@@ -80,6 +80,15 @@ export function validateResourceFilter(query) {
   }
   return {filter, limit};
 }
+export function parseSavedResourceIds(query) {
+  const ids = query?.ids;
+  if (!query || Object.keys(query).length !== 1 || typeof ids !== 'string' ||
+      ids.length > 1249 || !/^[a-f0-9]{24}(?:,[a-f0-9]{24}){0,49}$/.test(ids)) {
+    throw new HttpError(400, 'INVALID_SAVED_RESOURCE_IDS', 'Provide up to 50 valid resource IDs');
+  }
+  return [...new Set(ids.split(','))];
+}
+
 export function resourceView(item) {
   const r = item.toObject ? item.toObject() : item;
   return {id: String(r._id), title: r.title, description: r.description,

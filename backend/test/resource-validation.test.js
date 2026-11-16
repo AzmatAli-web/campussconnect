@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateResourceMetadata,validatePdf,safeDownloadName,
-  validateResourceFilter,resourceView} from '../src/services/resource-validation.js';
+  validateResourceFilter,parseSavedResourceIds,resourceView} from '../src/services/resource-validation.js';
 
 const meta={title:'Week 1 Lecture Notes',description:'PDF slides',
   program:'BSE',semester:'7',courseCode:'CSC494'};
@@ -51,4 +51,13 @@ test('catalog strips file storage key and uploader identity',()=>{
  assert.equal(view.id,'test');
  assert.equal(Object.hasOwn(view,'storageKey'),false);
  assert.equal(Object.hasOwn(view,'uploadedBy'),false);
+});
+
+test('saved resource lookup accepts only a bounded ordered list of exact IDs',()=>{
+ const a='a'.repeat(24),b='b'.repeat(24);
+ assert.deepEqual(parseSavedResourceIds({ids:[b,a,b].join(',')}),[b,a]);
+ for(const query of [{},{ids:[a,b]},{ids:a,universityId:b},{ids:a+','},{ids:'wrong'},
+  {ids:Array.from({length:51},()=>a).join(',')}]){
+  assert.throws(()=>parseSavedResourceIds(query),{code:'INVALID_SAVED_RESOURCE_IDS'});
+ }
 });

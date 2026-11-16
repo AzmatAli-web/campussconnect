@@ -556,6 +556,19 @@ test('academic resource upload requires verified faculty; students receive only 
  assert.equal(wrongCourse.status,200);
  assert.ok(!wrongCourse.body.data.some(r=>r.id===item.id));
 
+ const savedLookup='/api/v1/me/saved-resources';
+ const original=await AcademicResource.findById(item.id).lean();
+ const foreign=await AcademicResource.create({...original,_id:new mongoose.Types.ObjectId(),
+  universityId:new mongoose.Types.ObjectId()});
+ const lookupIds={ids:[item.id,foreign.id,String(new mongoose.Types.ObjectId())].join(',')};
+ assert.equal((await request(app).get(savedLookup).query(lookupIds)).status,401);
+ assert.equal((await request(app).get(savedLookup).query(lookupIds)
+  .set(auth('fixture-faculty-resource-test'))).status,403);
+ const saved=await request(app).get(savedLookup).query(lookupIds).set(auth(studentUid));
+ assert.equal(saved.status,200);
+ assert.equal(saved.headers['cache-control'],'private, no-store');
+ assert.deepEqual(saved.body.data,[item]);
+
  const missingAuth=await request(app).get('/api/v1/resources/'+item.id+'/file');
  assert.equal(missingAuth.status,401);
  const downloaded=await request(app).get('/api/v1/resources/'+item.id+'/file')
@@ -582,6 +595,9 @@ test('academic resource upload requires verified faculty; students receive only 
  const noLongerPublic=await request(app).get('/api/v1/resources/'+item.id+'/file')
   .set(auth(studentUid));
  assert.equal(noLongerPublic.status,404);
+ const unavailable=await request(app).get(savedLookup).query(lookupIds).set(auth(studentUid));
+ assert.equal(unavailable.status,200);
+ assert.deepEqual(unavailable.body.data,[]);
  const listAfter=await request(app).get('/api/v1/resources').set(auth(studentUid));
  assert.ok(!listAfter.body.data.some(r=>r.id===item.id));
 

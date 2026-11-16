@@ -174,7 +174,7 @@ export function Announcements({user,revision}){
   <Head tag="OFFICIAL UPDATES" title="Campus announcements" detail="Search by title or message, or filter by audience. You only see notices you have access to."/>
   <form className="wc-resource-filter" onSubmit={e=>{e.preventDefault();setSearch(input.trim());setPage(1);reload();}}>
    <label>Search announcements<input value={input} onChange={e=>setInput(e.target.value)} maxLength={80} placeholder="Exam schedule or orientation"/></label>
-   <label>Audience<select value={scope} onChange={e=>{setScope(e.target.value);setPage(1);}}>
+   <label>Audience<select aria-label="Audience" value={scope} onChange={e=>{setScope(e.target.value);setPage(1);}}>
     {Object.entries(announcementScopes).map(([value,label])=><option value={value} key={value}>{label}</option>)}
    </select></label>
    <button className="wc-primary" type="submit">Search</button>

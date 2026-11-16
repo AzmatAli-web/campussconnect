@@ -6,7 +6,7 @@ import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campu
 import {Event,EventRegistration,IdempotencyKey,Society,SocietyManagerAssignment} from '../models/campus-content.js';
 import {CampusNotification} from '../models/notification.js';
 import {personalNotificationData} from '../services/notification-feed.js';
-import {eventInput,eventView,registrationInput,registrationView,privateRegistrationView,pagination,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
+import {eventInput,eventView,registrationInput,registrationView,privateRegistrationView,pagination,eventBrowseQuery,requireBody,requireObjectId,textField} from '../services/mvp-validation.js';
 
 const has=(req,role)=>req.roles.includes(role);
 const noStore=(_req,res,next)=>{res.set('Cache-Control','no-store');next();};
@@ -76,10 +76,10 @@ export function eventsRouter(deps){
   return res.json({data:items.map(registrationView),meta:{page,limit,total}});
  }));
  router.get('/events',auth,asyncHandler(async(req,res)=>{
-  const {page,limit,skip}=pagination(req.query);
-  const filter={universityId:deps.config.universityId,status:'published'};
+  const {page,limit,skip,filter:criteria,sort}=eventBrowseQuery(req.query);
+  const filter={...criteria,universityId:deps.config.universityId,status:'published'};
   const [items,total]=await Promise.all([
-   Event.find(filter).sort({startsAt:1,_id:1}).skip(skip).limit(limit).lean(),
+   Event.find(filter).sort(sort).skip(skip).limit(limit).lean(),
    Event.countDocuments(filter)
   ]);
   return res.json({data:items.map(x=>eventView(x)),meta:{page,limit,total}});

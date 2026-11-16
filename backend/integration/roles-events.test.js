@@ -430,6 +430,40 @@ test('students see the same published event and totals but never each other’s 
  }
 },{timeout:90000});
 
+test('event discovery filters published campus events before pagination and keeps registrations private',async()=>{
+ const user='fixture-student-00', now=Date.now();
+ const date=hours=>new Date(now+hours*3600000);
+ const candidate={
+  universityId:UNIVERSITY_ID,organizerId:faculty._id,organizerType:'faculty',
+  title:'Discovery (A) [2]',description:'Fictional workshop',venue:'Discovery Auditorium',
+  startsAt:date(24),endsAt:date(26),registrationOpensAt:date(-2),registrationClosesAt:date(12),
+  capacity:10,confirmedCount:0,status:'published'
+ };
+ const [upcoming,past,inProgress]=await Event.create([
+  candidate,{...candidate,title:'Discovery archive',startsAt:date(-24),endsAt:date(-22),
+   registrationOpensAt:date(-48),registrationClosesAt:date(-25)},
+  {...candidate,title:'Discovery happening now',startsAt:date(-1),endsAt:date(1),
+   registrationOpensAt:date(-4),registrationClosesAt:date(-2)},
+  {...candidate,title:'Discovery cancelled',status:'cancelled'},
+  {...candidate,title:'Discovery other campus',universityId:new mongoose.Types.ObjectId()}
+ ]);
+ const get=query=>request(app).get('/api/v1/events').query(query).set(auth(user));
+ const literal=await get({q:'discovery (a) [2]',when:'upcoming'});
+ assert.equal(literal.status,200);
+ assert.deepEqual(literal.body.data.map(row=>row.id),[upcoming.id]);
+ assert.equal(Object.hasOwn(literal.body.data[0],'studentName'),false);
+ assert.equal(Object.hasOwn(literal.body.data[0],'registrations'),false);
+ const pageOne=await get({q:'Discovery Auditorium',when:'upcoming',limit:'1'});
+ const pageTwo=await get({q:'Discovery Auditorium',when:'upcoming',limit:'1',page:'2'});
+ assert.deepEqual(pageOne.body.meta,{page:1,limit:1,total:2});
+ assert.deepEqual(pageOne.body.data.map(row=>row.id),[inProgress.id]);
+ assert.deepEqual(pageTwo.body.data.map(row=>row.id),[upcoming.id]);
+ const history=await get({q:'Discovery Auditorium',when:'past'});
+ assert.deepEqual(history.body.data.map(row=>row.id),[past.id]);
+ assert.equal(history.body.data[0].registrationOpen,false);
+ assert.equal((await get({status:'cancelled'})).status,400);
+},{timeout:30000});
+
 test('official timetable: only staff/admin publish and conflicting quarter-hour slots are blocked', async () => {
  const payload=(changes={})=>({
   term:'Fall 2026',program:'BSE',semester:7,section:'A',dayOfWeek:1,

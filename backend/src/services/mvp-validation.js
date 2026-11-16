@@ -67,6 +67,26 @@ export function pagination(query){
  if(!Number.isInteger(page)||page<1||page>100000||!Number.isInteger(limit)||limit<1||limit>100) throw new HttpError(400,'INVALID_PAGINATION','Page or limit is invalid');
  return {page,limit,skip:(page-1)*limit};
 }
+export function eventBrowseQuery(query,now=new Date()){
+ const allowed=['page','limit','q','when'];
+ if(Object.keys(query).some(key=>!allowed.includes(key)||typeof query[key]!=='string')){
+  throw new HttpError(400,'INVALID_EVENT_FILTER','Unsupported event filter');
+ }
+ const paging=pagination(query);
+ const when=query.when??'all';
+ const search=(query.q??'').trim();
+ if(!['all','upcoming','past'].includes(when)||search.length>80){
+  throw new HttpError(400,'INVALID_EVENT_FILTER','Invalid event search or date filter');
+ }
+ const filter={};
+ if(when==='upcoming')filter.endsAt={$gt:now};
+ if(when==='past')filter.endsAt={$lte:now};
+ if(search){
+  const literal=search.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
+  filter.$or=['title','venue'].map(key=>({[key]:{$regex:literal,$options:'i'}}));
+ }
+ return {...paging,filter,sort:when==='past'?{startsAt:-1,_id:-1}:{startsAt:1,_id:1}};
+}
 export function availability(event,now=new Date()){
  return {isFull:event.confirmedCount>=event.capacity,registrationOpen:event.status==='published'&&now>=event.registrationOpensAt&&now<event.registrationClosesAt&&now<event.startsAt&&event.confirmedCount<event.capacity};
 }

@@ -98,6 +98,10 @@ export function registrationView(doc){
  const r=doc.toObject?doc.toObject():doc;
  return {id:String(r._id),eventId:String(r.eventId),studentId:String(r.studentId),status:r.status,confirmedAt:r.confirmedAt};
 }
+export function registeredEventView(event){
+ if(!event)return null;
+ return {title:event.title,venue:event.venue,startsAt:event.startsAt,endsAt:event.endsAt,status:event.status};
+}
 export function announcementView(doc){
  const a=doc.toObject?doc.toObject():doc;
  return {id:String(a._id),title:a.title,body:a.body,scope:a.scope,status:a.status,publishedAt:a.publishedAt};

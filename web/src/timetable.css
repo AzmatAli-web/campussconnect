@@ -9,3 +9,9 @@
 .wc-timetable-card>div small{display:block;color:#768c9a;font-size:11px;margin-top:6px}
 .wc-timetable-error{color:#a63d4a;font-size:12px;margin-top:15px}
 @media(max-width:650px){.wc-timetable-card{align-items:flex-start;flex-wrap:wrap;gap:10px}.wc-timetable-card .wc-outline{margin-left:auto}}
+
+.wc-timetable-view{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
+.wc-timetable-view [aria-pressed="true"]{color:#174943;border-color:#6aada5;background:#e6f7f4}
+.wc-timetable-today{margin:0 0 18px;padding:14px 16px;border:1px solid #cce3e7;border-radius:12px;background:#f0faf9;color:#25485b}
+.wc-timetable-today h3{margin:0 0 8px;font-size:15px}
+.wc-timetable-today p{margin:5px 0;font-size:13px;overflow-wrap:anywhere}

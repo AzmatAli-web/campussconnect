@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {hasRole} from './dashboard-domain.js';
+import {todaySchedule} from './timetable-today.js';
 import {chooseTimetableGroup,groupId,readTimetablePreference,saveTimetablePreference} from './timetable-preference.js';
 
 const days=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -19,12 +20,24 @@ export default function TimetablePage({profile,call,act,busy,preferenceKey}){
  const [loading,setLoading]=useState(true);
  const [groupError,setGroupError]=useState('');
  const [form,setForm]=useState(initialForm);
+ const [view,setView]=useState('week');
+ const [now,setNow]=useState(Date.now);
  const chosen=chooseTimetableGroup(groups,preferred);
  const selected=chosen?groupId(chosen):'';
  const slotKey=JSON.stringify([selected,slotRevision]);
  const slots=slotResult?.key===slotKey?slotResult.rows:[];
  const slotsLoading=Boolean(chosen)&&slotResult?.key!==slotKey;
  const error=groupError||(slotResult?.key===slotKey?slotResult.error:'');
+ const today=todaySchedule(slots,now);
+ const visibleDays=view==='today'?[today.day]:[1,2,3,4,5,6,7];
+
+ useEffect(()=>{
+  const update=()=>setNow(Date.now());
+  const timer=setInterval(update,15000);
+  document.addEventListener('visibilitychange',update);
+  return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',update);};
+ },[]);
+
 
  async function loadGroups(isCurrent=()=>true){
   setLoading(true);
@@ -87,7 +100,7 @@ export default function TimetablePage({profile,call,act,busy,preferenceKey}){
    <div className="wc-head"><div>
     <span className="wc-kicker">ACADEMIC SCHEDULE</span>
     <h2>Official weekly timetable</h2>
-    <p>Choose a published program, semester and section. Weekly times are campus-local and do not depend on your phone timezone.</p>
+    <p>Choose a published program, semester and section. Class times use Pakistan Standard Time (PKT).</p>
    </div></div>
    {loading?<p>Loading schedules…</p>:groups.length===0?
     <div className="wc-empty"><span>▦</span><h3>No timetable published yet</h3>
@@ -100,9 +113,20 @@ export default function TimetablePage({profile,call,act,busy,preferenceKey}){
       </select>
      </label>
      {preferenceKey&&<p>Your selection is remembered in this browser for this account.</p>}
-     {slotsLoading?<p>Loading classes…</p>:slots.length===0?
+     <div className="wc-timetable-view" role="group" aria-label="Timetable view">
+      <button type="button" className="wc-outline" aria-pressed={view==='week'} onClick={()=>setView('week')}>Full week</button>
+      <button type="button" className="wc-outline" aria-pressed={view==='today'} onClick={()=>{setNow(Date.now());setView('today');}}>Today</button>
+     </div>
+     {!slotsLoading&&!error&&view==='today'&&<div className="wc-timetable-today">
+      <h3>Today · {days[today.day]}</h3>
+      {today.current&&<p><strong>In progress</strong> · {today.current.courseTitle} · Ends {today.current.endTime} PKT</p>}
+      {today.next&&<p><strong>Next today</strong> · {today.next.courseTitle} · {today.next.startTime} PKT · {today.next.room}</p>}
+      {!today.next&&today.classes.length>0&&<p>No more classes start today.</p>}
+      {today.classes.length===0&&<p>No classes scheduled for this group today.</p>}
+     </div>}
+     {slotsLoading?<p>Loading classes…</p>:error?null:slots.length===0&&view==='week'?
       <div className="wc-empty"><h3>No classes for this group</h3></div>:
-      <div className="wc-timetable-days">{[1,2,3,4,5,6,7].map(day=>{
+      <div className="wc-timetable-days">{visibleDays.map(day=>{
        const classes=slots.filter(row=>row.dayOfWeek===day);
        return classes.length?<section key={day} className="wc-timetable-day">
         <h3>{days[day]}</h3><div className="wc-timetable-cards">

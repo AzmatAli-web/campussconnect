@@ -1,5 +1,5 @@
 const base=(import.meta.env.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
-export async function callApi(path,user,{method='GET',body,headers={}}={}){
+export async function callApi(path,user,{method='GET',body,headers={},includeMeta=false}={}){
  const token=await user.getIdToken();
  let response;
  try{
@@ -16,7 +16,7 @@ export async function callApi(path,user,{method='GET',body,headers={}}={}){
   error.code=result?.error?.code;
   throw error;
  }
- return result.data;
+ return includeMeta?{data:result.data,meta:result.meta}:result.data;
 }
 
 /** Multipart form upload: browser supplies boundary, Firebase supplies ID token. */

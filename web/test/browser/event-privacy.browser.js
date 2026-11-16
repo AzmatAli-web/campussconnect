@@ -69,7 +69,18 @@ test('real React workspace: two students share event counts, never receipts or r
       const method = req.method();
       traffic.push({actor, path, method});
       if (req.headers().authorization !== 'Bearer fixture-' + actor) return deny(route, 'wrong fixture persona');
-      if (method === 'GET' && path === eventsPath) return send(route, [row()]);
+      if (method === 'GET' && path === eventsPath) {
+        const pageNumber = Number(url.searchParams.get('page') || 1);
+        const when = url.searchParams.get('when');
+        const q = url.searchParams.get('q');
+        if (!when) return send(route, [row()]);
+        const historic = {...row(), id: '000000000000000000000081', title: 'Past science fair',
+          startsAt: '2000-01-01T10:00:00Z', endsAt: '2000-01-01T11:00:00Z', registrationOpen: false};
+        const matches = q === 'auditorium'
+          ? (pageNumber === 1 ? [row()] : [{...row(), title: 'Second page campus workshop'}])
+          : q ? [] : when === 'past' ? [historic] : [row()];
+        return route.fulfill({status: 200, json: {data: matches, meta: {total: q === 'auditorium' ? 13 : matches.length}}});
+      }
       if (method === 'GET' && path === '/api/v1/announcements') return send(route, []);
       if (method === 'GET' && path === '/api/v1/resources') return send(route, publishedNote ? [note] : []);
       if (method === 'GET' && path === '/api/v1/me/saved-resources' && ['a','b'].includes(actor)) {
@@ -113,7 +124,7 @@ test('real React workspace: two students share event counts, never receipts or r
   }
 
   const navigate = async (page, label) => {
-    const button = page.getByRole('navigation').getByRole('button', {name: label});
+    const button = page.locator('.wc-sidebar nav').getByRole('button', {name: label});
     const mobileMenu = page.locator('.wc-mobile-menu');
     if (await mobileMenu.isVisible()) await mobileMenu.click();
     await button.click();
@@ -220,6 +231,22 @@ test('real React workspace: two students share event counts, never receipts or r
   assert.equal(await a.getByRole('button', {name: 'Download PDF', exact: true}).count(), 0);
   await a.getByRole('button', {name: 'Remove unavailable bookmarks', exact: true}).click();
   await a.getByRole('button', {name: 'Saved notes (0)', exact: true}).waitFor();
+
+  await navigate(a, /Explore events/);
+  await a.getByLabel('Search events').fill('auditorium');
+  await a.getByRole('button', {name: 'Search', exact: true}).click();
+  const eventsPagination = a.getByRole('navigation', {name: 'Event pages'});
+  await eventsPagination.getByText(/Page 1 of 2/).waitFor();
+  await eventsPagination.getByRole('button', {name: 'Next', exact: true}).click();
+  await a.getByRole('heading', {name: 'Second page campus workshop'}).waitFor();
+  await eventsPagination.getByText(/Page 2 of 2/).waitFor();
+  await a.getByRole('button', {name: 'Clear filters'}).click();
+  await a.getByLabel('Event timing').selectOption('past');
+  await a.getByRole('heading', {name: 'Past science fair'}).waitFor();
+  assert.equal(await a.getByRole('button', {name: 'Add to calendar'}).count(), 0);
+  await a.getByLabel('Search events').fill('no such event');
+  await a.getByRole('button', {name: 'Search', exact: true}).click();
+  await a.getByRole('heading', {name: 'No matching events'}).waitFor();
 
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {eventInput,registrationInput,announcementInput,availability,pagination} from '../src/services/mvp-validation.js';
+import {eventInput,registrationInput,announcementInput,availability,pagination,eventBrowseQuery} from '../src/services/mvp-validation.js';
 
 const now=new Date('2026-10-30T12:00:00Z');
 const event={
@@ -40,4 +40,20 @@ test('announcements reject cross-target scope and actor-controlled fields',()=>{
 test('pagination is bounded',()=>{
  assert.deepEqual(pagination({page:'2',limit:'10'}),{page:2,limit:10,skip:10});
  assert.throws(()=>pagination({limit:'1000'}),{code:'INVALID_PAGINATION'});
+});
+
+test('event discovery queries stay bounded and interpret punctuation as literal text',()=>{
+ const result=eventBrowseQuery({q:' Lab (A) [2] ',when:'upcoming',page:'2',limit:'12'},now);
+ assert.equal(result.skip,12);
+ assert.deepEqual(result.filter.endsAt,{$gt:now});
+ assert.equal(result.filter.$or[0].title.$options,'i');
+ assert.equal(new RegExp(result.filter.$or[0].title.$regex).test('Lab (A) [2]'),true);
+ assert.equal(new RegExp(result.filter.$or[1].venue.$regex).test('Lab A 2'),false);
+ const historic=eventBrowseQuery({when:'past'},now);
+ assert.deepEqual(historic.filter, {endsAt:{$lte:now}});
+ assert.deepEqual(historic.sort, {startsAt:-1,_id:-1});
+ assert.deepEqual(eventBrowseQuery({},now).filter,{});
+ for(const query of [{q:['a','b']},{q:'a'.repeat(81)},{when:'any'},{status:'cancelled'}]){
+  assert.throws(()=>eventBrowseQuery(query,now),{code:'INVALID_EVENT_FILTER'});
+ }
 });

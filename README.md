@@ -8,6 +8,10 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
+## Milestone 35 event discovery (draft)
+
+Explore events on the web supports title or venue search, upcoming/in-progress and past filters, and page controls. Only published events for the current campus are included. Existing registration and attendee permissions are unchanged.
+
 ## Milestone 34 saved notes (draft)
 
 Students can bookmark published PDFs in Academic Resources and revisit them from Saved notes. Bookmarks are per campus account in the current browser. They do not store PDF files or override campus download permissions.

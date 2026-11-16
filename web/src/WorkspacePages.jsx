@@ -1,4 +1,5 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
+import {callApi} from './api.js';
 import {canExportEvent,downloadEventCalendar} from './event-calendar.js';
 import {buildEventPayload,buildAnnouncementPayload,canOrganize,displayRole,eventFull,formatDate,hasRole,isVerifiedFaculty,myRegistration} from './dashboard-domain.js';
 
@@ -34,9 +35,57 @@ export function Overview({data,profile,choose}){
  <section className="wc-panel"><Head tag="CAMPUS BULLETIN" title="Recent announcements" right={<button className="wc-link" onClick={()=>choose('announcements')}>See all ↗</button>}/>{notes.length?notes.slice(0,4).map(n=><div className="wc-compact" key={n.id}><span>◉</span><div><strong>{n.title}</strong><small>{n.scope} · {formatDate(n.publishedAt)}</small></div></div>):<Empty title="No announcements yet" detail="You will see relevant campus notices here."/>}</section>
  </div></>;
 }
-export function Events({data,profile,busy,register}){
- const events=data.events||[],regs=data.registrations||[];
- return <section className="wc-panel"><Head tag="CAMPUS CALENDAR" title="Published events" detail="You can see event details and seat totals. Other students' names and registrations are private." right={<Tag kind="blue">{events.length} events</Tag>}/>{events.length?<div className="wc-event-grid">{events.map(event=><EventCard key={event.id} event={event} registrations={regs} profile={profile} busy={busy} register={register}/>)}</div>:<Empty title="No events yet" detail="Faculty and Society Managers can publish events once their real roles are approved."/>}</section>;
+const pageSize=12;
+export function Events({data,profile,user,busy,register,revision}){
+ const [input,setInput]=useState('');
+ const [search,setSearch]=useState('');
+ const [when,setWhen]=useState('upcoming');
+ const [page,setPage]=useState(1);
+ const [retry,setRetry]=useState(0);
+ const [result,setResult]=useState(null);
+ const key=JSON.stringify([search,when,page,revision,retry]);
+ const current=result?.key===key?result:null;
+ const regs=data.registrations||[];
+ const reload=()=>setRetry(n=>n+1);
+ useEffect(()=>{
+  let active=true;
+  const params=new URLSearchParams({when,page:String(page),limit:String(pageSize)});
+  if(search)params.set('q',search);
+  callApi('/events?'+params,user,{includeMeta:true})
+   .then(({data:events,meta})=>{
+    if(!active)return;
+    if(page>1&&Number.isInteger(meta?.total)&&meta.total<=(page-1)*pageSize){
+     setPage(Math.max(1,Math.ceil(meta.total/pageSize)));
+     return;
+    }
+    if(!Array.isArray(events))throw new Error('Invalid events response');
+    setResult({key,events,total:Number.isInteger(meta?.total)?meta.total:events.length});
+   })
+   .catch(()=>{if(active)setResult({key,error:true});});
+  return()=>{active=false;};
+ },[key,user]);
+ return <section className="wc-panel"><Head tag="CAMPUS CALENDAR" title="Published events"
+  detail="Search by title or venue. Other students’ names and registrations are private."/>
+  <form className="wc-resource-filter" onSubmit={e=>{e.preventDefault();setSearch(input.trim());setPage(1);reload();}}>
+   <label>Search events<input value={input} onChange={e=>setInput(e.target.value)} maxLength={80} placeholder="Workshop or auditorium"/></label>
+   <label>Event timing<select value={when} onChange={e=>{setWhen(e.target.value);setPage(1);}}>
+    <option value="upcoming">Upcoming and in progress</option><option value="past">Past</option><option value="all">All published events</option>
+   </select></label>
+   <button className="wc-primary" type="submit">Search</button>
+   <button className="wc-outline" type="button" onClick={()=>{setInput('');setSearch('');setWhen('upcoming');setPage(1);reload();}}>Clear filters</button>
+  </form>
+  {!current?<p role="status">Loading events…</p>:current.error?
+   <p role="alert">Could not load events. <button type="button" className="wc-outline" onClick={reload}>Retry</button></p>:
+   <>
+    {current.events.length?<div className="wc-event-grid">{current.events.map(event=><EventCard key={event.id} event={event} registrations={regs} profile={profile} busy={busy} register={register}/>)}</div>:
+     <Empty title="No matching events" detail="Try another search or change the event timing filter."/>}
+    <nav className="wc-event-pagination" aria-label="Event pages">
+     <button type="button" className="wc-outline" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</button>
+     <span role="status">Page {page} of {Math.max(1,Math.ceil(current.total/pageSize))} · {current.total} events</span>
+     <button type="button" className="wc-outline" disabled={page*pageSize>=current.total} onClick={()=>setPage(p=>p+1)}>Next</button>
+    </nav>
+   </>}
+ </section>;
 }
 export function Registrations({data,choose}){
  const regs=data.registrations||[],events=data.events||[];

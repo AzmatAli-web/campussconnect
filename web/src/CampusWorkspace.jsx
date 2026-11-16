@@ -30,7 +30,7 @@ const titles={overview:'Your campus at a glance',events:'Explore campus events',
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','admin'].includes(tab))requested.events='/events?limit=50';
- if(['overview','announcements'].includes(tab))requested.announcements='/announcements?limit=50';
+ if(tab==='overview')requested.announcements='/announcements?limit=50';
  if(hasRole(profile,'student')&&['overview','events'].includes(tab))requested.registrations='/me/event-registrations?limit=100';
  if(tab==='organizer'){
   requested.organized='/me/organized-events?limit=100';
@@ -110,7 +110,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   overview:<Overview {...props}/>,
   events:<Events {...props} busy={busy||loading} revision={revision}/>,
   registrations:<Registrations {...props} revision={revision}/>,
-  announcements:<Announcements {...props}/>,
+  announcements:<Announcements {...props} revision={revision}/>,
   timetable:<TimetablePage key={timetableKey??'timetable'} preferenceKey={timetableKey} {...props}/>,
   resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
   marketplace:<MarketplacePage {...props}/>,
@@ -135,7 +135,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
    <main className="wc-content">
     <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
-    {loading&&!['events','registrations'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
+    {loading&&!['events','registrations','announcements'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
      <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>
       {page}
      </Suspense>}

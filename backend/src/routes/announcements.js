@@ -2,7 +2,7 @@ import {Router} from 'express';
 import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campus-user.js';
 import {Announcement,Society,SocietyManagerAssignment} from '../models/campus-content.js';
-import {announcementInput,announcementView,pagination,requireObjectId,requireBody,textField} from '../services/mvp-validation.js';
+import {announcementInput,announcementView,announcementBrowseQuery,requireObjectId,requireBody,textField} from '../services/mvp-validation.js';
 import {notificationAudience} from '../services/notification-feed.js';
 
 // Reuse the inbox audience contract: membership, assigned management and
@@ -23,8 +23,10 @@ async function mayPublish(req,content,universityId){
 export function announcementsRouter(deps){
  const router=Router(),auth=campusUserMiddleware(deps);
  router.get('/announcements',auth,asyncHandler(async(req,res)=>{
-  const {page,limit,skip}=pagination(req.query);
-  const filter={universityId:deps.config.universityId,status:'published',...await notificationAudience(req)};
+  const {page,limit,skip,filter:criteria}=announcementBrowseQuery(req.query);
+  // Search and scope can narrow the authorized audience, never replace it.
+  const filter={universityId:deps.config.universityId,status:'published',
+   $and:[await notificationAudience(req),criteria]};
   const [items,total]=await Promise.all([
    Announcement.find(filter).sort({publishedAt:-1,_id:-1}).skip(skip).limit(limit).lean(),
    Announcement.countDocuments(filter)

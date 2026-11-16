@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {eventInput,registrationInput,announcementInput,availability,pagination,eventBrowseQuery} from '../src/services/mvp-validation.js';
+import {eventInput,registrationInput,announcementInput,availability,pagination,eventBrowseQuery,announcementBrowseQuery} from '../src/services/mvp-validation.js';
 
 const now=new Date('2026-10-30T12:00:00Z');
 const event={
@@ -56,4 +56,17 @@ test('event discovery queries stay bounded and interpret punctuation as literal 
  for(const query of [{q:['a','b']},{q:'a'.repeat(81)},{when:'any'},{status:'cancelled'}]){
   assert.throws(()=>eventBrowseQuery(query,now),{code:'INVALID_EVENT_FILTER'});
  }
+});
+
+test('announcement search uses literal title and body terms and bounds audience and paging',()=>{
+ const result=announcementBrowseQuery({q:' Exam [A] ',scope:'department',page:'2',limit:'12'});
+ assert.equal(result.filter.scope,'department');
+ assert.equal(result.skip,12);
+ assert.equal(new RegExp(result.filter.$or[0].title.$regex,'i').test('EXAM [A]'),true);
+ assert.equal(new RegExp(result.filter.$or[1].body.$regex,'i').test('Exam A'),false);
+ assert.deepEqual(announcementBrowseQuery({scope:'all',q:' '}).filter,{});
+ for(const query of [{q:['one','two']},{scope:'other'},{q:'x'.repeat(81)},{societyId:'hidden'}]){
+  assert.throws(()=>announcementBrowseQuery(query),{code:'INVALID_ANNOUNCEMENT_FILTER'});
+ }
+ assert.throws(()=>announcementBrowseQuery({page:'0'}),{code:'INVALID_PAGINATION'});
 });

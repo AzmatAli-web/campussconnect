@@ -1470,7 +1470,24 @@ test('Milestone 25: announcements and inbox enforce identical membership, depart
   sample('society','QA25 restricted society news',{societyId}),
   sample('department','QA25 private department news',{departmentId:dpt})
  ]);
+ await Announcement.create(sample('university','QA25 archived notice',{status:'archived'}));
  const path='/api/v1/announcements?limit=100';
+ const queryFor=(uid,query)=>request(app).get('/api/v1/announcements').set(auth(uid)).query(query);
+ const hidden=await queryFor(outsider,{scope:'society',q:'restricted society'});
+ assert.equal(hidden.status,200);
+ assert.equal(hidden.body.meta.total,0);
+ assert.deepEqual(hidden.body.data,[]);
+ const visible=await queryFor(member,{scope:'society',q:'verified campus policy'});
+ assert.equal(visible.status,200);
+ assert.deepEqual(visible.body.data.map(row=>row.id),[societyNote.id]);
+ const page2=await queryFor(member,{q:'QA25',page:'2',limit:'1'});
+ assert.equal(page2.status,200);
+ assert.deepEqual(page2.body.meta,{page:2,limit:1,total:3});
+ assert.equal(page2.body.data.length,1);
+ const foreignFiltered=await queryFor(member,{scope:'department',q:'private department'});
+ assert.deepEqual(foreignFiltered.body.data.map(row=>row.id),[departmentNote.id]);
+ assert.equal((await queryFor(outsider,{scope:'department',q:'QA25'})).body.meta.total,0);
+ assert.equal((await queryFor(member,{scope:'all',q:'QA25.*'})).body.meta.total,0);
  const fetchIds=async uid=>{
   const list=await request(app).get(path).set(auth(uid));
   assert.equal(list.status,200,JSON.stringify(list.body));
@@ -1522,6 +1539,7 @@ test('Milestone 25: announcements and inbox enforce identical membership, depart
  const afterLeave=await fetchIds(member);
  assert.ok(!afterLeave.includes(String(societyNote._id)));
  assert.ok(afterLeave.includes(String(departmentNote._id)));
+ assert.equal((await queryFor(member,{scope:'society',q:'QA25'})).body.meta.total,0);
  const afterRevocation=await fetchIds('fixture-qa25-manager');
  assert.ok(!afterRevocation.includes(String(societyNote._id)));
  const memberReadAfterLeave=await request(app).post(
@@ -1536,4 +1554,5 @@ test('Milestone 25: announcements and inbox enforce identical membership, depart
   body:'Different university.',status:'published',publishedAt:new Date()
  });
  assert.ok(!(await fetchIds('fixture-admin')).includes(String(another._id)));
+ assert.equal((await queryFor('fixture-admin',{scope:'university',q:'foreign university'})).body.meta.total,0);
 },{timeout:90000});

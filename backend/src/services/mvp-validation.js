@@ -87,6 +87,24 @@ export function eventBrowseQuery(query,now=new Date()){
  }
  return {...paging,filter,sort:when==='past'?{startsAt:-1,_id:-1}:{startsAt:1,_id:1}};
 }
+export function announcementBrowseQuery(query){
+ const allowed=['page','limit','q','scope'];
+ if(Object.keys(query).some(key=>!allowed.includes(key)||typeof query[key]!=='string')){
+  throw new HttpError(400,'INVALID_ANNOUNCEMENT_FILTER','Unsupported announcement filter');
+ }
+ const scope=query.scope??'all';
+ const search=(query.q??'').trim();
+ if(!['all','university','department','society'].includes(scope)||search.length>80){
+  throw new HttpError(400,'INVALID_ANNOUNCEMENT_FILTER','Invalid announcement search or audience');
+ }
+ const filter={};
+ if(scope!=='all')filter.scope=scope;
+ if(search){
+  const literal=search.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
+  filter.$or=['title','body'].map(key=>({[key]:{$regex:literal,$options:'i'}}));
+ }
+ return {...pagination(query),filter};
+}
 export function availability(event,now=new Date()){
  return {isFull:event.confirmedCount>=event.capacity,registrationOpen:event.status==='published'&&now>=event.registrationOpensAt&&now<event.registrationClosesAt&&now<event.startsAt&&event.confirmedCount<event.capacity};
 }

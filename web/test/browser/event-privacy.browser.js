@@ -82,7 +82,18 @@ test('real React workspace: two students share event counts, never receipts or r
           : q ? [] : when === 'past' ? [historic] : [row()];
         return route.fulfill({status: 200, json: {data: matches, meta: {total: q === 'auditorium' ? 13 : matches.length}}});
       }
-      if (method === 'GET' && path === '/api/v1/announcements') return send(route, []);
+      if (method === 'GET' && path === '/api/v1/announcements') {
+        const scope = url.searchParams.get('scope');
+        if (!scope) return send(route, []);
+        const q = url.searchParams.get('q');
+        const second = url.searchParams.get('page') === '2';
+        const notes = scope === 'society' || q === 'no such notice' ? [] : [{
+          id: 'fixture-announcement-' + (second ? '2' : '1'),
+          title: second ? 'Second page exam notice' : 'Exam schedule',
+          body: 'Fictional exam announcement', scope: 'department', publishedAt: '2026-10-01T10:00:00Z'
+        }];
+        return route.fulfill({status: 200, json: {data: notes, meta: {total: notes.length ? 13 : 0}}});
+      }
       if (method === 'GET' && path === '/api/v1/resources') return send(route, publishedNote ? [note] : []);
       if (method === 'GET' && path === '/api/v1/me/saved-resources' && ['a','b'].includes(actor)) {
         return send(route, publishedNote && url.searchParams.get('ids') === note.id ? [note] : []);
@@ -270,6 +281,20 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByText('Old campus fair', {exact: true}).waitFor();
   await a.getByText('Past event', {exact: true}).waitFor();
   assert.equal(traffic.filter(r => r.actor === 'a' && r.path === eventsPath && r.method === 'GET').length, catalogReads);
+
+  await navigate(a, /Announcements/);
+  await a.getByRole('heading', {name: 'Exam schedule'}).waitFor();
+  await a.getByLabel('Audience', {exact: true}).selectOption('department');
+  await a.getByLabel('Search announcements').fill('exam');
+  await a.getByRole('button', {name: 'Search', exact: true}).click();
+  const announcementPages = a.getByRole('navigation', {name: 'Announcement pages'});
+  await announcementPages.getByRole('button', {name: 'Next', exact: true}).click();
+  await a.getByRole('heading', {name: 'Second page exam notice'}).waitFor();
+  await announcementPages.getByText(/Page 2 of 2/).waitFor();
+  await a.getByLabel('Audience', {exact: true}).selectOption('society');
+  await a.getByRole('heading', {name: 'No matching announcements'}).waitFor();
+  await a.getByRole('button', {name: 'Clear filters'}).click();
+  await a.getByRole('heading', {name: 'Exam schedule'}).waitFor();
 
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {

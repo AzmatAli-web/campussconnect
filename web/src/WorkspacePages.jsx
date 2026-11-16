@@ -141,9 +141,59 @@ export function Registrations({user,choose,revision}){
   <button type="button" className="wc-outline" onClick={()=>choose('events')}>Browse events ↗</button>
  </section>;
 }
-export function Announcements({data}){
- const notes=data.announcements||[];
- return <section className="wc-panel"><Head tag="OFFICIAL UPDATES" title="Campus announcements" detail="Published messages available to your campus audience."/>{notes.length?<div className="wc-notice-grid">{notes.map(a=><article className="wc-announcement" key={a.id}><div><Tag kind="blue">{a.scope}</Tag><small>{formatDate(a.publishedAt)}</small></div><h3>{a.title}</h3><p>{a.body}</p></article>)}</div>:<Empty title="No announcements" detail="Relevant official notices will appear here once published."/>}</section>;
+const announcementScopes={all:'All notices',university:'University',department:'My department',society:'My societies'};
+export function Announcements({user,revision}){
+ const [input,setInput]=useState('');
+ const [search,setSearch]=useState('');
+ const [scope,setScope]=useState('all');
+ const [page,setPage]=useState(1);
+ const [retry,setRetry]=useState(0);
+ const [result,setResult]=useState(null);
+ const key=JSON.stringify([search,scope,page,revision,retry]);
+ const current=result?.key===key?result:null;
+ const reload=()=>setRetry(n=>n+1);
+ useEffect(()=>{
+  let active=true;
+  const query=new URLSearchParams({scope,page:String(page),limit:String(pageSize)});
+  if(search)query.set('q',search);
+  callApi('/announcements?'+query,user,{includeMeta:true})
+   .then(({data:notes,meta})=>{
+    if(!active)return;
+    if(!Array.isArray(notes))throw new Error('Invalid announcement response');
+    const total=Number.isInteger(meta?.total)?meta.total:notes.length;
+    if(page>1&&total<=(page-1)*pageSize){
+     setPage(Math.max(1,Math.ceil(total/pageSize)));
+     return;
+    }
+    setResult({key,notes,total});
+   })
+   .catch(()=>{if(active)setResult({key,error:true});});
+  return()=>{active=false;};
+ },[key,user]);
+ return <section className="wc-panel">
+  <Head tag="OFFICIAL UPDATES" title="Campus announcements" detail="Search by title or message, or filter by audience. You only see notices you have access to."/>
+  <form className="wc-resource-filter" onSubmit={e=>{e.preventDefault();setSearch(input.trim());setPage(1);reload();}}>
+   <label>Search announcements<input value={input} onChange={e=>setInput(e.target.value)} maxLength={80} placeholder="Exam schedule or orientation"/></label>
+   <label>Audience<select aria-label="Audience" value={scope} onChange={e=>{setScope(e.target.value);setPage(1);}}>
+    {Object.entries(announcementScopes).map(([value,label])=><option value={value} key={value}>{label}</option>)}
+   </select></label>
+   <button className="wc-primary" type="submit">Search</button>
+   <button className="wc-outline" type="button" onClick={()=>{setInput('');setSearch('');setScope('all');setPage(1);reload();}}>Clear filters</button>
+  </form>
+  {!current?<p role="status">Loading announcements…</p>:current.error?
+   <p role="alert">Could not load announcements. <button type="button" className="wc-outline" onClick={reload}>Retry</button></p>:
+   current.notes.length?<>
+    <div className="wc-notice-grid">{current.notes.map(a=><article className="wc-announcement" key={a.id}>
+     <div><Tag kind="blue">{a.scope==='department'?'Department':a.scope==='society'?'Society':'University'}</Tag><small>{formatDate(a.publishedAt)}</small></div>
+     <h3>{a.title}</h3><p>{a.body}</p>
+    </article>)}</div>
+    <nav className="wc-event-pagination" aria-label="Announcement pages">
+     <button type="button" className="wc-outline" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</button>
+     <span role="status">Page {page} of {Math.max(1,Math.ceil(current.total/pageSize))} · {current.total} notices</span>
+     <button type="button" className="wc-outline" disabled={page*pageSize>=current.total} onClick={()=>setPage(p=>p+1)}>Next</button>
+    </nav>
+   </>:<Empty title="No matching announcements" detail="Try another search or change the audience filter."/>}
+ </section>;
 }
 const blankEvent={title:'',description:'',venue:'',capacity:'50',registrationOpensAt:'',registrationClosesAt:'',startsAt:'',endsAt:'',societyId:''};
 export function Organizer({data,profile,act,call,busy,showRoster,openRoster,rosters}){

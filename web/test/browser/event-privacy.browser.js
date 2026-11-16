@@ -39,6 +39,10 @@ test('real React workspace: two students share event counts, never receipts or r
     : {});
   const receipts = new Map();
   const traffic = [];
+  const note = {id: '000000000000000000000051', title: 'Fixture project notes', program: 'BSE', semester: 7,
+    courseCode: 'CSC494', fileName: 'notes.pdf', status: 'published', sizeBytes: 1000};
+  let publishedNote = true;
+
   let sections = ['A', 'B'];
   const group = section => ({term: 'Fall 2026', program: 'BSE', semester: 7, section});
   const sectionLabel = section => 'Fall 2026 · BSE · Semester 7 · Section ' + section;
@@ -67,6 +71,11 @@ test('real React workspace: two students share event counts, never receipts or r
       if (req.headers().authorization !== 'Bearer fixture-' + actor) return deny(route, 'wrong fixture persona');
       if (method === 'GET' && path === eventsPath) return send(route, [row()]);
       if (method === 'GET' && path === '/api/v1/announcements') return send(route, []);
+      if (method === 'GET' && path === '/api/v1/resources') return send(route, publishedNote ? [note] : []);
+      if (method === 'GET' && path === '/api/v1/me/saved-resources' && ['a','b'].includes(actor)) {
+        return send(route, publishedNote && url.searchParams.get('ids') === note.id ? [note] : []);
+      }
+
       if (method === 'GET' && path === '/api/v1/timetable/groups') return send(route, sections.map(group));
       if (method === 'GET' && path === '/api/v1/timetable/slots') {
         const section = url.searchParams.get('section');
@@ -192,6 +201,25 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.reload();
   await navigate(a, /Timetable/);
   await showSection(a, 'A');
+
+  await navigate(a, /Academic Resources/);
+  await a.getByRole('button', {name: 'Save note: '+note.title}).click();
+  await a.reload();
+  await navigate(a, /Academic Resources/);
+  await a.getByRole('button', {name: 'Saved notes (1)', exact: true}).click();
+  await a.getByRole('heading', {name: note.title}).waitFor();
+
+  await navigate(sameBrowserB, /Academic Resources/);
+  await sameBrowserB.getByRole('button', {name: 'Saved notes (0)', exact: true}).click();
+  await sameBrowserB.getByText('No saved notes yet.', {exact: false}).waitFor();
+
+  publishedNote = false;
+  await a.getByRole('button', {name: 'All notes', exact: true}).click();
+  await a.getByRole('button', {name: 'Saved notes (1)', exact: true}).click();
+  await a.getByText(/1 saved note is no longer available/).waitFor();
+  assert.equal(await a.getByRole('button', {name: 'Download PDF', exact: true}).count(), 0);
+  await a.getByRole('button', {name: 'Remove unavailable bookmarks', exact: true}).click();
+  await a.getByRole('button', {name: 'Saved notes (0)', exact: true}).waitFor();
 
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {

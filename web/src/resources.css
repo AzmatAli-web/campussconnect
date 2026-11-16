@@ -15,3 +15,6 @@
 .wc-resource-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .wc-resource-error{background:#fff1f0;border:1px solid #edc4c3;border-radius:10px;padding:13px;color:#9c394b;font-size:12px;margin-bottom:18px}
 .wc-resource-muted{color:#71869a;font-size:12px}
+
+.wc-resource-view-switch{margin:0 0 18px}
+.wc-resource-view-switch .wc-outline[aria-pressed="true"]{background:#e6f7f4;border-color:#6aada5;color:#174943}

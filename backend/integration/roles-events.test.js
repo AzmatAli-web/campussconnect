@@ -431,7 +431,8 @@ test('students see the same published event and totals but never each other’s 
 },{timeout:90000});
 
 test('private receipt details remain available for cancelled events and never join another campus',async()=>{
- const student=students[17], uid='fixture-student-17';
+ const uid='fixture-registration-history';
+ const student=await User.create(person(uid));
  const [cancelled,foreign]=await Event.create([
   {...makeEvent('Cancelled workshop on a private receipt',3),universityId:UNIVERSITY_ID,
    organizerType:'faculty',organizerId:faculty._id,status:'cancelled',cancelReason:'Internal reason'},

@@ -40,6 +40,7 @@ const societySchema=new Schema({
  description:{type:String,required:true},createdBy:oid,status:{type:String,enum:['active','archived'],required:true,default:'active'}
 },{timestamps:true,collection:'societies',versionKey:false});
 societySchema.index({universityId:1,slug:1},{unique:true});
+societySchema.index({universityId:1,status:1,name:1,_id:1});
 const idempotencySchema=new Schema({
  universityId:oid,actorId:oid,scope:{type:String,required:true},key:{type:String,required:true},
  requestHash:{type:String,required:true},status:{type:String,enum:['processing','completed'],required:true},

@@ -4,9 +4,11 @@ import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole} from '../middleware/campus-user.js';
 import {User} from '../models/user.js';
 import {Society,SocietyManagerAssignment} from '../models/campus-content.js';
+import {SocietyMembership} from '../models/society-membership.js';
 import {AdminBootstrap,AuditLog,StaffInvitation} from '../models/governance.js';
 import {emailMatchesDomains,normalizeEmail} from '../services/identity.js';
 import {pagination,requireObjectId} from '../services/mvp-validation.js';
+import {societyDirectoryQuery,societyMembershipView} from '../services/society-membership-validation.js';
 import {
   parseStatusChange,parseFacultyApproval,parseManagerAssignment,
   parseStaffInvitation,parseStaffActivation,parseReason,parseSociety,
@@ -314,13 +316,26 @@ export function governanceRouter(deps) {
   }));
 
   router.get('/societies',auth,asyncHandler(async(req,res)=>{
-    const {page,limit,skip}=pagination(req.query);
-    const filter={universityId:uni,status:'active'};
+    const {page,limit,skip,filter:search,includeMembership}=societyDirectoryQuery(req.query);
+    if(includeMembership)needRole(req,'student');
+    const filter={universityId:uni,status:'active',...search};
     const [items,total]=await Promise.all([
       Society.find(filter).sort({name:1,_id:1}).skip(skip).limit(limit).lean(),
       Society.countDocuments(filter)
     ]);
-    return res.json({data:items.map(asSociety),meta:{page,limit,total}});
+    res.set('Cache-Control','private, no-store');
+    if(!includeMembership)return res.json({data:items.map(asSociety),meta:{page,limit,total}});
+    const membershipRows=items.length?await SocietyMembership.find({
+      universityId:uni,studentId:req.currentUser._id,societyId:{$in:items.map(s=>s._id)}
+    }).lean():[];
+    const ownBySociety=new Map(membershipRows.map(m=>[String(m.societyId),societyMembershipView(m)]));
+    return res.json({
+      data:items.map(s=>{
+        const own=ownBySociety.get(String(s._id));
+        return {...asSociety(s),membership:own?{id:own.id,status:own.status}:null};
+      }),
+      meta:{page,limit,total}
+    });
   }));
 
   return router;

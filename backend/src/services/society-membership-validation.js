@@ -3,6 +3,20 @@ import {pagination,requireBody,textField} from './mvp-validation.js';
 
 const managerStatuses=['pending','active'];
 const actions=['approve','reject','remove'];
+export function societyDirectoryQuery(query){
+ const allowed=['page','limit','q','includeMembership'];
+ if(Object.keys(query).some(key=>!allowed.includes(key)||typeof query[key]!=='string'))
+  throw new HttpError(400,'INVALID_SOCIETY_FILTER','Unsupported society filter');
+ const search=(query.q??'').trim();
+ if(search.length>80||(query.includeMembership!==undefined&&query.includeMembership!=='1'))
+  throw new HttpError(400,'INVALID_SOCIETY_FILTER','Invalid society search or membership option');
+ const filter={};
+ if(search){
+  const literal=search.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
+  filter.$or=['name','description'].map(key=>({[key]:{$regex:literal,$options:'i'}}));
+ }
+ return {...pagination(query),filter,includeMembership:query.includeMembership==='1'};
+}
 export function emptySocietyBody(body){
  if(body===undefined)return;
  requireBody(body,[]);

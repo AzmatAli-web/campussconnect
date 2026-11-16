@@ -71,3 +71,10 @@ flutter pub get
 flutter analyze
 flutter test
 ```
+
+## Web society discovery
+
+- The authenticated directory lists active societies from the signed-in user's campus. Search matches literal words or text in the name or description without case sensitivity. The web screen shows 12 results per page.
+- Students see their own current membership state on matching cards. The separate My memberships list keeps its own page and labels archived societies when the record still exists.
+- GET /api/v1/societies accepts page, limit, and an optional q of up to 80 characters. Students can opt in with includeMembership=1 to receive only their own membership ID and status for each result. The default response is unchanged.
+- GET /api/v1/me/society-memberships accepts includeSociety=1 to include the same-campus society name on each personal receipt. The default response is unchanged. Neither route provides rosters or changes publishing privileges.

@@ -397,6 +397,36 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByRole('button', {name: 'Clear filters'}).click();
   await a.getByRole('heading', {name: 'Exam schedule'}).waitFor();
 
+  await navigate(a, /Assignment Tracker/);
+  await a.getByRole('heading', {name: 'No open assignments'}).waitFor();
+  await a.getByLabel('Assignment title').fill('Research outline');
+  await a.getByLabel('Course (optional)').fill('CSC494');
+  await a.getByLabel('Due date (PKT)').fill('2000-01-02');
+  await a.getByRole('button', {name: 'Add assignment'}).click();
+  const assignment = a.getByRole('article', {name: 'Research outline'});
+  await assignment.getByText('Overdue', {exact:true}).waitFor();
+  await checkReflow(a,320);
+  await assignment.getByRole('button', {name: 'Edit', exact:true}).click();
+  await a.getByLabel('Assignment title').fill('Research outline revised');
+  await a.getByRole('button', {name: 'Save changes'}).click();
+  const revised = a.getByRole('article', {name: 'Research outline revised'});
+  await revised.getByRole('button', {name: 'Mark complete'}).click();
+  await a.getByRole('heading', {name: 'No open assignments'}).waitFor();
+  await a.reload();
+  await navigate(a, /Assignment Tracker/);
+  await a.getByLabel('Show assignments').selectOption('completed');
+  await revised.getByText('Completed', {exact:true}).waitFor();
+  await revised.getByRole('button', {name: 'Reopen'}).click();
+  await a.getByLabel('Show assignments').selectOption('open');
+  await revised.getByText('Overdue', {exact:true}).waitFor();
+  await navigate(sameBrowserB, /Assignment Tracker/);
+  await sameBrowserB.getByRole('heading', {name: 'No open assignments'}).waitFor();
+  assert.equal(await sameBrowserB.getByText('Research outline revised').count(),0);
+  assert.equal(await organizer.getByRole('button', {name:'Assignment Tracker'}).count(),0);
+  await revised.getByRole('button', {name:'Remove', exact:true}).click();
+  await revised.getByRole('button', {name:'Confirm removal'}).click();
+  await a.getByRole('heading', {name:'No open assignments'}).waitFor();
+
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {
     const url = new URL(route.request().url());

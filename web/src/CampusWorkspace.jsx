@@ -2,6 +2,7 @@ import React,{Suspense,lazy,useCallback,useEffect,useMemo,useRef,useState} from 
 import {callApi} from './api.js';
 import {timetablePreferenceKey} from './timetable-preference.js';
 import {savedNotesKey} from './saved-notes.js';
+import {plannerKey} from './assignment-planner.js';
 import {activeRoles,displayRole,hasRole,navigationFor,registrationAttemptKey} from './dashboard-domain.js';
 import {Overview,Events,Registrations,Announcements,Organizer} from './WorkspacePages.jsx';
 import './workspace.css';
@@ -24,9 +25,10 @@ const MarketplacePage=lazy(()=>import('./MarketplacePage.jsx'));
 const LostFoundPage=lazy(()=>import('./LostFoundPage.jsx'));
 const SocietiesPage=lazy(()=>import('./SocietiesPage.jsx'));
 const NotificationsPage=lazy(()=>import('./NotificationsPage.jsx'));
+const AssignmentPlanner=lazy(()=>import('./AssignmentPlanner.jsx'));
 const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','admin'].includes(tab))requested.events='/events?limit=50';
@@ -114,6 +116,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  }
  const timetableKey=timetablePreferenceKey(profile);
  const notesKey=savedNotesKey(profile);
+ const assignmentKey=plannerKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
   overview:<Overview {...props}/>,
@@ -122,6 +125,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   announcements:<Announcements {...props} revision={revision}/>,
   timetable:<TimetablePage key={timetableKey??'timetable'} preferenceKey={timetableKey} {...props}/>,
   resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
+  assignments:<AssignmentPlanner key={assignmentKey??'assignments'} storageKey={assignmentKey}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,
   societies:<SocietiesPage key={user.uid??profile.id} {...props} revision={revision}/>,
@@ -144,9 +148,9 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   <div className="wc-main">
    <header className="wc-topbar"><button type="button" ref={menuButton} className="wc-mobile-menu" aria-label="Campus menu" aria-controls="campus-sidebar" aria-expanded={menu} onClick={()=>menu?closeMenu():setMenu(true)}>☰</button><span>UNIVERSITY PORTAL <b>/</b> {activeTab.toUpperCase()}</span><div><span className="wc-auth-dot">● Verified session</span><button className="wc-refresh" onClick={()=>setRevision(n=>n+1)}>↻ Refresh</button></div></header>
    <main className="wc-content">
-    <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1 ref={pageHeading} tabIndex={-1}>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark" aria-hidden="true">✧</div></div>
+    <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1 ref={pageHeading} tabIndex={-1}>{titles[activeTab]}</h1><p>{activeTab==='assignments'?'Keep track of your own deadlines and completed work.':'Information from your campus backend, protected by your verified Firebase session.'}</p></div><div className="wc-hero-mark" aria-hidden="true">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
-    {loading&&!['events','registrations','announcements','societies'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
+    {loading&&!['events','registrations','announcements','societies','assignments'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
      <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>
       {page}
      </Suspense>}

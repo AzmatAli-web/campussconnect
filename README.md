@@ -8,6 +8,10 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
+## Milestone 40 recovery and mobile web QA (draft)
+
+GitHub Actions runs a backup and restore rehearsal with fictional MongoDB records and an isolated Docker container. The signed-in web fixture checks reflow and keyboard navigation on mobile, tablet, and desktop widths. See the [QA guide](qa/README.md). This does not schedule or verify production backups.
+
 ## Milestone 39 society discovery (draft)
 
 Search active campus societies by name or description. The web directory and private membership history have separate pagination, so searching doesn't hide your past requests. Manager approval and roster permissions are unchanged. See the [society membership guide](docs/SOCIETY_MEMBERSHIP_MVP.md).

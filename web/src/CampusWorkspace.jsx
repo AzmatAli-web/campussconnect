@@ -46,6 +46,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(null),[revision,setRevision]=useState(0),[menu,setMenu]=useState(false);
  const [rosters,setRosters]=useState({}),[openRoster,setOpenRoster]=useState(null);
  const idempotencyKeys=useRef(new Map());
+ const menuButton=useRef(null),sidebar=useRef(null),pageHeading=useRef(null),focusHeading=useRef(false);
  const activeTab=nav.some(item=>item.id===tab)?tab:'overview';
  const call=useCallback((path,opts)=>callApi(path,user,opts),[user]);
  useEffect(()=>{
@@ -99,7 +100,15 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
    setRosters(prev=>({...prev,[eventId]:attendees}));
   }catch(err){setOpenRoster(null);setNotice({kind:'error',text:err?.message||'Not authorized to view attendees'});}
  }
- function choose(next){setTab(next);setMenu(false);setNotice(null);setOpenRoster(null);}
+ function closeMenu(){setMenu(false);menuButton.current?.focus();}
+ useEffect(()=>{
+  if(menu)sidebar.current?.querySelector('nav button[aria-current="page"]')?.focus();
+  else if(focusHeading.current){focusHeading.current=false;pageHeading.current?.focus();}
+ },[menu,activeTab]);
+ function choose(next){
+  if(menu)focusHeading.current=true;
+  setTab(next);setMenu(false);setNotice(null);setOpenRoster(null);
+ }
  async function refreshProfile(){
   await act(async()=>{const next=await call('/me');onProfileChange(next);},'Account permissions refreshed.');
  }
@@ -124,16 +133,18 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  }[activeTab];
  if(profile.status!=='active')return <div className="wc-locked"><div className="wc-locked-card"><div className="wc-logo">C·</div><h1>Campus account pending</h1><p>Your university profile is {profile.status}. Privileged features will remain unavailable until your account is approved.</p><button onClick={refreshProfile}>Check approval status</button><button onClick={onSignOut}>Sign out</button>{notice&&<p>{notice.text}</p>}</div></div>;
  return <div className="wc-layout">
-  <aside className={'wc-sidebar '+(menu?'open':'')}>
+  <aside id="campus-sidebar" ref={sidebar} className={'wc-sidebar '+(menu?'open':'')}
+   onKeyDown={event=>{if(menu&&event.key==='Escape'){event.preventDefault();closeMenu();}}}>
    <div className="wc-brand"><div className="wc-logo">C·</div><div><strong>CampusConnect</strong><small>COMSATS Abbottabad</small></div></div>
    <span className="wc-side-label">YOUR WORKSPACE</span>
-   <nav>{nav.map(item=><button className={item.id===activeTab?'selected':''} key={item.id} onClick={()=>choose(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
+   <button type="button" className="wc-close-menu" onClick={closeMenu}>Close campus menu</button>
+   <nav aria-label="Campus workspace">{nav.map(item=><button aria-current={item.id===activeTab?'page':undefined} className={item.id===activeTab?'selected':''} key={item.id} onClick={()=>choose(item.id)}><span aria-hidden="true">{item.icon}</span>{item.label}</button>)}</nav>
    <div className="wc-sidebar-footer"><small>University identity verified</small><div className="wc-account"><span>{profile.fullName?.slice(0,1).toUpperCase()||'U'}</span><div><strong>{profile.fullName}</strong><small>{displayRole(profile)}</small></div></div><button onClick={onSignOut}>↪ Sign out</button></div>
   </aside>
   <div className="wc-main">
-   <header className="wc-topbar"><button className="wc-mobile-menu" onClick={()=>setMenu(!menu)}>☰</button><span>UNIVERSITY PORTAL <b>/</b> {activeTab.toUpperCase()}</span><div><span className="wc-auth-dot">● Verified session</span><button className="wc-refresh" onClick={()=>setRevision(n=>n+1)}>↻ Refresh</button></div></header>
+   <header className="wc-topbar"><button type="button" ref={menuButton} className="wc-mobile-menu" aria-label="Campus menu" aria-controls="campus-sidebar" aria-expanded={menu} onClick={()=>menu?closeMenu():setMenu(true)}>☰</button><span>UNIVERSITY PORTAL <b>/</b> {activeTab.toUpperCase()}</span><div><span className="wc-auth-dot">● Verified session</span><button className="wc-refresh" onClick={()=>setRevision(n=>n+1)}>↻ Refresh</button></div></header>
    <main className="wc-content">
-    <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark">✧</div></div>
+    <div className="wc-hero"><div><span>CAMPUSCONNECT / AUTHENTICATED WORKSPACE</span><h1 ref={pageHeading} tabIndex={-1}>{titles[activeTab]}</h1><p>Information from your campus backend, protected by your verified Firebase session.</p></div><div className="wc-hero-mark" aria-hidden="true">✧</div></div>
     {notice&&<div role="status" className={'wc-notice '+notice.kind}><strong>{notice.kind==='success'?'✓':'!'}</strong><p>{notice.text}</p><button aria-label="Dismiss message" onClick={()=>setNotice(null)}>×</button></div>}
     {loading&&!['events','registrations','announcements','societies'].includes(activeTab)?<div className="wc-loading"><div/><div/><div/></div>:
      <Suspense fallback={<div role="status" className="wc-loading"><div/><div/><div/></div>}>

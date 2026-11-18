@@ -186,6 +186,15 @@ test('real React workspace: two students share event counts, never receipts or r
     if (await mobileMenu.isVisible()) await mobileMenu.click();
     await button.click();
   };
+  async function checkReflow(page, width){
+    await page.setViewportSize({width, height: 844});
+    const {scroll,view} = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      view: document.documentElement.clientWidth,
+    }));
+    assert.ok(view <= width + 1, 'viewport is not sized to the device');
+    assert.ok(scroll <= view + 1, 'horizontal overflow at ' + width + ' CSS pixels: ' + scroll + ' > ' + view);
+  }
   const card = page => page.locator('article').filter({has: page.getByRole('heading', {name: title, exact: true})});
   const seats = (page, count) => card(page).getByText(count + '/3 confirmed', {exact: true}).waitFor();
   const confirm = page => card(page).getByRole('button', {name: '✓ Confirmed', exact: true}).waitFor();
@@ -224,8 +233,27 @@ test('real React workspace: two students share event counts, never receipts or r
   await confirm(a);
 
   const b = await pageFor('b', {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+  const campusMenu = b.getByRole('button', {name: 'Campus menu', exact: true});
+  const campusNav = b.getByRole('navigation', {name: 'Campus workspace'});
+  await campusMenu.waitFor();
+  assert.equal(await campusNav.count(), 0, 'closed drawer must not appear in the accessibility tree');
+  await b.keyboard.press('Tab');
+  await b.waitForFunction(() => document.activeElement?.classList.contains('wc-mobile-menu'));
+  assert.equal(await campusMenu.getAttribute('aria-expanded'), 'false');
+  await b.keyboard.press('Enter');
+  await campusNav.waitFor();
+  await b.waitForFunction(() => document.activeElement?.getAttribute('aria-current') === 'page');
+  assert.equal(await campusMenu.getAttribute('aria-expanded'), 'true');
+  await b.keyboard.press('Escape');
+  await campusNav.waitFor({state:'hidden'});
+  await b.waitForFunction(() => document.activeElement?.classList.contains('wc-mobile-menu'));
+  assert.equal(await campusMenu.getAttribute('aria-expanded'), 'false');
   await navigate(b, /Explore events/);
   await seats(b, 1);
+  await b.waitForFunction(() => document.activeElement?.tagName === 'H1');
+  for(const width of [320,390,768]) await checkReflow(b,width);
+  await checkReflow(b,390);
+  await checkReflow(a,1366);
   await navigate(b, /My registrations/);
   await b.getByRole('heading', {name: 'Nothing registered yet'}).waitFor();
   await navigate(b, /Explore events/);
@@ -272,6 +300,8 @@ test('real React workspace: two students share event counts, never receipts or r
   await history.getByText('Archived fixture group', {exact: true}).waitFor();
   await navigate(b, /Societies/);
   await b.getByRole('heading', {name: 'No membership history yet'}).waitFor();
+  for(const width of [320,390,768]) await checkReflow(b,width);
+  await checkReflow(b,390);
   assert.equal(await b.getByText('Archived fixture group', {exact: true}).count(), 0);
 
   await navigate(a, /Timetable/);

@@ -1,6 +1,6 @@
 # CampusConnect — Milestone 20 backup/recovery & accessibility QA (draft)
 
-This is optional developer tooling built on the **Milestone 19** full-stack branch. It is **not** part of the live CampusConnect API, does not run automatically, and is **not evidence of a successful restore or a production-ready release**. All tests and configuration remain to be executed/reviewed.
+The manually configured tools below are optional, separate from the CampusConnect API, and do not configure live backups. Milestone 40 adds a separate automated rehearsal and signed-in web checks described below.
 
 ## 1. MongoDB backup (read source, write local archive)
 
@@ -62,3 +62,15 @@ Playwright reports/screenshots/traces can contain private page data; keep them l
 ## Relationship to milestone 19
 
 The existing `scripts/verify-all.ps1` and `.github/workflows/full-stack-qa.yml` remain unchanged. Milestone 20 adds **opt-in** verification tooling only. Do not merge this draft until its commands have been executed against a safe development environment and reviewed.
+
+## Milestone 40 automated rehearsal
+
+From the repository root, use Docker running Linux containers and Node.js 22 or later.
+
+```powershell
+npm.cmd --prefix qa run test:recovery
+```
+
+The command starts an unnetworked, disposable MongoDB container without host ports, host mounts, app credentials, or a connection to Atlas. It seeds two fictional records and a unique index, dumps a single database, removes a record from the source, and restores the archive into a differently named database. It checks exact record contents, the restored unique index, and that the changed source was left alone. The container and synthetic archive are cleaned up on normal completion or test errors. GitHub Actions runs this drill on changes to the rehearsal and supports manual dispatch once the workflow is on the default branch.
+
+The web browser regression suite runs against fictional signed-in accounts. It checks horizontal overflow on Events and Societies at 320, 390 and 768 CSS pixels plus desktop Events at 1366 CSS pixels. It also checks accessible names, current page and expanded state, and the keyboard sequence for opening, navigating and dismissing the mobile menu. Run it from the repository root with `npm.cmd --prefix web run test:browser` after installing web dependencies and Chromium. The public axe suite above remains separate. Real devices, screen readers, complete WCAG conformance, Atlas backups, and recovery of Firebase or uploaded media are outside this rehearsal.

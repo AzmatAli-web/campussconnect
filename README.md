@@ -8,6 +8,10 @@ A **college campus services platform** with a Flutter Android student app, React
 
 Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
 
+## Milestone 41 personal assignment tracker (draft)
+
+Active students can add, edit, complete, reopen and remove personal deadline reminders under **Assignment Tracker**. Due-date labels follow Pakistan Standard Time. Reminders stay in the current browser under the campus account's profile key. They are not synced, shared with faculty, or used as official submission records. Clearing browser data removes the planner entries.
+
 ## Milestone 40 recovery and mobile web QA (draft)
 
 GitHub Actions runs a backup and restore rehearsal with fictional MongoDB records and an isolated Docker container. The signed-in web fixture checks reflow and keyboard navigation on mobile, tablet, and desktop widths. See the [QA guide](qa/README.md). This does not schedule or verify production backups.

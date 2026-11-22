@@ -40,3 +40,26 @@ test('validates real calendar dates and computes due status at midnight PKT',()=
  assert.equal(assignmentStatus(make(1),'2028-03-01'),'overdue');
  assert.equal(assignmentStatus({...make(1),done:true},'2028-03-01'),'completed');
 });
+
+import {buildAssignmentCalendar} from '../src/assignment-calendar.js';
+
+test('calendar exports open local deadlines as all-day events without profile or completed items',()=>{
+ const first=make(1), completed={...make(2),done:true,title:'Private completed work'};
+ const file=buildAssignmentCalendar([first,completed],new Date('2026-11-22T10:20:00Z'));
+ assert.equal(file.name,'campusconnect-assignment-deadlines.ics');
+ assert.equal(file.count,1);
+ assert.match(file.contents,/DTSTART;VALUE=DATE:20280229\r\n/);
+ assert.match(file.contents,/DTEND;VALUE=DATE:20280301\r\n/);
+ assert.match(file.contents,/SUMMARY:Programming assignment\r\n/);
+ assert.match(file.contents,/DESCRIPTION:Course: SCD\r\n/);
+ assert.doesNotMatch(file.contents,/Private completed work|@campus.example|BEARER|TOKEN/i);
+ assert.equal(buildAssignmentCalendar([completed]),null);
+});
+
+test('calendar escapes untrusted text and folds unicode lines at 75 UTF-8 octets',()=>{
+ const item={...make(3),title:'Lecture, plan;\\notes\n'+'☃'.repeat(35),due:'2028-12-31'};
+ const file=buildAssignmentCalendar([item],new Date('2026-11-22T00:00:00Z'));
+ assert.match(file.contents,/DTEND;VALUE=DATE:20290101/);
+ assert.match(file.contents,/SUMMARY:Lecture\\, plan\\;\\\\notes\\n/);
+ for(const line of file.contents.split('\r\n'))assert.ok(new TextEncoder().encode(line).length<=75);
+});

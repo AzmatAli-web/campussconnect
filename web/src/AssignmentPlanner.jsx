@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {MAX_ASSIGNMENTS,assignmentFields,assignmentStatus,formatDeadline,
  readAssignments,todayAtCampus,writeAssignments} from './assignment-planner.js';
 import './assignment-planner.css';
+import {downloadAssignmentCalendar} from './assignment-calendar.js';
 
 const empty = {title:'',course:'',due:''};
 const labels = {completed:'Completed',overdue:'Overdue',today:'Due today',upcoming:'Upcoming'};
@@ -80,9 +81,12 @@ export default function AssignmentPlanner({storageKey}) {
   <section className="wc-panel" aria-labelledby="assignment-list-heading">
    <div className="wc-head"><div><h2 id="assignment-list-heading" tabIndex={-1} ref={listHeading}>My assignments</h2>
     <p>{rows.filter(row=>!row.done).length} open · {rows.filter(row=>assignmentStatus(row,today)==='overdue').length} overdue</p></div>
+    <div className="wc-planner-actions"><button type="button" className="wc-outline" disabled={!rows.some(row=>!row.done)}
+      onClick={()=>{if(downloadAssignmentCalendar(readAssignments(storageKey))) setMessage("Calendar file downloaded. Import it into your calendar app.");}}
+      >Export open deadlines (.ics)</button>
     <label className="wc-planner-filter">Show assignments <select value={filter} onChange={event=>{setRemove(null);setFilter(event.target.value);}}>
      <option value="open">Open</option><option value="completed">Completed</option><option value="all">All</option>
-    </select></label></div>
+    </select></label></div></div>
    {visible.length===0?<div className="wc-empty"><h3>No {filter==='all'?'':filter+' '}assignments</h3></div>:
     <ul className="wc-planner-list">{visible.map(row=>{
      const status = assignmentStatus(row,today);

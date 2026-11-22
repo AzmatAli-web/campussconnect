@@ -26,6 +26,7 @@ const LostFoundPage=lazy(()=>import('./LostFoundPage.jsx'));
 const SocietiesPage=lazy(()=>import('./SocietiesPage.jsx'));
 const NotificationsPage=lazy(()=>import('./NotificationsPage.jsx'));
 const AssignmentPlanner=lazy(()=>import('./AssignmentPlanner.jsx'));
+const StudentOverview=lazy(()=>import('./StudentOverview.jsx'));
 const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
 const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
@@ -119,7 +120,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const assignmentKey=plannerKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
-  overview:<Overview {...props}/>,
+  overview:hasRole(profile,'student')?<StudentOverview key={assignmentKey??'overview'} assignmentKey={assignmentKey} preferenceKey={timetableKey} {...props}/>:<Overview {...props}/>,
   events:<Events {...props} busy={busy||loading} revision={revision}/>,
   registrations:<Registrations {...props} revision={revision}/>,
   announcements:<Announcements {...props} revision={revision}/>,

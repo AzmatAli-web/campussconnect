@@ -110,7 +110,7 @@ export default function AssignmentPlanner({storageKey}) {
         <div className="wc-planner-badges">
          <span className={'wc-tag '+(status==='overdue'||status==='today'?'warn':status==='completed'?'good':'')}>{labels[status]}</span>
          <span className={'wc-tag wc-priority-'+row.priority}>{row.priority} priority</span>
-         <span className="wc-planner-countdown">{countdownLabel(row,today)}</span>
+         {!row.done&&<span className="wc-planner-countdown">{countdownLabel(row,today)}</span>}
         </div></div>
        <div className="wc-planner-actions">
         <button type="button" className="wc-outline" onClick={()=>{

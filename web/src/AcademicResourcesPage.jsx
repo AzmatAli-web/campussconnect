@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {isVerifiedFaculty,hasRole} from './dashboard-domain.js';
 import {uploadAcademicPdf,downloadAcademicPdf} from './api.js';
 import {MAX_SAVED_NOTES,readSavedNotes,toggleSavedNote,writeSavedNotes} from './saved-notes.js';
+import {groupCourseResources,cleanResourceSearch} from './resource-discovery.js';
 
 const emptyUpload={
  title:'',description:'',program:'BSE',semester:'7',courseCode:''
@@ -17,7 +18,7 @@ export default function AcademicResourcesPage({profile,user,call,act,busy,notesK
  const [myFiles,setMyFiles]=useState([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
- const [filter,setFilter]=useState({program:'',semester:'',courseCode:''});
+ const [filter,setFilter]=useState({program:'',semester:'',courseCode:'',q:''});
  const [selectedFilter,setSelectedFilter]=useState({});
  const [upload,setUpload]=useState(emptyUpload);
  const [selectedFile,setSelectedFile]=useState(null);
@@ -37,7 +38,7 @@ export default function AcademicResourcesPage({profile,user,call,act,busy,notesK
   try{
    const params=new URLSearchParams({limit:'100'});
    for(const [key,value] of Object.entries(query)){
-    if(value) params.set(key,value.trim());
+    if(value) params.set(key,value);
    }
    const requests=[call('/resources?'+params.toString())];
    if(isTeacher)requests.push(call('/me/resources'));
@@ -166,20 +167,31 @@ export default function AcademicResourcesPage({profile,user,call,act,busy,notesK
    {error&&<div role="alert" className="wc-resource-error">{error}</div>}
    {!showSaved&&<>
    <form className="wc-resource-filter" onSubmit={e=>{e.preventDefault();
-     setSelectedFilter({...filter});load(filter);}}>
+     try { const query=cleanResourceSearch(filter);setSelectedFilter(query);load(query); }
+     catch(err){setError(err.message); }
+   }}>
+    <label>Search notes<input type="search" value={filter.q} maxLength={64} placeholder="Operating systems, CSC494…" 
+     onChange={e=>setFilter(s=>({...s,q:e.target.value}))}/></label>
     <label>Program<input value={filter.program} maxLength={24} placeholder="BSE"
      onChange={e=>setFilter(s=>({...s,program:e.target.value}))}/></label>
-    <label>Semester<input type="number" min="1" max="12" value={filter.semester}
-     placeholder="All" onChange={e=>setFilter(s=>({...s,semester:e.target.value}))}/></label>
+    <label>Semester<select value={filter.semester} onChange={e=>setFilter(s=>({...s,semester:e.target.value}))}>
+     <option value="">All semesters</option>{Array.from({length:12},(_,i)=><option key={i+1} value={String(i+1)}>Semester {i+1}</option>)}
+    </select></label>
     <label>Course code<input value={filter.courseCode} maxLength={24}
      placeholder="CSC494" onChange={e=>setFilter(s=>({...s,courseCode:e.target.value}))}/></label>
     <button className="wc-primary" type="submit">Search</button>
-    <button type="button" className="wc-outline" onClick={()=>{setFilter({program:'',semester:'',courseCode:''});setSelectedFilter({});load({});}}>Clear</button>
+    <button type="button" className="wc-outline" onClick={()=>{setFilter({program:'',semester:'',courseCode:'',q:''});setSelectedFilter({});load({});}}>Clear</button>
    </form>
    {loading?<p className="wc-resource-muted">Loading course resources…</p>:
-    resources.length?list(resources):
-    <div className="wc-empty"><span>▤</span><h3>No course PDFs published yet</h3>
-     <p>Once verified Faculty upload their notes, students can find and download them here.</p>
+    resources.length?<div className="wc-resource-courses">
+     <p className="wc-resource-muted" role="status">Showing {resources.length} matching PDFs (up to 100 newest results).</p>
+     {groupCourseResources(resources).map(group=><section key={group.key} aria-label={group.course+' resources'}>
+      <h3 className="wc-course-heading">{group.program} · Semester {group.semester} · {group.course} <small>({group.items.length} PDFs)</small></h3>
+      {list(group.items)}
+     </section>)}
+    </div>:
+    <div className="wc-empty"><span>▤</span><h3>No matching course PDFs</h3>
+     <p>Try another course or semester. Only published notes are visible here.</p>
     </div>}
    </>}
    {showSaved&&<>

@@ -100,7 +100,13 @@ test('real React workspace: two students share event counts, never receipts or r
         }];
         return route.fulfill({status: 200, json: {data: notes, meta: {total: notes.length ? 13 : 0}}});
       }
-      if (method === 'GET' && path === '/api/v1/resources') return send(route, publishedNote ? [note] : []);
+      if (method === 'GET' && path === '/api/v1/resources') {
+        const q=url.searchParams.get('q')?.toLowerCase();
+        const semester=url.searchParams.get('semester');
+        const matches=(!q||[note.title,note.courseCode,note.fileName].some(v=>v.toLowerCase().includes(q)))
+          &&(!semester||semester===String(note.semester));
+        return send(route, publishedNote&&matches ? [note] : []);
+      }
       if (method === 'GET' && path === '/api/v1/societies' && actor !== 'organizer') {
         if (url.searchParams.get('includeMembership') !== '1') return deny(route, 'missing personal membership option');
         const pageNumber = Number(url.searchParams.get('page'));
@@ -338,6 +344,16 @@ test('real React workspace: two students share event counts, never receipts or r
   await showSection(a, 'A');
 
   await navigate(a, /Academic Resources/);
+  await a.getByLabel('Search notes').fill('fixture');
+  await a.getByLabel('Semester', {exact:true}).selectOption('7');
+  await a.getByRole('button', {name:'Search',exact:true}).click();
+  await a.getByRole('heading', {name:'BSE · Semester 7 · CSC494 (1 PDFs)'}).waitFor();
+  await a.getByLabel('Search notes').fill('unmatched phrase');
+  await a.getByRole('button', {name:'Search',exact:true}).click();
+  await a.getByRole('heading', {name:'No matching course PDFs'}).waitFor();
+  await a.getByRole('button', {name:'Clear',exact:true}).click();
+  await a.getByRole('button', {name: 'Save note: '+note.title}).waitFor();
+  await checkReflow(a,320);
   await a.getByRole('button', {name: 'Save note: '+note.title}).click();
   await a.reload();
   await navigate(a, /Academic Resources/);

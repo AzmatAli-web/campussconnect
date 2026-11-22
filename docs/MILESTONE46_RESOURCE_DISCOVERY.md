@@ -1,0 +1,7 @@
+# Milestone 46 — Academic resource discovery
+
+Academic Resources now offers keyword search (`q`, 2–64 characters), exact program, exact course code, and semester dropdown filters. The server checks and safely escapes keyword values before searching published resources by title, description, or course code. Results are grouped by program / semester / course code for easier scanning. The authenticated `GET /api/v1/resources` still caps results at 100 newest matches; it is not a complete paginated search and the UI states this limit. For very large catalogs, a future milestone should add indexed full-text search and cursor pagination. No uploader identity or private file path is exposed by this feature.
+
+Saved notes remain browser-only bookmarks; previously bookmarked PDFs still require authorization, and unavailable archived notes remain hidden. Uploading is still restricted to verified faculty; download, archive and staff permissions are unchanged. The keyword search uses a bounded escaped case-insensitive regex. This can require scanning many records on a large campus dataset; performance testing and indexed full-text search should precede production rollout.
+
+Use `npm --prefix backend test` and `npm --prefix web test`, `npm --prefix web run build`, `npm --prefix web run test:browser`. Only fictional fixture data is used in automated acceptance. Physical-device and live campus acceptance remain deferred.

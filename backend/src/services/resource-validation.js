@@ -59,7 +59,7 @@ export function safeDownloadName(name) {
     ? safe : 'campus-notes.pdf';
 }
 export function validateResourceFilter(query) {
-  const valid = ['program', 'semester', 'courseCode', 'limit'];
+  const valid = ['program', 'semester', 'courseCode', 'q', 'limit'];
   if (!query || Object.keys(query).some(k => !valid.includes(k))) {
     throw new HttpError(400, 'INVALID_RESOURCE_FILTER', 'Unsupported resource filter');
   }
@@ -73,6 +73,18 @@ export function validateResourceFilter(query) {
       throw new HttpError(400, 'INVALID_RESOURCE_FILTER', 'Invalid semester');
     }
     filter.semester = semester;
+  }
+  if (query.q !== undefined) {
+    if (typeof query.q !== 'string' || query.q.trim().length < 2 ||
+        query.q.trim().length > 64 || /[\u0000-\u001f\u007f]/.test(query.q)) {
+      throw new HttpError(400, 'INVALID_RESOURCE_FILTER', 'Search must have 2–64 characters');
+    }
+    const literal = query.q.trim().replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
+    filter.$or = [
+      {title: {$regex: literal, $options: 'i'}},
+      {description: {$regex: literal, $options: 'i'}},
+      {courseCode: {$regex: literal, $options: 'i'}}
+    ];
   }
   const limit = query.limit === undefined ? 50 : Number(query.limit);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {

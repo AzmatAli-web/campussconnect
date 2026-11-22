@@ -18,3 +18,9 @@
 
 .wc-resource-view-switch{margin:0 0 18px}
 .wc-resource-view-switch .wc-outline[aria-pressed="true"]{background:#e6f7f4;border-color:#6aada5;color:#174943}
+
+.wc-resource-filter input[type=search],.wc-resource-filter select{min-height:44px;width:100%;padding:11px 13px;border:1px solid #d1e3e8;background:#fff;border-radius:10px;color:#24445a}
+.wc-resource-courses{display:grid;gap:24px;min-width:0}
+.wc-course-heading{font-size:16px;font-weight:800;margin:0 0 12px;overflow-wrap:anywhere}
+.wc-course-heading small{font-size:12px;color:#657c89;font-weight:500}
+@media(max-width:500px){.wc-resource-filter label{flex:1 1 100%}.wc-resource-grid{grid-template-columns:minmax(0,1fr)}}

@@ -61,3 +61,14 @@ test('saved resource lookup accepts only a bounded ordered list of exact IDs',()
   assert.throws(()=>parseSavedResourceIds(query),{code:'INVALID_SAVED_RESOURCE_IDS'});
  }
 });
+
+test('keyword search validates length and escapes Mongo regex metacharacters',()=>{
+ const result=validateResourceFilter({q:'CS.C*',semester:'7',limit:'12'});
+ assert.equal(result.limit,12);
+ assert.equal(result.filter.semester,7);
+ assert.deepEqual(result.filter.$or.map(x=>Object.values(x)[0].$options),['i','i','i']);
+ assert.equal(result.filter.$or[0].title.$regex,'CS\\.C\\*');
+ for(const q of ['', 'x', 'x'.repeat(65), '\\n', ['CSC494']]){
+  assert.throws(()=>validateResourceFilter({q}),{code:'INVALID_RESOURCE_FILTER'});
+ }
+});

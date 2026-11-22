@@ -10,7 +10,7 @@ export function navigationFor(profile){
  items.push(['announcements','Announcements','◉']);
  items.push(['timetable','Timetable','▦']);
  items.push(['resources','Academic Resources','▤']);
- if(hasRole(profile,'student'))items.push(['assignments','Assignment Tracker','▧']);
+ if(hasRole(profile,'student'))items.push(['assignments','Assignment Tracker','▧'],['study','Study Planner','◴']);
  items.push(['marketplace','Marketplace','◈']);
  items.push(['lostfound','Lost & Found','⌕']);
  items.push(['societies','Societies','♧']);

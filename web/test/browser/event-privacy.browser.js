@@ -427,6 +427,26 @@ test('real React workspace: two students share event counts, never receipts or r
   await revised.getByRole('button', {name:'Confirm removal'}).click();
   await a.getByRole('heading', {name:'No open assignments'}).waitFor();
 
+  await navigate(a, /Study Planner/);
+  await a.getByRole('heading', {name: 'Weekly study goals'}).waitFor();
+  await a.getByLabel('Study goal', {exact:true}).fill('Review chapter for quiz');
+  await a.getByRole('button', {name:'Add weekly goal'}).click();
+  await a.getByText('Review chapter for quiz',{exact:true}).waitFor();
+  await a.getByRole('button',{name:'Mark complete',exact:true}).click();
+  await a.getByText(/1 of 1 goals completed/).waitFor();
+  await a.reload();
+  await navigate(a, /Study Planner/);
+  await a.getByText(/1 of 1 goals completed/).waitFor();
+  await checkReflow(a,320);
+  await navigate(sameBrowserB, /Study Planner/);
+  await sameBrowserB.getByText('No study goals yet for this week.').waitFor();
+  assert.equal(await sameBrowserB.getByText('Review chapter for quiz',{exact:true}).count(),0);
+  await navigate(a, /Overview/);
+  await a.getByRole('region',{name:'Weekly study progress'}).getByText(/1 of 1 weekly goals completed/).waitFor();
+  await navigate(a, /Study Planner/);
+  await a.getByRole('button',{name:'Remove goal: Review chapter for quiz'}).click();
+  await a.getByText('No study goals yet for this week.').waitFor();
+
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {
     const url = new URL(route.request().url());

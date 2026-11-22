@@ -2,19 +2,21 @@ import React,{useEffect,useState} from 'react';
 import {Overview} from './WorkspacePages.jsx';
 import {readAssignments,sortAssignments,countdownLabel,todayAtCampus} from './assignment-planner.js';
 import {todaySchedule} from './timetable-today.js';
+import {goalsKey,readGoals,thisCampusWeek,weekProgress} from './weekly-goals.js';
 import {chooseTimetableGroup,readTimetablePreference} from './timetable-preference.js';
 import './student-overview.css';
 
 const days=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 export default function StudentOverview({data,profile,choose,call,assignmentKey,preferenceKey}){
  const [assignments,setAssignments]=useState(()=>readAssignments(assignmentKey));
+ const [goals,setGoals]=useState(()=>readGoals(goalsKey(assignmentKey)));
  const [now,setNow]=useState(()=>Date.now());
  const [schedule,setSchedule]=useState({loading:true,group:null,slots:[],error:''});
  const [reload,setReload]=useState(0);
  useEffect(()=>{
-  const refresh=()=>{setAssignments(readAssignments(assignmentKey));setNow(Date.now());};
+  const refresh=()=>{setAssignments(readAssignments(assignmentKey));setGoals(readGoals(goalsKey(assignmentKey)));setNow(Date.now());};
   const changed=event=>{
-   if(event.key===null||event.key===assignmentKey)refresh();
+   if(event.key===null||event.key===assignmentKey||event.key===goalsKey(assignmentKey))refresh();
    if(event.key===null||event.key===preferenceKey)setReload(n=>n+1);
   };
   const tick=window.setInterval(()=>setNow(Date.now()),30_000);
@@ -45,6 +47,7 @@ export default function StudentOverview({data,profile,choose,call,assignmentKey,
  },[call,preferenceKey,reload]);
  const today=todayAtCampus(new Date(now));
  const deadlines=sortAssignments(assignments.filter(item=>!item.done)).slice(0,4);
+ const study=weekProgress(goals,assignments,thisCampusWeek(new Date(now)));
  const timed=todaySchedule(schedule.slots,now);
  const todayClasses=schedule.slots.filter(item=>item.dayOfWeek===timed.day).sort((a,b)=>a.startTime.localeCompare(b.startTime));
  const groupLabel=schedule.group?[schedule.group.program,'semester '+schedule.group.semester,'section '+schedule.group.section].join(', '):'Published academic schedule';
@@ -76,6 +79,12 @@ export default function StudentOverview({data,profile,choose,call,assignmentKey,
      </li>)}</ul>}
    </section>
   </div>
+  <section className="wc-panel" aria-label="Weekly study progress" style={{marginBottom:20}}>
+   <div className="wc-head"><div><span className="wc-kicker">YOUR WEEK AT A GLANCE</span><h2>Study goal progress</h2>
+    <p>{study.completed} of {study.total} weekly goals completed · {study.percent}%</p></div>
+    <button type="button" className="wc-link" onClick={()=>choose('study')}>Open study planner</button></div>
+   <progress max={Math.max(1,study.total)} value={study.completed} aria-label="Weekly study progress" style={{width:'100%',height:14,accentColor:'#0c947e'}}/>
+  </section>
   <Overview data={data} profile={profile} choose={choose}/>
  </>;
 }

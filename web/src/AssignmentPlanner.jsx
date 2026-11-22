@@ -1,10 +1,10 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {MAX_ASSIGNMENTS,assignmentFields,assignmentStatus,formatDeadline,
+import {MAX_ASSIGNMENTS,assignmentFields,assignmentStatus,assignmentSummary,sortAssignments,countdownLabel,formatDeadline,
  readAssignments,todayAtCampus,writeAssignments} from './assignment-planner.js';
 import './assignment-planner.css';
 import {downloadAssignmentCalendar} from './assignment-calendar.js';
 
-const empty = {title:'',course:'',due:''};
+const empty = {title:'',course:'',due:'',priority:'medium'};
 const labels = {completed:'Completed',overdue:'Overdue',today:'Due today',upcoming:'Upcoming'};
 
 export default function AssignmentPlanner({storageKey}) {
@@ -55,8 +55,8 @@ export default function AssignmentPlanner({storageKey}) {
  }
  if(!storageKey)return <section className="wc-panel"><h2>Planner unavailable</h2>
   <p>Sign in with an active student profile to use the planner.</p></section>;
- const visible = rows.filter(row=>filter==='all'||(filter==='completed'?row.done:!row.done))
-  .sort((a,b)=>Number(a.done)-Number(b.done)||a.due.localeCompare(b.due)||a.title.localeCompare(b.title));
+ const visible = sortAssignments(rows.filter(row=>filter==='all'||(filter==='completed'?row.done:!row.done)));
+ const summary = assignmentSummary(rows,today);
  return <div className="wc-stack wc-planner">
   <section className="wc-panel">
    <div className="wc-head"><div><h2>{edit?'Edit assignment':'Add an assignment'}</h2>
@@ -70,6 +70,9 @@ export default function AssignmentPlanner({storageKey}) {
      <label>Due date (PKT)<input type="date" required min="2000-01-01" max="2099-12-31" value={form.due}
       onChange={event=>setForm({...form,due:event.target.value})}/></label>
     </div>
+    <label>Priority<select value={form.priority} onChange={event=>setForm({...form,priority:event.target.value})}>
+     <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+    </select></label>
     <div className="wc-planner-actions">
      <button className="wc-primary">{edit?'Save changes':'Add assignment'}</button>
      {edit&&<button type="button" className="wc-outline" onClick={()=>{reset();setError('');titleInput.current?.focus();}}>Cancel editing</button>}
@@ -77,6 +80,16 @@ export default function AssignmentPlanner({storageKey}) {
    </form>
    {error&&<p role="alert" className="wc-planner-feedback">{error}</p>}
    <p role="status" className="wc-planner-feedback">{message}</p>
+  </section>
+  <section className="wc-panel" aria-label="Assignment deadline overview">
+   <h2>Deadline overview</h2>
+   <div className="wc-planner-stats">
+    <div><strong>{summary.open}</strong><span>Open</span></div>
+    <div><strong>{summary.dueSoon}</strong><span>Due within 7 days</span></div>
+    <div><strong>{summary.overdue}</strong><span>Overdue</span></div>
+    <div><strong>{summary.highPriority}</strong><span>High priority</span></div>
+   </div>
+   <p className="wc-hint">Based on campus dates (PKT); dates do not include submission times.</p>
   </section>
   <section className="wc-panel" aria-labelledby="assignment-list-heading">
    <div className="wc-head"><div><h2 id="assignment-list-heading" tabIndex={-1} ref={listHeading}>My assignments</h2>
@@ -94,7 +107,11 @@ export default function AssignmentPlanner({storageKey}) {
       <article className="wc-planner-card" aria-label={row.title}>
        <div><h3>{row.title}</h3>
         <p>{row.course&&<>{row.course} · </>}Due <time dateTime={row.due}>{formatDeadline(row.due)}</time></p>
-        <span className={'wc-tag '+(status==='overdue'||status==='today'?'warn':status==='completed'?'good':'')}>{labels[status]}</span></div>
+        <div className="wc-planner-badges">
+         <span className={'wc-tag '+(status==='overdue'||status==='today'?'warn':status==='completed'?'good':'')}>{labels[status]}</span>
+         <span className={'wc-tag wc-priority-'+row.priority}>{row.priority} priority</span>
+         <span className="wc-planner-countdown">{countdownLabel(row,today)}</span>
+        </div></div>
        <div className="wc-planner-actions">
         <button type="button" className="wc-outline" onClick={()=>{
          const current = readAssignments(storageKey);
@@ -102,7 +119,7 @@ export default function AssignmentPlanner({storageKey}) {
           row.done?'Assignment reopened.':'Assignment completed.')) listHeading.current?.focus();
         }}>{row.done?'Reopen':'Mark complete'}</button>
         <button type="button" className="wc-outline" onClick={()=>{
-         setEdit(row.id);setForm({title:row.title,course:row.course,due:row.due});
+         setEdit(row.id);setForm({title:row.title,course:row.course,due:row.due,priority:row.priority});
          setError('');setMessage('');titleInput.current?.focus();
         }}>Edit</button>
         <button type="button" className="wc-outline dangerous" aria-expanded={remove===row.id}

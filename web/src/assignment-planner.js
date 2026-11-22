@@ -1,6 +1,8 @@
 import {savedNotesKey} from './saved-notes.js';
 
 export const MAX_ASSIGNMENTS = 60;
+export const PRIORITIES = ['high','medium','low'];
+const priorityRank = {high:0,medium:1,low:2};
 const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const campusDate = new Intl.DateTimeFormat('en-CA', {
   timeZone:'Asia/Karachi', year:'numeric', month:'2-digit', day:'2-digit',
@@ -30,7 +32,9 @@ export function assignmentFields(values) {
   if (typeof due !== 'string' || !/^20\d\d-\d\d-\d\d$/.test(due)) throw new Error('Enter a valid due date.');
   const date = new Date(due + 'T00:00:00Z');
   if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0,10) !== due) throw new Error('Enter a valid due date.');
-  return {title,course,due};
+  const priority = values?.priority ?? 'medium';
+  if (!PRIORITIES.includes(priority)) throw new Error('Choose a valid priority.');
+  return {title,course,due,priority};
 }
 
 function sanitize(items) {
@@ -69,4 +73,27 @@ export function writeAssignments(key, rows, storage) {
 
 export function assignmentStatus(row, today) {
   return row.done ? 'completed' : row.due < today ? 'overdue' : row.due === today ? 'today' : 'upcoming';
+}
+
+export function daysUntil(due,today) {
+ const dueMs=Date.parse(due+'T00:00:00Z'),nowMs=Date.parse(today+'T00:00:00Z');
+ return Math.round((dueMs-nowMs)/86_400_000);
+}
+export function countdownLabel(item,today) {
+ if(item.done)return 'Completed';
+ const days=daysUntil(item.due,today);
+ return days<0?Math.abs(days)+' day'+(days===-1?'':'s')+' overdue':
+  days===0?'Due today':days===1?'Due tomorrow':days+' days left';
+}
+export function assignmentSummary(rows,today) {
+ const open=rows.filter(item=>!item.done);
+ const dueSoon=open.filter(item=>{const days=daysUntil(item.due,today);return days>=0&&days<=7;});
+ return {open:open.length,overdue:open.filter(item=>item.due<today).length,
+  dueSoon:dueSoon.length,highPriority:open.filter(item=>item.priority==='high').length};
+}
+export function sortAssignments(rows) {
+ return [...rows].sort((a,b)=>Number(a.done)-Number(b.done)
+ || a.due.localeCompare(b.due)
+ || (priorityRank[a.priority]??1)-(priorityRank[b.priority]??1)
+ || a.title.localeCompare(b.title));
 }

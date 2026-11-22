@@ -13,3 +13,15 @@
 .wc-planner-card{border:1px solid #d7e3e8;border-radius:12px;max-width:100%;padding:14px;display:grid;gap:12px;overflow-wrap:anywhere}
 .wc-planner-card h3,.wc-planner-card p{margin:0 0 6px}
 @media(max-width:540px){.wc-planner .wc-form-pair{grid-template-columns:minmax(0,1fr)}}
+
+.wc-planner .wc-form select{width:100%;max-width:320px;min-height:44px;padding:9px;border:1px solid #71869a;border-radius:9px;background:#fff;color:#193248}
+.wc-planner-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+.wc-planner-stats>div{min-width:0;display:grid;gap:6px;border:1px solid #dbe7ec;border-radius:12px;background:#f8fbfc;padding:16px}
+.wc-planner-stats strong{font-size:26px}
+.wc-planner-stats span{font-size:12px;color:#4c6379}
+.wc-planner-badges{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px}
+.wc-planner-countdown{font-size:12px;color:#405a70}
+.wc-priority-high{color:#9b2836;background:#fff0f1}
+.wc-priority-medium{color:#785b11;background:#fff6dd}
+.wc-priority-low{color:#20644d;background:#e8f8ee}
+@media(max-width:600px){.wc-planner-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}

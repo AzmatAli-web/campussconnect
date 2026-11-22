@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {navigationFor} from '../src/dashboard-domain.js';
-import {MAX_ASSIGNMENTS,assignmentFields,assignmentStatus,plannerKey,readAssignments,todayAtCampus,writeAssignments} from '../src/assignment-planner.js';
+import {MAX_ASSIGNMENTS,assignmentFields,assignmentStatus,assignmentSummary,countdownLabel,sortAssignments,plannerKey,readAssignments,todayAtCampus,writeAssignments} from '../src/assignment-planner.js';
 
 const student={status:'active',activeRoles:['student'],_id:'a'.repeat(24),universityId:'b'.repeat(24)};
-const fields={title:'Programming assignment',course:'SCD',due:'2028-02-29'};
+const fields={title:'Programming assignment',course:'SCD',due:'2028-02-29',priority:'medium'};
 const make=id=>({id:'12345678-0000-0000-0000-'+ id.toString(16).padStart(12,'0'),...fields,done:false});
 
 test('planner navigation is student-only and browser records are campus/account scoped',()=>{
@@ -62,4 +62,33 @@ test('calendar escapes untrusted text and folds unicode lines at 75 UTF-8 octets
  assert.match(file.contents,/DTEND;VALUE=DATE:20290101/);
  assert.match(file.contents,/SUMMARY:Lecture\\, plan\\;\\\\notes\\n/);
  for(const line of file.contents.split('\r\n'))assert.ok(new TextEncoder().encode(line).length<=75);
+});
+
+test('priorities migrate legacy entries and reject invalid input',()=>{
+ const key=plannerKey(student);
+ const old={...make(4)};delete old.priority;
+ const store={getItem:()=>JSON.stringify([old])};
+ assert.equal(readAssignments(key,store)[0].priority,'medium');
+ assert.throws(()=>assignmentFields({...fields,priority:'urgent'}),/valid priority/);
+ assert.deepEqual(assignmentFields({...fields,priority:'high'}),{...fields,priority:'high'});
+});
+test('deadline metrics, countdown and sorting are deterministic around campus dates',()=>{
+ const today='2028-02-29';
+ const data=[
+  {...make(1),due:'2028-02-28',priority:'high'},
+  {...make(2),due:'2028-02-29',priority:'medium'},
+  {...make(3),due:'2028-03-01',priority:'low'},
+  {...make(4),due:'2028-03-07',priority:'high'},
+  {...make(5),due:'2028-03-08',priority:'high'},
+  {...make(6),done:true,priority:'high',due:'2028-02-20'}
+ ];
+ assert.deepEqual(assignmentSummary(data,today),{open:5,overdue:1,dueSoon:3,highPriority:3});
+ assert.equal(countdownLabel(data[0],today),'1 day overdue');
+ assert.equal(countdownLabel(data[1],today),'Due today');
+ assert.equal(countdownLabel(data[2],today),'Due tomorrow');
+ assert.equal(countdownLabel(data[3],today),'7 days left');
+ assert.equal(countdownLabel(data[5],today),'Completed');
+ assert.equal(sortAssignments([...data].reverse())[0].id,data[0].id);
+ const tied=[{...make(7),priority:'low'},{...make(8),priority:'high'}];
+ assert.equal(sortAssignments(tied)[0].priority,'high');
 });

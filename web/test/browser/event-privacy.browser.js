@@ -345,7 +345,7 @@ test('real React workspace: two students share event counts, never receipts or r
 
   await navigate(a, /Academic Resources/);
   await a.getByLabel('Search notes').fill('fixture');
-  await a.getByLabel('Semester', {exact:true}).selectOption('7');
+  await a.locator('.wc-resource-filter select').selectOption('7');
   await a.getByRole('button', {name:'Search',exact:true}).click();
   await a.getByRole('heading', {name:'BSE · Semester 7 · CSC494 (1 PDFs)'}).waitFor();
   await a.getByLabel('Search notes').fill('unmatched phrase');

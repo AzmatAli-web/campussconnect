@@ -68,7 +68,7 @@ test('keyword search validates length and escapes Mongo regex metacharacters',()
  assert.equal(result.filter.semester,7);
  assert.deepEqual(result.filter.$or.map(x=>Object.values(x)[0].$options),['i','i','i']);
  assert.equal(result.filter.$or[0].title.$regex,'CS\\.C\\*');
- for(const q of ['', 'x', 'x'.repeat(65), '\\n', ['CSC494']]){
+ for(const q of ['', 'x', 'x'.repeat(65), '\n', ['CSC494']]){
   assert.throws(()=>validateResourceFilter({q}),{code:'INVALID_RESOURCE_FILTER'});
  }
 });

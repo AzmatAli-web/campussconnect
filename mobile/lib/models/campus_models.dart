@@ -363,6 +363,18 @@ class CampusLostFoundItem {
 }
 
 
+class CampusLostFoundMatch {
+  final CampusLostFoundItem item;
+  final List<String> reasons;
+
+  const CampusLostFoundMatch(this.item, this.reasons);
+
+  factory CampusLostFoundMatch.fromJson(Json data) => CampusLostFoundMatch(
+    CampusLostFoundItem.fromJson(asJson(data['item'])),
+    List<String>.from(data['reasons'] as List),
+  );
+}
+
 class CampusSociety {
   final String id;
   final String name;

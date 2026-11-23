@@ -1,0 +1,25 @@
+name: Flutter student app
+on:
+  push:
+    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+jobs:
+  flutter-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # The repo contains app source; Flutter generates native runner scaffolding
+      # on checkout. No real Firebase credentials or live emulator required for tests.
+      - run: flutter create --platforms=android --org=com.campusconnect --project-name=campusconnect_mobile .
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

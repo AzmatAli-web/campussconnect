@@ -1,0 +1,10 @@
+.wc-student-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:19px;margin-bottom:20px}
+.wc-student-grid .wc-head{flex-wrap:wrap}.wc-student-grid .wc-panel{min-width:0}
+.wc-student-grid .wc-student-items{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.wc-student-grid .wc-student-items li{min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:7px;border:1px solid #e3ebf0;border-radius:12px;padding:13px}
+.wc-student-grid .wc-student-items strong{width:100%;overflow-wrap:anywhere;font-size:13px}
+.wc-student-grid .wc-student-items small{color:#576d7d;overflow-wrap:anywhere}
+.wc-student-grid .wc-priority-high{background:#fff0f1;color:#9b2836}
+.wc-student-grid .wc-priority-medium{background:#fff6dd;color:#785b11}
+.wc-student-grid .wc-priority-low{background:#e8f8ee;color:#20644d}
+@media(max-width:900px){.wc-student-grid{grid-template-columns:minmax(0,1fr)}}

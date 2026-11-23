@@ -1,0 +1,17 @@
+
+/* Timetable module: desktop and small-phone responsive */
+.wc-timetable-picker{display:grid;gap:9px;max-width:480px;font-size:12px;font-weight:800;color:#486b7c;margin:10px 0 24px}
+.wc-timetable-picker select{width:100%;padding:13px;border:1px solid #cce3e7;border-radius:11px;background:white;color:#21465c}
+.wc-timetable-days{display:grid;gap:20px}.wc-timetable-day>h3{font-size:14px;color:#197d7b;margin:0 0 9px}
+.wc-timetable-cards{display:grid;gap:10px}.wc-timetable-card{border:1px solid #e0eaee;background:#faffff;border-radius:12px;padding:15px;display:flex;gap:18px;align-items:center}
+.wc-timetable-card>strong{font-size:13px;color:#117a73;white-space:nowrap}
+.wc-timetable-card>div{flex:1;font-size:13px;min-width:0}
+.wc-timetable-card>div small{display:block;color:#768c9a;font-size:11px;margin-top:6px}
+.wc-timetable-error{color:#a63d4a;font-size:12px;margin-top:15px}
+@media(max-width:650px){.wc-timetable-card{align-items:flex-start;flex-wrap:wrap;gap:10px}.wc-timetable-card .wc-outline{margin-left:auto}}
+
+.wc-timetable-view{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
+.wc-timetable-view [aria-pressed="true"]{color:#174943;border-color:#6aada5;background:#e6f7f4}
+.wc-timetable-today{margin:0 0 18px;padding:14px 16px;border:1px solid #cce3e7;border-radius:12px;background:#f0faf9;color:#25485b}
+.wc-timetable-today h3{margin:0 0 8px;font-size:15px}
+.wc-timetable-today p{margin:5px 0;font-size:13px;overflow-wrap:anywhere}

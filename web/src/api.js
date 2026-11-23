@@ -1,11 +1,11 @@
 const base=(import.meta.env.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
-export async function callApi(path,user,{method='GET',body}={}){
- const token=await user.getIdToken(true);
+export async function callApi(path,user,{method='GET',body,headers={},includeMeta=false}={}){
+ const token=await user.getIdToken();
  let response;
  try{
   response=await fetch(base+path,{
-   method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},
-   ...(body?{body:JSON.stringify(body)}:{})
+   method,cache:'no-store',headers:{Authorization:'Bearer '+token,...(body!==undefined?{'Content-Type':'application/json'}:{}),...headers},
+   ...(body!==undefined?{body:JSON.stringify(body)}:{})
   });
  }catch{throw new Error('Cannot reach backend. Check that Express is running on port 4000.');}
  let result;
@@ -16,5 +16,94 @@ export async function callApi(path,user,{method='GET',body}={}){
   error.code=result?.error?.code;
   throw error;
  }
- return result.data;
+ return includeMeta?{data:result.data,meta:result.meta}:result.data;
+}
+
+/** Multipart form upload: browser supplies boundary, Firebase supplies ID token. */
+export async function uploadAcademicPdf(user, form) {
+ const token = await user.getIdToken();
+ let response;
+ try {
+  response = await fetch(base+'/resources',{
+   method:'POST',cache:'no-store',
+   headers:{Authorization:'Bearer '+token},
+   body:form
+  });
+ } catch {throw new Error('Cannot reach the campus backend for PDF upload.');}
+ const payload = await response.json().catch(()=>null);
+ if(!response.ok){
+  const error=new Error(payload?.error?.message||'PDF upload failed.');
+  error.code=payload?.error?.code;
+  error.status=response.status;
+  throw error;
+ }
+ return payload.data;
+}
+
+/** Authenticated binary download, NOT a public PDF URL. */
+export async function downloadAcademicPdf(user, resource) {
+ if(!/^[0-9a-f]{24}$/.test(String(resource.id))) {
+  throw new Error('Invalid academic resource identifier.');
+ }
+ const token=await user.getIdToken();
+ let response;
+ try {
+  response=await fetch(base+'/resources/'+resource.id+'/file',{
+   cache:'no-store',headers:{Authorization:'Bearer '+token,
+    Accept:'application/pdf'}
+  });
+ } catch {throw new Error('Cannot reach the campus backend for PDF download.');}
+ if(!response.ok){
+  const data=await response.json().catch(()=>null);
+  throw new Error(data?.error?.message||'PDF download unavailable.');
+ }
+ const length=Number(response.headers.get('content-length')||0);
+ if(length>8*1024*1024)throw new Error('PDF exceeds the allowed size.');
+ if(!String(response.headers.get('content-type')||'').includes('application/pdf')){
+  throw new Error('Backend returned a non-PDF file.');
+ }
+ const blob=await response.blob();
+ if(blob.size>8*1024*1024)throw new Error('PDF exceeds the allowed size.');
+ const name=String(resource.fileName||'campus-notes.pdf')
+  .split(/[\\/]/).pop().replace(/[^a-zA-Z0-9 ._()-]/g,'_');
+ const filename=/\.pdf$/i.test(name)?name:'campus-notes.pdf';
+ const url=URL.createObjectURL(blob);
+ const anchor=document.createElement('a');
+ anchor.href=url;
+ anchor.download=filename;
+ anchor.style.display='none';
+ document.body.appendChild(anchor);
+ anchor.click();
+ anchor.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+
+/** Marketplace photos are private authenticated resources, never public image URLs. */
+export async function downloadMarketplacePhoto(user,id){
+ if(!/^[a-f0-9]{24}$/i.test(id))throw new Error('Invalid listing identifier.');
+ const token=await user.getIdToken();
+ const response=await fetch(base+'/marketplace/'+id+'/image',{
+  cache:'no-store',headers:{Authorization:'Bearer '+token}
+ });
+ if(!response.ok)throw new Error('Marketplace image unavailable.');
+ const mime=(response.headers.get('content-type')||'').split(';')[0];
+ if(!['image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Unexpected photo format.');
+ const bytes=await response.blob();
+ if(bytes.size>2*1024*1024)throw new Error('Photo is too large.');
+ return bytes;
+}
+export async function uploadMarketplacePhoto(user,id,file){
+ if(!/^[a-f0-9]{24}$/i.test(id))throw new Error('Invalid listing identifier.');
+ if(!file||file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type))
+  throw new Error('Choose a JPEG, PNG or WebP photo up to 2 MB.');
+ const token=await user.getIdToken();
+ const data=new FormData();data.append('file',file);
+ const response=await fetch(base+'/marketplace/'+id+'/image',{
+  method:'POST',cache:'no-store',
+  headers:{Authorization:'Bearer '+token},body:data
+ });
+ const envelope=await response.json().catch(()=>null);
+ if(!response.ok)throw new Error(envelope?.error?.message||'Photo upload failed.');
+ return envelope.data;
 }

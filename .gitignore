@@ -5,6 +5,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.staging.example
 coverage/
 dist/
 *.log
@@ -13,3 +14,9 @@ dist/
 *serviceAccount*.json
 *service-account*.json
 firebase-adminsdk*.json
+
+# Untrusted uploaded PDFs must remain private and outside git history.
+**/private_uploads/
+
+# Milestone 27 local staging evidence. The checked-in fixture is blank.
+**/pilot-evidence/

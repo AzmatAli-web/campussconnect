@@ -1,0 +1,47 @@
+name: Milestone 25 — Security and Performance QA
+
+on:
+  push:
+    branches:
+      - feature/milestone25-integration-security-performance
+    paths:
+      - 'backend/**'
+      - '.github/workflows/milestone25-quality-gates.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/milestone25-quality-gates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-benchmark:
+    name: Synthetic indexed-query and API smoke benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MONGOMS_VERSION: '7.0.24'
+      NODE_ENV: test
+      QA25_REPORT_PATH: qa25-benchmark.json
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run isolated fixture benchmark
+        run: npm run qa:benchmark
+      - name: Upload benchmark metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusconnect-m25-synthetic-benchmark
+          path: backend/qa25-benchmark.json
+          retention-days: 14
+          if-no-files-found: warn

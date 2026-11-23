@@ -1,0 +1,33 @@
+name: Milestone 27 — Staging Acceptance Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'docs/MILESTONE27_STAGING_ACCEPTANCE.md'
+      - '.github/workflows/milestone27-staging-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-evidence:
+    name: Offline pilot evidence validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run test:pilot:evidence
+      - name: Verify the checked-in blank record cannot advance
+        shell: bash
+        run: |
+          status=0
+          node scripts/pilot-evidence.js test/fixtures/pilot-evidence.blank.json 0000000000000000000000000000000000000000 || status=$?
+          test "$status" -eq 1

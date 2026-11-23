@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 const {Schema}=mongoose;
-const roles=['student','faculty','societyManager','staff','admin'];
+const roles=['student','faculty','societyManager','staff','financeOfficer','admin'];
 const schema=new Schema({
  universityId:{type:Schema.Types.ObjectId,required:true,immutable:true,ref:'University'},
  firebaseUid:{type:String,required:true,immutable:true,trim:true},

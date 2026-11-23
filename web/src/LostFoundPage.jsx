@@ -10,7 +10,35 @@ function Heading({tag,title,detail}){
  return <div className="wc-head"><div><span className="wc-kicker">{tag}</span>
   <h2>{title}</h2><p>{detail}</p></div></div>;
 }
-function Report({item,own,admin,busy,contact,edit,resolve,remove}){
+function Matches({item,call}){
+ const [expanded,setExpanded]=useState(false),[attempt,setAttempt]=useState(0);
+ const [result,setResult]=useState(null),[error,setError]=useState('');
+ useEffect(()=>{
+  if(!expanded)return;
+  let active=true;
+  call('/me/lost-found-items/'+item.id+'/matches').then(rows=>{
+   if(active)setResult(rows);
+  }).catch(err=>{if(active)setError(err.message||'Could not load matches.');});
+  return ()=>{active=false;};
+ },[expanded,attempt,call,item.id]);
+ return <div>
+  <button className="wc-outline" aria-expanded={expanded} onClick={()=>{
+   setResult(null);setError('');setExpanded(!expanded);
+  }}>{expanded?'Hide possible matches':'View possible matches'}</button>
+  {expanded&&<div aria-live="polite">
+   {error?<><p>{error}</p><button className="wc-outline" onClick={()=>{
+    setError('');setAttempt(n=>n+1);
+   }}>Retry matches</button></>:result===null?<p>Checking campus reports…</p>:<>
+    <p>Up to five suggestions from the latest 100 opposite-type reports in this category.</p>
+    {result.length?<ul>{result.map(({item:other,reasons})=><li key={other.id}>
+     <strong>{other.title}</strong><p>{reasons.join(' · ')}</p>
+     <p>Contact {contact[other.contactPreference]||'campus helpdesk'} and quote <code>{other.id}</code> to check this item.</p>
+    </li>)}</ul>:<p>No possible matches found.</p>}
+   </>}
+  </div>}
+ </div>;
+}
+function Report({item,call,own,admin,busy,contact,edit,resolve,remove}){
  return <article className="wc-lost-item">
   <div className="wc-lost-top"><span className={'wc-tag '+(item.kind==='lost'?'warn':'good')}>
    {item.kind==='lost'?'Lost item':'Found item'}</span><span className="wc-tag">{item.status}</span></div>
@@ -29,6 +57,7 @@ function Report({item,own,admin,busy,contact,edit,resolve,remove}){
    {admin&&item.status!=='removed'&&<button className="wc-outline dangerous" disabled={busy}
     onClick={()=>remove(item)}>Admin remove</button>}
   </div>
+  {own&&item.status==='open'&&<Matches key={[item.id,item.title,item.locationText].join('|')} item={item} call={call}/>}
  </article>;
 }
 const contact={helpdesk:'campus helpdesk',adminMediated:'campus administration'};
@@ -90,7 +119,7 @@ export default function LostFoundPage({profile,call,act,busy}){
   if(ok){setModerating(null);setReason('');await load();}
  }
  const update=(key,value)=>setForm(s=>({...s,[key]:value}));
- const cards=(items,owner)=>items.map(i=><Report key={i.id} item={i} own={owner}
+ const cards=(items,owner)=>items.map(i=><Report key={i.id} item={i} call={call} own={owner}
   admin={admin} busy={busy} contact={contact}
   edit={populate} resolve={resolve} remove={setModerating}/>);
  return <div className="wc-stack wc-lost">

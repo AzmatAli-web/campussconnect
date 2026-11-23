@@ -1,0 +1,138 @@
+import React,{useEffect,useMemo,useState} from 'react';
+import {readAssignments} from './assignment-planner.js';
+import {chooseTimetableGroup,readTimetablePreference} from './timetable-preference.js';
+import {calendarDates,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
+import './campus-calendar.css';
+
+const weekdays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const labels={class:'Class',event:'Campus event',assignment:'Personal deadline'};
+const monthName=new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
+const dateName=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+function displayDate(date,format){
+ return format.format(new Date(date+'T00:00:00Z'));
+}
+export default function CampusCalendar({call,assignmentKey,preferenceKey}){
+ const [today,setToday]=useState(calendarToday);
+ const [view,setView]=useState('month');
+ const [anchor,setAnchor]=useState(calendarToday);
+ const [selected,setSelected]=useState(calendarToday);
+ const [tasks,setTasks]=useState(()=>readAssignments(assignmentKey));
+ const [results,setResults]=useState({loading:true,events:[],slots:[],group:null,errors:[],limited:false});
+ const [reload,setReload]=useState(0);
+ const [enabled,setEnabled]=useState({class:true,event:true,assignment:true});
+ useEffect(()=>{
+  const sync=event=>{
+   if(event.key===null||event.key===assignmentKey)setTasks(readAssignments(assignmentKey));
+   if(event.key===null||event.key===preferenceKey)setReload(n=>n+1);
+  };
+  const focus=()=>{setToday(calendarToday());sync({key:null});};
+  const timer=window.setInterval(()=>setToday(calendarToday()),30_000);
+  window.addEventListener('storage',sync);window.addEventListener('focus',focus);
+  return()=>{window.clearInterval(timer);window.removeEventListener('storage',sync);window.removeEventListener('focus',focus);};
+ },[assignmentKey,preferenceKey]);
+ useEffect(()=>{
+  let current=true;
+  setResults(previous=>({...previous,loading:true,errors:[]}));
+  (async()=>{
+   const [eventsResult,groupsResult]=await Promise.allSettled([
+    call('/events?when=all&limit=100'),
+    call('/timetable/groups')
+   ]);
+   if(!current)return;
+   const errors=[];
+   const events=eventsResult.status==='fulfilled'&&Array.isArray(eventsResult.value)?eventsResult.value:[];
+   if(eventsResult.status!=='fulfilled')errors.push('Published events could not be loaded.');
+   const groups=groupsResult.status==='fulfilled'&&Array.isArray(groupsResult.value)?groupsResult.value:[];
+   if(groupsResult.status!=='fulfilled')errors.push('Academic timetable groups could not be loaded.');
+   const group=chooseTimetableGroup(groups,readTimetablePreference(preferenceKey));
+   let slots=[];
+   if(group){
+    const params=new URLSearchParams({
+     term:group.term,program:group.program,semester:String(group.semester),section:group.section
+    });
+    try{
+     const response=await call('/timetable/slots?'+params.toString());
+     if(!current)return;
+     if(!Array.isArray(response))throw new Error('Invalid timetable response');
+     slots=response;
+    }catch{if(current)errors.push('Classes for the selected timetable could not be loaded.');}
+   }
+   if(current)setResults({loading:false,events,slots,group,errors,limited:events.length>=100});
+  })();
+  return()=>{current=false;};
+ },[call,preferenceKey,reload]);
+ const dates=useMemo(()=>calendarDates(view,anchor),[view,anchor]);
+ const agenda=useMemo(()=>{
+  const catalog={slots:results.slots,events:results.events,assignments:tasks};
+  return new Map(dates.map(date=>[date,itemsOnCampusDay(date,catalog).filter(x=>enabled[x.kind])]));
+ },[dates,results.slots,results.events,tasks,enabled]);
+ const activeAgenda=agenda.get(selected)??[];
+ function navigate(direction){
+  const next=moveCalendar(view,anchor,direction);
+  if(next){setAnchor(next);setSelected(next);}
+ }
+ function todayClick(){
+  const now=calendarToday();setToday(now);setAnchor(now);setSelected(now);
+ }
+ const periodLabel=view==='month'?displayDate(anchor,monthName):
+   displayDate(dates[0]??anchor,dateName)+' – '+displayDate(dates[6]??anchor,dateName);
+ return <div className="wc-stack wc-calendar">
+  <section className="wc-panel">
+   <div className="wc-head"><div><span className="wc-kicker">MY CAMPUS SCHEDULE</span>
+    <h2>Unified campus calendar</h2>
+    <p>Published classes and events, plus your personal unfinished deadlines. All dates and class times use Pakistan Standard Time (PKT).</p>
+   </div></div>
+   <div className="wc-calendar-toolbar">
+    <div role="group" aria-label="Calendar view">
+     <button type="button" className="wc-outline" aria-pressed={view==='week'} onClick={()=>setView('week')}>Week</button>
+     <button type="button" className="wc-outline" aria-pressed={view==='month'} onClick={()=>setView('month')}>Month</button>
+    </div>
+    <div>
+     <button type="button" className="wc-outline" onClick={()=>navigate(-1)}>Previous {view}</button>
+     <strong aria-live="polite">{periodLabel}</strong>
+     <button type="button" className="wc-outline" onClick={()=>navigate(1)}>Next {view}</button>
+     <button type="button" className="wc-outline" onClick={todayClick}>Today</button>
+     <button type="button" className="wc-outline" onClick={()=>setReload(n=>n+1)}>Refresh schedule</button>
+    </div>
+   </div>
+   <div className="wc-calendar-legend" role="group" aria-label="Calendar categories">
+    {Object.entries(labels).map(([key,label])=><label key={key}>
+     <input type="checkbox" checked={enabled[key]} onChange={event=>setEnabled(current=>({...current,[key]:event.target.checked}))}/>
+     {' '+label}</label>)}
+   </div>
+   {results.loading&&<p role="status">Loading published campus calendar…</p>}
+   {results.errors.map(error=><p role="alert" key={error}>{error}</p>)}
+   {results.limited&&<p className="wc-resource-muted">The event feed shows only the first 100 published events. More events may exist.</p>}
+   {!results.loading&&!results.group&&!results.errors.some(x=>x.includes('timetable'))&&
+    <p className="wc-resource-muted">No timetable group has been published. Class dates will appear when one is available.</p>}
+   {results.group&&<p className="wc-resource-muted">Class group: {results.group.program} · Semester {results.group.semester} · Section {results.group.section}. Change it on the Timetable page.</p>}
+   <div className="wc-calendar-weekdays" aria-hidden="true">{weekdays.map(day=><span key={day}>{day}</span>)}</div>
+   <div className="wc-calendar-grid" role="group" aria-label={view==='month'?'Month dates':'Week dates'}>
+    {dates.map(date=>{
+     const count={class:0,event:0,assignment:0};
+     for(const item of agenda.get(date)??[])count[item.kind]++;
+     const outside=view==='month'&&date.slice(0,7)!==anchor.slice(0,7);
+     return <button type="button" key={date}
+      className={'wc-calendar-day'+(outside?' outside':'')+(date===selected?' selected':'')+(date===today?' today':'')}
+      aria-pressed={date===selected} aria-label={displayDate(date,dateName)}
+      onClick={()=>setSelected(date)}>
+      <span className="wc-calendar-number">{Number(date.slice(-2))}</span>
+      <span className="wc-calendar-counts">
+       {Object.entries(count).filter(([,n])=>n>0).map(([kind,n])=>
+        <span className={'wc-calendar-count '+kind} key={kind}>{n} {labels[kind]}</span>)}
+      </span>
+     </button>;
+    })}
+   </div>
+  </section>
+  <section className="wc-panel" aria-label="Selected day agenda">
+   <div className="wc-head"><div><span className="wc-kicker">DAY AGENDA</span>
+    <h2>{displayDate(selected,dateName)}</h2><p>Personal deadlines do not represent official faculty submissions.</p></div></div>
+   {activeAgenda.length===0?<p>No matching calendar items on this date.</p>:
+    <ul className="wc-calendar-agenda">{activeAgenda.map(item=><li key={item.id}>
+     <span className={'wc-tag '+(item.kind==='assignment'?'warn':item.kind==='class'?'blue':'good')}>{labels[item.kind]}</span>
+     <strong>{item.title}</strong><small>{item.time?item.time+' PKT · ':''}{item.detail}</small>
+    </li>)}</ul>}
+  </section>
+ </div>;
+}

@@ -6,7 +6,7 @@ import {requireBody,requireObjectId,pagination} from '../services/mvp-validation
 import {LostFoundItem} from '../models/lost-found.js';
 import {AuditLog} from '../models/governance.js';
 import {
- lostFoundCreate,lostFoundPatch,lostFoundFilter,lostFoundModeration,lostFoundView
+ lostFoundCreate,lostFoundPatch,lostFoundFilter,lostFoundModeration,lostFoundView,rankLostFoundMatches
 } from '../services/lost-found-validation.js';
 
 export function lostFoundRouter(deps){
@@ -38,6 +38,19 @@ export function lostFoundRouter(deps){
    LostFoundItem.countDocuments(scoped)
   ]);
   return res.json({data:items.map(lostFoundView),meta:{page,limit,total}});
+ }));
+ router.get('/me/lost-found-items/:id/matches',auth,asyncHandler(async(req,res)=>{
+  needRole(req,'student');
+  const universityId=deps.config.universityId,reporterId=req.currentUser._id;
+  const source=await LostFoundItem.findOne({
+   _id:requireObjectId(req.params.id),universityId,reporterId,status:'open'
+  }).lean();
+  if(!source)throw new HttpError(404,'LOST_FOUND_NOT_FOUND','Open report unavailable');
+  const candidates=await LostFoundItem.find({
+   universityId,reporterId:{$ne:reporterId},status:'open',category:source.category,
+   kind:source.kind==='lost'?'found':'lost'
+  }).sort({createdAt:-1,_id:-1}).limit(100).lean();
+  return res.json({data:rankLostFoundMatches(source,candidates)});
  }));
  router.post('/lost-found-items',auth,asyncHandler(async(req,res)=>{
   needRole(req,'student');

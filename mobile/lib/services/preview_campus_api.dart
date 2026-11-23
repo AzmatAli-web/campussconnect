@@ -122,7 +122,9 @@ class PreviewCampusApi extends CampusApi {
     }
     final term = keyword?.trim().toLowerCase() ?? '';
     if (![demo.title, demo.description, demo.courseCode]
-        .any((field) => field.toLowerCase().contains(term))) return [];
+        .any((field) => field.toLowerCase().contains(term))) {
+      return [];
+    }
     return [demo];
   }
 

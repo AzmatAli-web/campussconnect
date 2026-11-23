@@ -164,17 +164,25 @@ class CampusApi {
           .map(CampusEvent.fromJson)
           .toList();
 
+  Future<List<CampusEvent>> searchEvents(String keyword, String when) async {
+    final query = Uri(queryParameters: {
+      'limit':'100', 'when':when, if (keyword.trim().isNotEmpty) 'q':keyword.trim(),
+    }).query;
+    return asJsonList(await _request('/events?$query')).map(CampusEvent.fromJson).toList();
+  }
+
   Future<List<CampusRegistration>> getMyRegistrations() async =>
-      asJsonList(await _request('/me/event-registrations?limit=100'))
+      asJsonList(await _request('/me/event-registrations?limit=100&includeEvent=1'))
           .map(CampusRegistration.fromJson)
           .toList();
 
   Future<List<CampusAnnouncement>> getAnnouncements() => searchAnnouncements('');
 
-  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword) async {
+  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword, {String scope = 'all'}) async {
     final query = Uri(queryParameters: {
       'limit': '100',
       if (keyword.trim().isNotEmpty) 'q': keyword.trim(),
+      if (scope != 'all') 'scope': scope,
     }).query;
     return asJsonList(await _request('/announcements?$query'))
         .map(CampusAnnouncement.fromJson).toList(growable: false);

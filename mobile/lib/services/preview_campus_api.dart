@@ -58,6 +58,14 @@ class PreviewCampusApi extends CampusApi {
       List.unmodifiable(_registrations);
 
   @override
+  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword) async {
+    final term = keyword.trim().toLowerCase();
+    return (await getAnnouncements()).where((notice) =>
+        notice.title.toLowerCase().contains(term) || notice.body.toLowerCase().contains(term)
+    ).toList(growable: false);
+  }
+
+  @override
   Future<List<CampusAnnouncement>> getAnnouncements() async => [
         CampusAnnouncement.fromJson({
           'id': 'preview-announcement-1',

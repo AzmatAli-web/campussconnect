@@ -169,10 +169,16 @@ class CampusApi {
           .map(CampusRegistration.fromJson)
           .toList();
 
-  Future<List<CampusAnnouncement>> getAnnouncements() async =>
-      asJsonList(await _request('/announcements?limit=100'))
-          .map(CampusAnnouncement.fromJson)
-          .toList();
+  Future<List<CampusAnnouncement>> getAnnouncements() => searchAnnouncements('');
+
+  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword) async {
+    final query = Uri(queryParameters: {
+      'limit': '100',
+      if (keyword.trim().isNotEmpty) 'q': keyword.trim(),
+    }).query;
+    return asJsonList(await _request('/announcements?$query'))
+        .map(CampusAnnouncement.fromJson).toList(growable: false);
+  }
 
   /// University-published groups, never a student-editable schedule.
   Future<List<CampusTimetableGroup>> getTimetableGroups() async =>

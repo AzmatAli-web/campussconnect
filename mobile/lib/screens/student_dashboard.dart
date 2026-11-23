@@ -217,7 +217,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               0 => _overview(),
                               1 => _eventList(),
                               2 => _myRegistrations(),
-                              3 => _announcementList(),
+                              3 => _NoticeSearch(api: widget.api, notices: _announcements, card: _announcementCard),
                               4 => _profilePage(),
                               5 => TimetablePanel(
                                 api: widget.api,
@@ -493,21 +493,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
             onPressed: () => _selectTab(1),
             child: const Text('Explore campus events'),
           ),
-        ],
-      );
-
-  Widget _announcementList() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SectionHeader(title: 'Official campus updates'),
-          const SizedBox(height: 14),
-          if (_announcements.isEmpty)
-            const _EmptyView(
-              title: 'No announcements',
-              detail: 'You will see relevant campus notices here once published.',
-            )
-          else
-            ..._announcements.map(_announcementCard),
         ],
       );
 
@@ -846,4 +831,72 @@ class _Failure extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _NoticeSearch extends StatefulWidget {
+  final CampusApi api;
+  final List<CampusAnnouncement> notices;
+  final Widget Function(CampusAnnouncement) card;
+  const _NoticeSearch({required this.api, required this.notices, required this.card});
+
+  @override
+  State<_NoticeSearch> createState() => _NoticeSearchState();
+}
+
+class _NoticeSearchState extends State<_NoticeSearch> {
+  final _input = TextEditingController();
+  Future<List<CampusAnnouncement>>? _results;
+  String _keyword = '';
+
+  void _search(String text) {
+    setState(() {
+      _keyword = text.trim();
+      _results = _keyword.isEmpty ? null : widget.api.searchAnnouncements(_keyword);
+    });
+  }
+
+  @override
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const _SectionHeader(title: 'Official campus updates'),
+      TextField(controller: _input, maxLength: 80, textInputAction: TextInputAction.search,
+        decoration: const InputDecoration(labelText: 'Search notices', hintText: 'Title or message'),
+        onSubmitted: _search),
+      Wrap(spacing: 8, children: [
+        FilledButton(onPressed: () => _search(_input.text), child: const Text('Search')),
+        TextButton(onPressed: () { _input.clear(); _search(''); }, child: const Text('Clear')),
+      ]),
+      const SizedBox(height: 14),
+      FutureBuilder<List<CampusAnnouncement>>(
+        future: _results,
+        builder: (context, snapshot) {
+          if (_results != null && snapshot.connectionState != ConnectionState.done) {
+            return const LinearProgressIndicator(semanticsLabel: 'Searching notices');
+          }
+          if (_results != null && snapshot.hasError) {
+            return Column(children: [
+              const Text('Could not search notices.'),
+              TextButton(onPressed: () => _search(_keyword), child: const Text('Retry')),
+            ]);
+          }
+          final notices = _results == null ? widget.notices : snapshot.requireData;
+          if (notices.isEmpty) {
+            return _EmptyView(title: _keyword.isEmpty ? 'No announcements' : 'No matching notices',
+              detail: _keyword.isEmpty ? 'Relevant campus notices will appear here.' : 'Try another word or clear the search.');
+          }
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (notices.length == 100) const Text('Showing the newest 100 notices.'),
+            ...notices.map(widget.card),
+          ]);
+        },
+      ),
+    ],
+  );
 }

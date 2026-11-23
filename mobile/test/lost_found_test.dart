@@ -44,7 +44,10 @@ void main(){
     await tester.pumpAndSettle();
     final action = find.text('View possible matches');
     await tester.scrollUntilVisible(action, 360, scrollable: find.byType(Scrollable).first);
-    await tester.tap(action);
+    await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(tester.element(action), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(action.hitTestable());
     await tester.pumpAndSettle();
     expect(find.text('Possible matches'), findsOneWidget);
     expect(find.text('Item name: notebook'), findsOneWidget);

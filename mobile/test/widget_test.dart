@@ -51,7 +51,7 @@ void main() {
     final api = HistoryPreview();
     addTearDown(api.dispose);
     await tester.pumpWidget(MaterialApp(home: StudentDashboard(api:api,previewMode:true,
-      profile:CampusProfile.fromJson({'status':'active','roles':['student']}))));
+      profile:CampusProfile.fromJson({'status':'active','activeRoles':['student']}))));
     await tester.pumpAndSettle();
     Future<void> pick(String current, String value) async {
       await tester.tap(find.text(current).first);

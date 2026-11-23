@@ -469,12 +469,17 @@ class CampusApi {
 
 
   /// Authenticated campus society directory; permissions remain enforced by Express.
-  Future<List<CampusSociety>> getSocieties() async =>
-    asJsonList(await _request('/societies?limit=100'))
-      .map(CampusSociety.fromJson).toList(growable:false);
+  Future<List<CampusSociety>> getSocieties({String query = ''}) async {
+    final params = Uri(queryParameters: {
+      'limit': '100',
+      if (query.trim().isNotEmpty) 'q': query.trim(),
+    }).query;
+    return asJsonList(await _request('/societies?$params'))
+        .map(CampusSociety.fromJson).toList(growable: false);
+  }
 
   Future<List<CampusSocietyMembership>> getMySocietyMemberships() async =>
-    asJsonList(await _request('/me/society-memberships?limit=100'))
+    asJsonList(await _request('/me/society-memberships?limit=100&includeSociety=1'))
       .map(CampusSocietyMembership.fromJson).toList(growable:false);
 
   Future<CampusSocietyMembership> requestSocietyMembership(String societyId) async =>

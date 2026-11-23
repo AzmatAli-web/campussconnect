@@ -45,6 +45,8 @@ void main() {
     expect(registrations, hasLength(1));
     expect(requested.single.path, '/api/v1/me/event-registrations');
     expect(requested.single.queryParameters['limit'], '100');
+    expect(requested.single.queryParameters['includeEvent'], '1');
+    expect(registrations.single.event,isNull);
     api.dispose();
   });
 

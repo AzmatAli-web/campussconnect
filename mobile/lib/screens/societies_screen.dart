@@ -21,6 +21,20 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
   List<CampusSocietyMembership> _mine=const [];
   bool _loading=true,_busy=false;
   String? _error;
+  final _search = TextEditingController();
+  String _query = '';
+  int _revision = 0;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _submitSearch() {
+    _query = _search.text.trim();
+    _load();
+  }
 
   @override
   void initState(){
@@ -29,11 +43,12 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
   }
 
   Future<void> _load() async {
-    setState(()=>_loading=true);
+    final revision = ++_revision;
+    setState(() { _loading=true; _error=null; });
     try {
-      final societies=await widget.api.getSocieties();
+      final societies=await widget.api.getSocieties(query: _query);
       final mine=await widget.api.getMySocietyMemberships();
-      if(mounted){
+      if(mounted && revision == _revision){
         setState((){
           _societies=societies;
           _mine=mine;
@@ -41,15 +56,15 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
         });
       }
     } on CampusApiException catch(error) {
-      if(mounted){
+      if(mounted && revision == _revision){
         setState(()=>_error=error.message);
       }
     } catch(_) {
-      if(mounted){
+      if(mounted && revision == _revision){
         setState(()=>_error='Cannot load society memberships.');
       }
     } finally {
-      if(mounted){
+      if(mounted && revision == _revision){
         setState(()=>_loading=false);
       }
     }
@@ -132,6 +147,18 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
             style:TextStyle(fontSize:12,color:_muted,height:1.5),
           ),
           const SizedBox(height:17),
+          TextField(controller:_search,maxLength:80,
+            textInputAction:TextInputAction.search,
+            decoration:const InputDecoration(labelText:'Search societies',
+              hintText:'Society name or activity'),
+            onSubmitted:(_)=>_submitSearch()),
+          Wrap(spacing:8,children:[
+            FilledButton(onPressed:_submitSearch,child:const Text('Search')),
+            TextButton(onPressed:(){
+              _search.clear();
+              _submitSearch();
+            },child:const Text('Clear search')),
+          ]),
           if(_error!=null)Padding(
             padding:const EdgeInsets.symmetric(vertical:10),
             child:Text(_error!,style:const TextStyle(color:Colors.red)),
@@ -139,12 +166,15 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
           if(_loading)const Center(child:Padding(
             padding:EdgeInsets.all(24),child:CircularProgressIndicator(),
           ))
-          else if(_societies.isEmpty)
-            const Card(child:Padding(
-              padding:EdgeInsets.all(22),
-              child:Text('No campus societies available yet.'),
+          else if(_error==null && _societies.isEmpty)
+            Card(child:Padding(
+              padding:const EdgeInsets.all(22),
+              child:Text(_query.isEmpty?'No campus societies available yet.':'No societies match your search.'),
             ))
-          else for(final society in _societies)_societyCard(society),
+          else if(_error==null)...[
+            if(_societies.length==100) const Text('Showing the first 100 matches. Refine your search to narrow the list.'),
+            for(final society in _societies)_societyCard(society),
+          ],
           const SizedBox(height:21),
           const Text('My membership history',
             style:TextStyle(fontSize:18,fontWeight:FontWeight.w900,color:_ink)),
@@ -160,7 +190,7 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
                 child:Column(
                   crossAxisAlignment:CrossAxisAlignment.start,
                   children:[
-                    Text(_societies.where((s)=>s.id==membership.societyId).firstOrNull?.name
+                    Text(membership.societyName.isNotEmpty ? membership.societyName : _societies.where((s)=>s.id==membership.societyId).firstOrNull?.name
                       ??'Society no longer listed',
                       style:const TextStyle(fontWeight:FontWeight.bold,color:_ink)),
                     const SizedBox(height:7),

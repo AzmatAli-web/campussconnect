@@ -33,7 +33,66 @@ class StubCampusApi extends CampusApi {
   Future<List<CampusAnnouncement>> getAnnouncements() async => [];
 }
 
+class HistoryPreview extends PreviewCampusApi {
+  @override
+  Future<List<CampusRegistration>> getMyRegistrations() async => [
+    CampusRegistration.fromJson({'id':'receipt','eventId':'archived','status':'confirmed',
+      'event':{'title':'Previous seminar','venue':'Alumni Hall','status':'cancelled',
+        'startsAt':'2026-08-01T09:00:00Z'}}),
+  ];
+}
+
 void main() {
+  testWidgets('students filter events and notices and read a receipt outside the public feed', (tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = HistoryPreview();
+    addTearDown(api.dispose);
+    await tester.pumpWidget(MaterialApp(home: StudentDashboard(api:api,previewMode:true,
+      profile:CampusProfile.fromJson({'status':'active','activeRoles':['student']}))));
+    await tester.pumpAndSettle();
+    Future<void> pick(String current, String value) async {
+      await tester.tap(find.text(current).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(value).last);
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byIcon(Icons.event_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField),'HALL');
+    await pick('All dates','Past');
+    expect(find.text('Campus Science Fair'),findsOneWidget);
+    expect(find.text('AI & Robotics Workshop'),findsNothing);
+    await pick('Past','Upcoming');
+    expect(find.text('No matching events'),findsOneWidget);
+    await tester.tap(find.byIcon(Icons.campaign_outlined));
+    await tester.pumpAndSettle();
+    await pick('All audiences','Society');
+    expect(find.text('Developer Community Session'),findsOneWidget);
+    expect(find.text('Welcome to the CampusConnect Preview'),findsNothing);
+    await tester.tap(find.byIcon(Icons.verified_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Previous seminar'),findsOneWidget);
+    expect(find.textContaining('Event cancelled'),findsOneWidget);
+    expect(find.textContaining('Alumni Hall'),findsOneWidget);
+  });
+
+  test('mobile search sends combined filters to the authenticated endpoints', () async {
+    final requests=<http.Request>[];
+    final api=CampusApi(idTokenProvider:() async=>'fixture',client:MockClient((req) async {
+      requests.add(req);
+      return http.Response('{"data":[]}',200);
+    }));
+    addTearDown(api.dispose);
+    await api.searchEvents(' Hall & A ','past');
+    await api.searchAnnouncements(' meeting ',scope:'department');
+    expect(requests.first.url.queryParameters,{'q':'Hall & A','limit':'100','when':'past'});
+    expect(requests.last.url.queryParameters,{'q':'meeting','limit':'100','scope':'department'});
+    expect(requests.every((req)=>req.headers['authorization']=='Bearer fixture'),isTrue);
+  });
+
   test('notice search sends a literal encoded keyword with the student token', () async {
     final api = CampusApi(idTokenProvider: () async => 'fixture', client: MockClient((req) async {
       expect(req.url.path, endsWith('/announcements'));

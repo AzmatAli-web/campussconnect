@@ -1,6 +1,7 @@
 import 'package:campusconnect_mobile/models/campus_models.dart';
 import 'package:campusconnect_mobile/screens/student_dashboard.dart';
 import 'package:campusconnect_mobile/services/campus_api.dart';
+import 'package:campusconnect_mobile/services/preview_campus_api.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -33,6 +34,45 @@ class StubCampusApi extends CampusApi {
 }
 
 void main() {
+  test('notice search sends a literal encoded keyword with the student token', () async {
+    final api = CampusApi(idTokenProvider: () async => 'fixture', client: MockClient((req) async {
+      expect(req.url.path, endsWith('/announcements'));
+      expect(req.url.queryParameters, {'q':'Arts & Crafts','limit':'100'});
+      expect(req.headers['authorization'], 'Bearer fixture');
+      return http.Response('{"data":[]}', 200);
+    }));
+    addTearDown(api.dispose);
+    expect(await api.searchAnnouncements('  Arts & Crafts '), isEmpty);
+  });
+
+  testWidgets('student searches notice messages and clears an empty result', (tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = PreviewCampusApi();
+    addTearDown(api.dispose);
+    await tester.pumpWidget(MaterialApp(home: StudentDashboard(
+      api: api, previewMode: true, profile: CampusProfile.fromJson({'roles':['student']}),
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.campaign_outlined));
+    await tester.pumpAndSettle();
+    Future<void> search(String term) async {
+      await tester.enterText(find.byType(TextField), term);
+      await tester.tap(find.widgetWithText(FilledButton, 'Search'));
+      await tester.pumpAndSettle();
+    }
+    await search('FIREBASE');
+    expect(find.text('Developer Community Session'), findsOneWidget);
+    expect(find.text('Welcome to the CampusConnect Preview'), findsNothing);
+    await search('no-such-notice');
+    expect(find.text('No matching notices'), findsOneWidget);
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome to the CampusConnect Preview'), findsOneWidget);
+  });
+
   testWidgets('real student UI exposes event seats, never other attendee names', (tester) async {
     tester.view.physicalSize = const Size(1200, 1900);
     tester.view.devicePixelRatio = 1;

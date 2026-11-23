@@ -1083,6 +1083,23 @@ test('Lost & Found: verified Student, tenant scope, owner updates, redaction and
  const otherHistory=await request(app).get('/api/v1/me/lost-found-items').set(auth(reader));
  assert.equal(otherHistory.status,200);
  assert.ok(!otherHistory.body.data.some(x=>x.id===id));
+ const matchPath='/api/v1/me/lost-found-items/'+id+'/matches';
+ const found={...input,kind:'found',title:'Found USB drive'};
+ const candidate=await request(app).post('/api/v1/lost-found-items').set(auth(reader)).send(found);
+ assert.equal(candidate.status,201);
+ await LostFoundItem.create({...found,universityId:new mongoose.Types.ObjectId(),
+  reporterId:students[1]._id,status:'open'});
+ await request(app).post('/api/v1/lost-found-items').set(auth(owner)).send(found).expect(201);
+ await request(app).get(matchPath).expect(401);
+ await request(app).get(matchPath).set(auth(reader)).expect(404);
+ const matches=await request(app).get(matchPath).set(auth(owner)).expect(200);
+ assert.deepEqual(matches.body.data.map(row=>row.item.id),[candidate.body.data.id]);
+ assert.ok(matches.body.data[0].reasons.some(reason=>reason.includes('usb')));
+ assert.ok(!('reporterId' in matches.body.data[0].item));
+ await request(app).patch('/api/v1/lost-found-items/'+candidate.body.data.id)
+  .set(auth(reader)).send({status:'resolved'}).expect(200);
+ const emptyMatches=await request(app).get(matchPath).set(auth(owner)).expect(200);
+ assert.deepEqual(emptyMatches.body.data,[]);
  const denied=await request(app).patch('/api/v1/lost-found-items/'+id)
   .set(auth(reader)).send({title:'Unauthorized new title'});
  assert.equal(denied.status,403);
@@ -1094,6 +1111,7 @@ test('Lost & Found: verified Student, tenant scope, owner updates, redaction and
   .set(auth(owner)).send({status:'resolved'});
  assert.equal(resolved.status,200);
  assert.equal(resolved.body.data.status,'resolved');
+ await request(app).get(matchPath).set(auth(owner)).expect(404);
  const notPublic=await request(app).get('/api/v1/lost-found-items/'+id).set(auth(reader));
  assert.equal(notPublic.status,404);
  const history=await request(app).get('/api/v1/me/lost-found-items').set(auth(owner));

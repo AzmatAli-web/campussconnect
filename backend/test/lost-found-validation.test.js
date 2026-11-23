@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- lostFoundCreate,lostFoundPatch,lostFoundFilter,lostFoundModeration,lostFoundView
+ lostFoundCreate,lostFoundPatch,lostFoundFilter,lostFoundModeration,lostFoundView,rankLostFoundMatches
 } from '../src/services/lost-found-validation.js';
 
 const item={
@@ -53,4 +53,15 @@ test('Admin moderation requires reason, response redacts reporter identity',()=>
  assert.equal(result.title,item.title);
  for(const key of ['reporterId','universityId','removedBy','removalReason','emailNormalized'])
   assert.equal(Object.hasOwn(result,key),false);
+});
+
+test('suggests up to five reports, ranks name and location overlap, ignores generic words',()=>{
+ const source={...item,title:'Lost USB drive',locationText:'CS lab'};
+ const similar=Array.from({length:7},(_,i)=>({...source,_id:i,title:'Found USB stick',locationText:'Lobby'}));
+ const best={...source,_id:'best',title:'FOUND usb drive',locationText:'CS lab'};
+ const unrelated={...source,_id:'other',title:'Lost item',locationText:'Near campus'};
+ const rows=rankLostFoundMatches(source,[unrelated,...similar,best]);
+ assert.deepEqual(rows.map(row=>row.item.id),['best','0','1','2','3']);
+ assert.deepEqual(rows[0].reasons,['Item name: usb, drive','Location: cs, lab']);
+ assert.deepEqual(rankLostFoundMatches(source,[unrelated]),[]);
 });

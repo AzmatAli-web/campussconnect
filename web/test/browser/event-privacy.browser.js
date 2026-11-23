@@ -76,6 +76,14 @@ test('real React workspace: two students share event counts, never receipts or r
       const method = req.method();
       traffic.push({actor, path, method});
       if (req.headers().authorization !== 'Bearer fixture-' + actor) return deny(route, 'wrong fixture persona');
+      if(method==='GET' && path==='/api/v1/lost-found-items')return send(route,[]);
+      if(method==='GET' && path==='/api/v1/me/lost-found-items')return send(route,[{
+        id:'my-report',title:'Lost USB stick',kind:'lost',status:'open',category:'electronics',
+        locationText:'CS lab',contactPreference:'helpdesk'
+      }]);
+      if(method==='GET' && path==='/api/v1/me/lost-found-items/my-report/matches')return send(route,[{
+        item:{id:'found-report',title:'Found USB drive',contactPreference:'helpdesk'},reasons:['Item name: usb']
+      }]);
       if (method === 'GET' && path === eventsPath) {
         const pageNumber = Number(url.searchParams.get('page') || 1);
         const when = url.searchParams.get('when');
@@ -222,6 +230,12 @@ test('real React workspace: two students share event counts, never receipts or r
   }
 
   const a = await pageFor('a');
+  await navigate(a, /Lost & Found/i);
+  await a.getByRole('button',{name:'View possible matches'}).click();
+  await a.getByText('Found USB drive',{exact:true}).waitFor();
+  await a.getByText('Item name: usb',{exact:true}).waitFor();
+  await a.getByRole('button',{name:'Hide possible matches'}).click();
+  assert.equal(await a.getByText('found-report',{exact:true}).count(),0);
   await navigate(a, /Explore events/);
   await seats(a, 0);
   const [download] = await Promise.all([

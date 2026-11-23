@@ -194,6 +194,12 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
           if(owner&&item.status=='open')...[
             const SizedBox(height:11),
             Wrap(spacing:10,children:[
+              OutlinedButton(
+                onPressed: _busy ? null : () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => _MatchesScreen(api: widget.api, report: item)),
+                ),
+                child: const Text('View possible matches'),
+              ),
               OutlinedButton(onPressed:_busy?null:()=>_startEdit(item),
                 child:const Text('Edit')),
               OutlinedButton(onPressed:_busy?null:()=>_resolve(item),
@@ -311,5 +317,66 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
         else for(final item in _mine)_item(item,owner:true),
       ],
     )),
+  );
+}
+
+class _MatchesScreen extends StatefulWidget {
+  final CampusApi api;
+  final CampusLostFoundItem report;
+  const _MatchesScreen({required this.api, required this.report});
+
+  @override
+  State<_MatchesScreen> createState() => _MatchesScreenState();
+}
+
+class _MatchesScreenState extends State<_MatchesScreen> {
+  late Future<List<CampusLostFoundMatch>> matches;
+
+  @override
+  void initState() {
+    super.initState();
+    matches = widget.api.getLostFoundMatches(widget.report.id);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Possible matches')),
+    body: FutureBuilder<List<CampusLostFoundMatch>>(
+      future: matches,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator(semanticsLabel: 'Checking campus reports'));
+        }
+        return ListView(padding: const EdgeInsets.all(18), children: [
+          Text(widget.report.title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          if (snapshot.hasError) ...[
+            Text(snapshot.error is CampusApiException
+                ? (snapshot.error as CampusApiException).message
+                : 'Possible matches could not be loaded.'),
+            TextButton(onPressed: () => setState(() {
+              matches = widget.api.getLostFoundMatches(widget.report.id);
+            }), child: const Text('Retry')),
+          ] else if (snapshot.requireData.isEmpty)
+            const Text('No possible matches found.')
+          else ...[
+            const Text('Up to five suggestions from the latest 100 opposite-type reports in this category.'),
+            for (final match in snapshot.requireData)
+              Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(match.item.title, style: Theme.of(context).textTheme.titleMedium),
+                  for (final reason in match.reasons) Text(reason),
+                  const SizedBox(height: 8),
+                  Text(match.item.contactPreference == 'adminMediated'
+                      ? 'Quote this reference to campus administration.'
+                      : 'Quote this reference to the campus helpdesk.'),
+                  SelectableText(match.item.id),
+                ],
+              ))),
+          ],
+        ]);
+      },
+    ),
   );
 }

@@ -70,3 +70,26 @@ export function lostFoundView(value){
   contactPreference:v.contactPreference,status:v.status,createdAt:v.createdAt,
   updatedAt:v.updatedAt};
 }
+
+const genericWords=new Set('a an the at in of near on by my is was item lost found missing misplaced campus university from with and'.split(' '));
+function words(value){
+ return new Set((value.toLowerCase().normalize('NFKC').match(/[\p{L}\p{N}]+/gu)||[])
+  .filter(word=>word.length>1&&!genericWords.has(word)));
+}
+
+// Candidates arrive newest first. Stable sorting preserves that order for equal scores.
+export function rankLostFoundMatches(source,candidates){
+ const title=words(source.title),location=words(source.locationText);
+ const results=[];
+ for(const candidate of candidates){
+  const titleWords=[...words(candidate.title)].filter(word=>title.has(word));
+  const placeWords=[...words(candidate.locationText)].filter(word=>location.has(word));
+  if(!titleWords.length&&!placeWords.length)continue;
+  const reasons=[];
+  if(titleWords.length)reasons.push('Item name: '+titleWords.join(', '));
+  if(placeWords.length)reasons.push('Location: '+placeWords.join(', '));
+  const score=2*Math.min(titleWords.length,3)+Math.min(placeWords.length,2);
+  results.push({score,item:lostFoundView(candidate),reasons});
+ }
+ return results.sort((a,b)=>b.score-a.score).slice(0,5).map(({item,reasons})=>({item,reasons}));
+}

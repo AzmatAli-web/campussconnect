@@ -98,22 +98,31 @@ class CampusEvent {
 class CampusRegistration {
   final String id;
   final String eventId;
+  final ({String title, String venue, DateTime? startsAt, String status})? event;
   final DateTime? confirmedAt;
   final String status;
 
   const CampusRegistration({
     required this.id,
     required this.eventId,
+    this.event,
     required this.confirmedAt,
     required this.status,
   });
 
-  factory CampusRegistration.fromJson(Json data) => CampusRegistration(
+  factory CampusRegistration.fromJson(Json data) {
+    final details = data['event'] is Map ? asJson(data['event']) : null;
+    return CampusRegistration(
+        event: details == null ? null : (
+          title: stringField(details,'title'), venue: stringField(details,'venue'),
+          startsAt: parseDate(details['startsAt']), status: stringField(details,'status'),
+        ),
         id: stringField(data, 'id'),
         eventId: stringField(data, 'eventId'),
         confirmedAt: parseDate(data['confirmedAt']),
         status: stringField(data, 'status'),
       );
+  }
 }
 
 class CampusAnnouncement {

@@ -408,7 +408,7 @@ class PreviewCampusApi extends CampusApi {
   ];
   final List<CampusSocietyMembership> _demoSocietyMemberships=[
     CampusSocietyMembership(
-      id:'preview-member-1',societyId:'preview-society-coding',
+      id:'preview-member-1',societyId:'preview-society-coding',societyName:'Campus Coding Society',
       status:'active',requestedAt:DateTime.now().subtract(const Duration(days:7)),
       reviewedAt:DateTime.now().subtract(const Duration(days:3)),
       reviewNote:'Demo membership, not associated with a real student.',
@@ -416,8 +416,11 @@ class PreviewCampusApi extends CampusApi {
   ];
 
   @override
-  Future<List<CampusSociety>> getSocieties() async =>
-      List.unmodifiable(_demoSocieties);
+  Future<List<CampusSociety>> getSocieties({String query = ''}) async {
+    final term = query.trim().toLowerCase();
+    return _demoSocieties.where((s) => s.name.toLowerCase().contains(term)
+        || s.description.toLowerCase().contains(term)).toList(growable: false);
+  }
 
   @override
   Future<List<CampusSocietyMembership>> getMySocietyMemberships() async =>
@@ -435,7 +438,7 @@ class PreviewCampusApi extends CampusApi {
     final created=CampusSocietyMembership(
       id:index>=0?_demoSocietyMemberships[index].id:
         'preview-member-${_demoSocietyMemberships.length+1}',
-      societyId:societyId,status:'pending',requestedAt:DateTime.now(),
+      societyId:societyId,societyName:_demoSocieties.firstWhere((s)=>s.id==societyId).name,status:'pending',requestedAt:DateTime.now(),
       reviewedAt:null,reviewNote:'',
     );
     if(index>=0){
@@ -455,7 +458,7 @@ class PreviewCampusApi extends CampusApi {
       throw const CampusApiException('MEMBERSHIP_NOT_WITHDRAWABLE','Cannot withdraw this record.');
     }
     final changed=CampusSocietyMembership(
-      id:prior.id,societyId:prior.societyId,
+      id:prior.id,societyId:prior.societyId,societyName:prior.societyName,
       status:prior.status=='pending'?'cancelled':'left',
       requestedAt:prior.requestedAt,reviewedAt:prior.reviewedAt,reviewNote:prior.reviewNote,
     );

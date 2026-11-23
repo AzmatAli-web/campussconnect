@@ -194,10 +194,11 @@ class CampusApi {
   }
 
   Future<List<CampusAcademicResource>> getAcademicResources({
-    String? program, int? semester, String? courseCode,
+    String? program, int? semester, String? courseCode, String? keyword,
   }) async {
     final query=Uri(queryParameters: {
       'limit': '100',
+      if (keyword != null && keyword.trim().isNotEmpty) 'q': keyword.trim(),
       if(program != null && program.trim().isNotEmpty)
         'program': program.trim(),
       if(semester != null) 'semester': semester.toString(),

@@ -25,7 +25,8 @@ class AcademicResourcesPanel extends StatefulWidget {
 class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
   final _program=TextEditingController();
   final _course=TextEditingController();
-  final _semester=TextEditingController();
+  final _keyword=TextEditingController();
+  int _semester=0;
   List<CampusAcademicResource> _resources=const [];
   bool _loading=true;
   String? _error;
@@ -41,16 +42,14 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
   void dispose(){
     _program.dispose();
     _course.dispose();
-    _semester.dispose();
+    _keyword.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    final semesterText=_semester.text.trim();
-    final semester=semesterText.isEmpty?null:int.tryParse(semesterText);
-    if(semesterText.isNotEmpty &&
-        (semester==null || semester<1 || semester>12)){
-      setState(()=>_error='Semester must be between 1 and 12.');
+    final keyword=_keyword.text.trim();
+    if(keyword.length==1 || keyword.length>64){
+      setState(()=>_error='Enter 2–64 characters to search notes.');
       return;
     }
     setState((){
@@ -61,7 +60,8 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
       final records=await widget.api.getAcademicResources(
         program:_program.text,
         courseCode:_course.text,
-        semester:semester,
+        semester:_semester==0?null:_semester,
+        keyword:keyword,
       );
       if(mounted)setState(()=>_resources=records);
     } on CampusApiException catch(e){
@@ -116,6 +116,20 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
     return '${(bytes/1024/1024).toStringAsFixed(1)} MB';
   }
 
+  List<MapEntry<(String,int,String),List<CampusAcademicResource>>> _courseGroups(){
+    final groups=<(String,int,String),List<CampusAcademicResource>>{};
+    for(final resource in _resources){
+      final key=(resource.program,resource.semester,resource.courseCode);
+      (groups[key]??=[]).add(resource);
+    }
+    return groups.entries.toList()..sort((a,b){
+      final program=a.key.$1.compareTo(b.key.$1);
+      if(program!=0)return program;
+      final semester=a.key.$2.compareTo(b.key.$2);
+      return semester!=0?semester:a.key.$3.compareTo(b.key.$3);
+    });
+  }
+
   @override
   Widget build(BuildContext context)=>Column(
     crossAxisAlignment:CrossAxisAlignment.stretch,
@@ -133,6 +147,9 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
         child:Column(
           crossAxisAlignment:CrossAxisAlignment.stretch,
           children:[
+            TextField(controller:_keyword, maxLength:64,
+              decoration:const InputDecoration(labelText:'Search notes',
+                hintText:'Title, description, or course code')),
             TextField(controller:_program,
               textCapitalization:TextCapitalization.characters,
               decoration:const InputDecoration(
@@ -142,12 +159,16 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
               )),
             const SizedBox(height:10),
             Row(children:[
-              Expanded(child:TextField(controller:_semester,
-                keyboardType:TextInputType.number,
-                decoration:const InputDecoration(
-                  labelText:'Semester',
-                  hintText:'7',
-                ))),
+              Expanded(child:DropdownButtonFormField<int>(
+                key:ValueKey(_semester),
+                initialValue:_semester, isExpanded:true,
+                decoration:const InputDecoration(labelText:'Semester'),
+                items:[
+                  const DropdownMenuItem(value:0,child:Text('All')),
+                  for(var i=1;i<=12;i++) DropdownMenuItem(value:i,child:Text('$i')),
+                ],
+                onChanged:(value)=>setState(()=>_semester=value??0),
+              )),
               const SizedBox(width:10),
               Expanded(flex:2,child:TextField(controller:_course,
                 textCapitalization:TextCapitalization.characters,
@@ -168,7 +189,8 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
                 onPressed:_loading?null:(){
                   _program.clear();
                   _course.clear();
-                  _semester.clear();
+                  _keyword.clear();
+                  _semester=0;
                   _load();
                 },
                 child:const Text('Clear'),
@@ -186,7 +208,7 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
       if(_loading)
         const Center(child:Padding(padding:EdgeInsets.all(22),
           child:CircularProgressIndicator()))
-      else if(_resources.isEmpty)
+      else if(_error==null && _resources.isEmpty)
         const Card(child:Padding(
           padding:EdgeInsets.symmetric(vertical:30,horizontal:20),
           child:Text(
@@ -196,8 +218,13 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
             style:TextStyle(color:_muted,height:1.6),
           ),
         ))
-      else
-        for(final resource in _resources)
+      else if(_error==null)...[
+        const Text('Showing up to 100 newest matching PDFs.'),
+        for(final group in _courseGroups())...[
+          Padding(padding:const EdgeInsets.symmetric(vertical:10),
+            child:Text('${group.key.$1} · Semester ${group.key.$2} · ${group.key.$3}',
+              style:Theme.of(context).textTheme.titleMedium)),
+          for(final resource in group.value)
           Padding(
             padding:const EdgeInsets.only(bottom:12),
             child:Card(child:Padding(
@@ -216,11 +243,7 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
                         color:_teal),
                     ),
                     const SizedBox(width:10),
-                    Expanded(child:Text(
-                      '${resource.program} · Sem ${resource.semester} · ${resource.courseCode}',
-                      style:const TextStyle(
-                        fontWeight:FontWeight.w800,fontSize:12,color:_teal),
-                    )),
+                    const Spacer(),
                     Text(_size(resource.sizeBytes),
                       style:const TextStyle(color:_muted,fontSize:11)),
                   ]),
@@ -246,6 +269,8 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
               ),
             )),
           ),
+        ],
+      ],
     ],
   );
 }

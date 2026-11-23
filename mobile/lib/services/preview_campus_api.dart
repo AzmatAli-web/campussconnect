@@ -99,7 +99,7 @@ class PreviewCampusApi extends CampusApi {
 
   @override
   Future<List<CampusAcademicResource>> getAcademicResources({
-    String? program, int? semester, String? courseCode,
+    String? program, int? semester, String? courseCode, String? keyword,
   }) async {
     const demo=CampusAcademicResource(
       id: 'offline-demo-resource',
@@ -118,6 +118,11 @@ class PreviewCampusApi extends CampusApi {
     }
     if(courseCode != null && courseCode.trim().isNotEmpty &&
         courseCode.trim().toUpperCase()!=demo.courseCode) {
+      return [];
+    }
+    final term = keyword?.trim().toLowerCase() ?? '';
+    if (![demo.title, demo.description, demo.courseCode]
+        .any((field) => field.toLowerCase().contains(term))) {
       return [];
     }
     return [demo];

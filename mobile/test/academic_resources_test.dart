@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:campusconnect_mobile/models/campus_models.dart';
 import 'package:campusconnect_mobile/services/campus_api.dart';
 import 'package:campusconnect_mobile/services/preview_campus_api.dart';
+import 'package:campusconnect_mobile/screens/academic_resources_panel.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -40,9 +42,10 @@ void main() {
         }]}),200);
       }),
     );
-    final data=await api.getAcademicResources(program:'BSE',semester:7,courseCode:'CSC494');
+    final data=await api.getAcademicResources(program:'BSE',semester:7,courseCode:'CSC494',keyword:'  Week & 1  ');
     expect(data,hasLength(1));
     expect(data.single.courseCode,'CSC494');
+    expect(requests.single.url.queryParameters['q'],'Week & 1');
     expect(requests.single.url.path,'/api/v1/resources');
     expect(requests.single.url.queryParameters['courseCode'],'CSC494');
     expect(requests.single.url.queryParameters['semester'],'7');
@@ -78,6 +81,34 @@ void main() {
       throwsA(isA<CampusApiException>()
         .having((e)=>e.code,'code','INVALID_PDF')));
     api.dispose();
+  });
+
+  testWidgets('students can search, see course groups, and clear their filters', (tester) async {
+    final api=PreviewCampusApi();
+    addTearDown(api.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: AcademicResourcesPanel(api:api,previewMode:true),
+    ))));
+    await tester.pumpAndSettle();
+    final search=find.widgetWithText(TextField,'Search notes');
+    final submit=find.text('Find PDFs');
+    Future<void> searchFor(String term) async {
+      await tester.enterText(search,term);
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+    }
+    await searchFor('x');
+    expect(find.text('Enter 2–64 characters to search notes.'),findsOneWidget);
+    await searchFor('no-such-note');
+    expect(find.textContaining('No academic PDFs'),findsOneWidget);
+    await searchFor('FICTIONAL');
+    expect(find.text('BSE · Semester 7 · CSC494'),findsOneWidget);
+    expect(find.text('Introduction to Software Engineering'),findsOneWidget);
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).controller!.text,isEmpty);
+    expect(find.text('BSE · Semester 7 · CSC494'),findsOneWidget);
   });
 
   test('offline demo never makes an actual PDF download',()async{

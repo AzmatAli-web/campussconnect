@@ -1,12 +1,46 @@
 import 'dart:convert';
 
 import 'package:campusconnect_mobile/services/campus_api.dart';
+import 'package:campusconnect_mobile/models/campus_models.dart';
+import 'package:campusconnect_mobile/screens/timetable_panel.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:campusconnect_mobile/services/preview_campus_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('today follows PKT midnight and treats class end times as exclusive', () {
+    CampusTimetableSlot slot(String id, String start, String end) =>
+        CampusTimetableSlot.fromJson({'id':id,'startTime':start,'endTime':end,'dayOfWeek':1});
+    final classes = [slot('later','09:00','10:00'), slot('first','08:00','09:00')];
+    CampusDaySchedule at(String utc) => CampusDaySchedule.at(classes, DateTime.parse(utc));
+    expect(at('2026-11-22T18:59:00Z').classes, isEmpty);
+    expect(at('2026-11-22T19:00:00Z').next?.id, 'first');
+    expect(at('2026-11-23T03:00:00Z').current?.id, 'first');
+    expect(at('2026-11-23T04:00:00Z').current?.id, 'later');
+    expect(at('2026-11-23T05:00:00Z').current, isNull);
+    expect(at('2026-11-23T05:00:00Z').next, isNull);
+  });
+
+  testWidgets('student switches between today and the full timetable', (tester) async {
+    final api = PreviewCampusApi();
+    addTearDown(api.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: TimetablePanel(api:api, previewMode:true),
+    ))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('CSC494 ·'), findsOneWidget);
+    expect(find.textContaining('CSC412 ·'), findsOneWidget);
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pakistan time (PKT)'), findsOneWidget);
+    await tester.tap(find.text('Full week'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pakistan time (PKT)'), findsNothing);
+    expect(find.textContaining('CSC412 ·'), findsOneWidget);
+  });
+
   test('list official class groups and fetch the chosen cohort', () async {
     final requests = <http.Request>[];
     final api = CampusApi(

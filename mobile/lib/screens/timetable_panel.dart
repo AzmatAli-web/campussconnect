@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../models/campus_models.dart';
@@ -9,6 +11,36 @@ const _muted = Color(0xFF73889B);
 const _days = <String>[
   '', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ];
+
+class CampusDaySchedule {
+  final int weekday;
+  final List<CampusTimetableSlot> classes;
+  final CampusTimetableSlot? current;
+  final CampusTimetableSlot? next;
+
+  CampusDaySchedule._(this.weekday, this.classes, this.current, this.next);
+
+  factory CampusDaySchedule.at(List<CampusTimetableSlot> slots, DateTime instant) {
+    final campus = instant.toUtc().add(const Duration(hours: 5));
+    final time = '${campus.hour.toString().padLeft(2, '0')}:${campus.minute.toString().padLeft(2, '0')}';
+    final classes = slots.where((s) => s.dayOfWeek == campus.weekday).toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final validTime = RegExp(r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$');
+    CampusTimetableSlot? current, next;
+    for (final slot in classes) {
+      if (!validTime.hasMatch(slot.startTime) || !validTime.hasMatch(slot.endTime) ||
+          slot.startTime.compareTo(slot.endTime) >= 0) {
+        continue;
+      }
+      if (slot.startTime.compareTo(time) <= 0 && slot.endTime.compareTo(time) > 0) {
+        current ??= slot;
+      } else if (slot.startTime.compareTo(time) > 0) {
+        next ??= slot;
+      }
+    }
+    return CampusDaySchedule._(campus.weekday, classes, current, next);
+  }
+}
 
 class TimetablePanel extends StatefulWidget {
   final CampusApi api;
@@ -29,6 +61,25 @@ class _TimetablePanelState extends State<TimetablePanel> {
   bool _loadingSlots = false;
   String? _error;
   int _requestSequence = 0;
+  bool _today = false;
+  Timer? _clock;
+
+  void _updateClock() {
+    _clock?.cancel();
+    if (!_today) return;
+    final now = DateTime.now();
+    _clock = Timer(Duration(milliseconds: 60000 - now.millisecondsSinceEpoch % 60000), () {
+      if (!mounted) return;
+      setState(() {});
+      _updateClock();
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -86,6 +137,8 @@ class _TimetablePanelState extends State<TimetablePanel> {
 
   @override
   Widget build(BuildContext context) {
+    final today = CampusDaySchedule.at(_slots, DateTime.now());
+    final visible = _today ? today.classes : _slots;
     final selectedGroup = _groups.where((g) => g.key == _selected);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
@@ -148,13 +201,31 @@ class _TimetablePanelState extends State<TimetablePanel> {
         else if (_slots.isEmpty)
           _notice('No classes in this timetable.')
         else ...[
+          Wrap(spacing: 8, children: [
+            for (final mode in [false, true])
+              ChoiceChip(label: Text(mode ? 'Today' : 'Full week'), selected: _today == mode,
+                onSelected: (_) {
+                  setState(() => _today = mode);
+                  _updateClock();
+                }),
+          ]),
+          if (_today) ...[
+            Text('${_days[today.weekday]} · Pakistan time (PKT)'),
+            if (visible.isEmpty) _notice('No classes scheduled for this group today.')
+            else ...[
+              Text(today.current == null ? 'No class in progress.'
+                  : 'In progress: ${today.current!.courseTitle}'),
+              Text(today.next == null ? 'No more classes start today.'
+                  : 'Up next: ${today.next!.courseTitle} at ${today.next!.startTime}'),
+            ],
+          ],
           if (selectedGroup.isNotEmpty)
             Padding(padding: const EdgeInsets.only(bottom: 12),
               child: Text(selectedGroup.first.label,
                 style: const TextStyle(color: _deep, fontSize: 12,
                   fontWeight: FontWeight.w700))),
           for (var day = 1; day <= 7; day++)
-            if (_slots.any((slot) => slot.dayOfWeek == day))
+            if (visible.any((slot) => slot.dayOfWeek == day))
               Padding(
                 padding: const EdgeInsets.only(bottom: 15),
                 child: Column(
@@ -166,7 +237,7 @@ class _TimetablePanelState extends State<TimetablePanel> {
                         style: const TextStyle(fontSize: 15,
                           fontWeight: FontWeight.w900, color: _sea)),
                     ),
-                    for (final slot in _slots.where((s) => s.dayOfWeek == day))
+                    for (final slot in visible.where((s) => s.dayOfWeek == day))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 9),
                         child: Card(child: Padding(

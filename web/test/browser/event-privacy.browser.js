@@ -463,6 +463,22 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByRole('button',{name:'Remove goal: Review chapter for quiz'}).click();
   await a.getByText('No study goals yet for this week.').waitFor();
 
+  await navigate(a, /Campus Calendar/);
+  await a.getByRole('heading', {name:'Unified campus calendar'}).waitFor();
+  await a.getByRole('button', {name:'Week',exact:true}).click();
+  assert.equal(await a.getByRole('group',{name:'Week dates'}).getByRole('button').count(),7);
+  await a.getByRole('button', {name:'Month',exact:true}).click();
+  assert.equal(await a.getByRole('group',{name:'Month dates'}).getByRole('button').count(),42);
+  await a.getByRole('button', {name:'Next month'}).click();
+  await a.getByRole('button', {name:'Today',exact:true}).click();
+  await a.getByRole('group',{name:'Calendar categories'}).getByLabel('Campus event').uncheck();
+  await a.getByRole('group',{name:'Calendar categories'}).getByLabel('Campus event').check();
+  await a.getByRole('region',{name:'Selected day agenda'}).waitFor();
+  await checkReflow(a,320);
+  await navigate(sameBrowserB, /Campus Calendar/);
+  await sameBrowserB.getByRole('heading', {name:'Unified campus calendar'}).waitFor();
+  assert.equal(await organizer.getByRole('button', {name:'Campus Calendar'}).count(),0);
+
   const demo = await browser.newContext({serviceWorkers: 'block'});
   await demo.route('**/*', route => {
     const url = new URL(route.request().url());

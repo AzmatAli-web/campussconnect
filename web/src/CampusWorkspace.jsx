@@ -28,9 +28,10 @@ const NotificationsPage=lazy(()=>import('./NotificationsPage.jsx'));
 const AssignmentPlanner=lazy(()=>import('./AssignmentPlanner.jsx'));
 const StudentOverview=lazy(()=>import('./StudentOverview.jsx'));
 const StudyPlanner=lazy(()=>import('./StudyPlanner.jsx'));
+const CampusCalendar=lazy(()=>import('./CampusCalendar.jsx'));
 const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',study:'Weekly Study Planner',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
+const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',study:'Weekly Study Planner',calendar:'My Campus Calendar',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','admin'].includes(tab))requested.events='/events?limit=50';
@@ -129,6 +130,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   resources:<AcademicResourcesPage key={notesKey??'resources'} notesKey={notesKey} {...props}/>,
   assignments:<AssignmentPlanner key={assignmentKey??'assignments'} storageKey={assignmentKey}/>,
   study:<StudyPlanner key={assignmentKey??'study'} assignmentKey={assignmentKey}/>,
+  calendar:<CampusCalendar key={assignmentKey??'calendar'} assignmentKey={assignmentKey} preferenceKey={timetableKey} call={call}/>,
   marketplace:<MarketplacePage {...props}/>,
   lostfound:<LostFoundPage {...props}/>,
   societies:<SocietiesPage key={user.uid??profile.id} {...props} revision={revision}/>,

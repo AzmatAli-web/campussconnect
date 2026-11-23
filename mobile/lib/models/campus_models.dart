@@ -397,18 +397,20 @@ class CampusSociety {
 class CampusSocietyMembership {
   final String id;
   final String societyId;
+  final String societyName;
   final String status;
   final DateTime? requestedAt;
   final DateTime? reviewedAt;
   final String reviewNote;
   const CampusSocietyMembership({
-    required this.id,required this.societyId,required this.status,
+    required this.id,required this.societyId,this.societyName='',required this.status,
     required this.requestedAt,required this.reviewedAt,
     required this.reviewNote,
   });
   factory CampusSocietyMembership.fromJson(Json data)=>CampusSocietyMembership(
     id:stringField(data,'id'),
     societyId:stringField(data,'societyId'),
+    societyName:stringField(data,'societyName'),
     status:stringField(data,'status'),
     requestedAt:parseDate(data['requestedAt']),
     reviewedAt:parseDate(data['reviewedAt']),

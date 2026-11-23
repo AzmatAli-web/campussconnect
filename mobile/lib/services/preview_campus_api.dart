@@ -32,6 +32,12 @@ class PreviewCampusApi extends CampusApi {
       'startsAt': DateTime.now().add(const Duration(days: 10)).toUtc().toIso8601String(),
       'endsAt': DateTime.now().add(const Duration(days: 10, hours: 3)).toUtc().toIso8601String(),
     }),
+    CampusEvent.fromJson({
+      'id':'preview-fair','title':'Campus Science Fair','venue':'Science Hall',
+      'startsAt':DateTime.now().subtract(const Duration(days:4)).toIso8601String(),
+      'endsAt':DateTime.now().subtract(const Duration(days:3)).toIso8601String(),
+      'registrationOpen':false,
+    }),
   ];
   PreviewCampusApi() : super(idTokenProvider: () async => '');
 
@@ -54,14 +60,28 @@ class PreviewCampusApi extends CampusApi {
   }).toList(growable: false);
 
   @override
+  Future<List<CampusEvent>> searchEvents(String keyword, String when) async {
+    final term = keyword.trim().toLowerCase();
+    final now = DateTime.now();
+    final rows = (await getEvents()).where((event) {
+      final upcoming = event.endsAt?.isAfter(now) ?? false;
+      return (when == 'all' || (when == 'upcoming') == upcoming)
+          && (event.title.toLowerCase().contains(term) || event.venue.toLowerCase().contains(term));
+    }).toList();
+    rows.sort((a,b) => when == 'past' ? b.startsAt!.compareTo(a.startsAt!) : a.startsAt!.compareTo(b.startsAt!));
+    return rows;
+  }
+
+  @override
   Future<List<CampusRegistration>> getMyRegistrations() async =>
       List.unmodifiable(_registrations);
 
   @override
-  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword) async {
+  Future<List<CampusAnnouncement>> searchAnnouncements(String keyword, {String scope = 'all'}) async {
     final term = keyword.trim().toLowerCase();
     return (await getAnnouncements()).where((notice) =>
-        notice.title.toLowerCase().contains(term) || notice.body.toLowerCase().contains(term)
+        (scope == 'all' || notice.scope == scope) &&
+        (notice.title.toLowerCase().contains(term) || notice.body.toLowerCase().contains(term))
     ).toList(growable: false);
   }
 
@@ -78,7 +98,7 @@ class PreviewCampusApi extends CampusApi {
           'id': 'preview-announcement-2',
           'title': 'Developer Community Session',
           'body': 'The real CampusConnect app will connect through verified university accounts once Firebase Android and a reachable backend are configured.',
-          'scope': 'university',
+          'scope': 'society',
           'publishedAt': DateTime.now().toUtc().toIso8601String(),
         }),
       ];

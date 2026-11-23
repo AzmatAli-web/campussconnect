@@ -332,6 +332,22 @@ class PreviewCampusApi extends CampusApi {
       .toList(growable:false);
 
   @override
+  Future<List<CampusLostFoundMatch>> getLostFoundMatches(String reportId) async {
+    final source = _lostFound.firstWhere(
+      (item) => item.id == reportId && item.status == 'open' && _mineLostFoundIds.contains(item.id),
+      orElse: () => throw const CampusApiException('LOST_FOUND_NOT_FOUND', 'Open report unavailable.'),
+    );
+    // The offline campus has one fictional, non-owned report: the library notebook.
+    final notebook = _lostFound.firstWhere((item) => item.id == 'demo-lost-1');
+    if (source.kind == notebook.kind || source.category != notebook.category) return [];
+    final reasons = [
+      if (RegExp(r'\bnotebook\b', caseSensitive: false).hasMatch(source.title)) 'Item name: notebook',
+      if (RegExp(r'\blibrary\b', caseSensitive: false).hasMatch(source.locationText)) 'Location: library',
+    ];
+    return reasons.isEmpty ? [] : [CampusLostFoundMatch(notebook, reasons)];
+  }
+
+  @override
   Future<CampusLostFoundItem> createLostFoundItem({
     required String kind,required String title,required String description,
     required String category,required String locationText,

@@ -217,7 +217,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               0 => _overview(),
                               1 => _eventList(),
                               2 => _myRegistrations(),
-                              3 => _NoticeSearch(api: widget.api, notices: _announcements, card: _announcementCard),
+                              3 => _CampusSearch<CampusAnnouncement>(
+                                heading:'Official campus updates', label:'Search notices', hint:'Title or message',
+                                filterLabel:'Audience', options:const {'all':'All audiences','university':'University',
+                                  'department':'Department','society':'Society'},
+                                initial:_announcements, card:_announcementCard, noun:'notices',
+                                search:(q, scope)=>widget.api.searchAnnouncements(q, scope:scope),
+                              ),
                               4 => _profilePage(),
                               5 => TimetablePanel(
                                 api: widget.api,
@@ -354,21 +360,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _eventList() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SectionHeader(title: 'Published events'),
-          const Padding(
-            padding: EdgeInsets.only(top: 5, bottom: 18),
-            child: Text('Everyone can see seat totals. Names of attendees stay private.',
-                style: TextStyle(color: _muted, fontSize: 12)),
-          ),
-          if (_events.isEmpty)
-            const _EmptyView(title: 'No events yet', detail: 'Organizers have not published an event.')
-          else
-            ..._events.map(_eventCard),
-        ],
-      );
+  Widget _eventList() => _CampusSearch<CampusEvent>(
+    heading:'Published events', label:'Search events', hint:'Title or venue',
+    filterLabel:'Event dates', options:const {'all':'All dates','upcoming':'Upcoming','past':'Past'},
+    initial:_events, search:widget.api.searchEvents, card:_eventCard, noun:'events',
+  );
 
   Widget _eventCard(CampusEvent event) {
     final registered = studentIsRegistered(event.id, _registrations);
@@ -470,6 +466,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
               final matching = _events.where((event) =>
                   event.id == registration.eventId).toList();
               final event = matching.isEmpty ? null : matching.first;
+              final details = registration.event;
+              final venue = details?.venue ?? event?.venue ?? '';
+              final lines = [
+                'Confirmed ${_date(registration.confirmedAt)}',
+                if (details != null || event != null) _date(details?.startsAt ?? event?.startsAt)
+                else 'Contact organizer for details',
+                if (venue.isNotEmpty) venue,
+                if (details?.status == 'cancelled') 'Event cancelled',
+              ];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 11),
                 child: Card(
@@ -479,10 +484,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       backgroundColor: Color(0xFFE0F8F1),
                       child: Icon(Icons.check_circle, color: Color(0xFF168F7D)),
                     ),
-                    title: Text(event?.title ?? 'Event unavailable or cancelled',
+                    title: Text(details?.title ?? event?.title ?? 'Event unavailable or cancelled',
                         style: const TextStyle(fontWeight: FontWeight.w800)),
-                    subtitle: Text('Confirmed ${_date(registration.confirmedAt)}\n'
-                        '${event == null ? 'Contact organizer for details' : _date(event.startsAt)}'),
+                    subtitle: Text(lines.join('\n')),
                     isThreeLine: true,
                   ),
                 ),
@@ -833,25 +837,30 @@ class _Failure extends StatelessWidget {
       );
 }
 
-class _NoticeSearch extends StatefulWidget {
-  final CampusApi api;
-  final List<CampusAnnouncement> notices;
-  final Widget Function(CampusAnnouncement) card;
-  const _NoticeSearch({required this.api, required this.notices, required this.card});
+class _CampusSearch<T> extends StatefulWidget {
+  final String heading, label, hint, filterLabel, noun;
+  final Map<String,String> options;
+  final List<T> initial;
+  final Future<List<T>> Function(String, String) search;
+  final Widget Function(T) card;
+  const _CampusSearch({required this.heading, required this.label, required this.hint,
+    required this.filterLabel, required this.noun, required this.options,
+    required this.initial, required this.search, required this.card});
 
   @override
-  State<_NoticeSearch> createState() => _NoticeSearchState();
+  State<_CampusSearch<T>> createState() => _CampusSearchState<T>();
 }
 
-class _NoticeSearchState extends State<_NoticeSearch> {
+class _CampusSearchState<T> extends State<_CampusSearch<T>> {
   final _input = TextEditingController();
-  Future<List<CampusAnnouncement>>? _results;
-  String _keyword = '';
+  Future<List<T>>? _results;
+  String _keyword = '', _filter = 'all';
 
-  void _search(String text) {
+  void _search(String text, String filter) {
     setState(() {
       _keyword = text.trim();
-      _results = _keyword.isEmpty ? null : widget.api.searchAnnouncements(_keyword);
+      _filter = filter;
+      _results = _keyword.isEmpty && filter == 'all' ? null : widget.search(_keyword, filter);
     });
   }
 
@@ -865,35 +874,40 @@ class _NoticeSearchState extends State<_NoticeSearch> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const _SectionHeader(title: 'Official campus updates'),
+      _SectionHeader(title: widget.heading),
+      DropdownButtonFormField<String>(
+        key:ValueKey(_filter), initialValue:_filter, decoration:InputDecoration(labelText:widget.filterLabel),
+        items:widget.options.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),
+        onChanged:(value){ if(value!=null) _search(_input.text,value); },
+      ),
       TextField(controller: _input, maxLength: 80, textInputAction: TextInputAction.search,
-        decoration: const InputDecoration(labelText: 'Search notices', hintText: 'Title or message'),
-        onSubmitted: _search),
+        decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
+        onSubmitted: (text)=>_search(text,_filter)),
       Wrap(spacing: 8, children: [
-        FilledButton(onPressed: () => _search(_input.text), child: const Text('Search')),
-        TextButton(onPressed: () { _input.clear(); _search(''); }, child: const Text('Clear')),
+        FilledButton(onPressed: () => _search(_input.text,_filter), child: const Text('Search')),
+        TextButton(onPressed: () { _input.clear(); _search('','all'); }, child: const Text('Clear')),
       ]),
       const SizedBox(height: 14),
-      FutureBuilder<List<CampusAnnouncement>>(
+      FutureBuilder<List<T>>(
         future: _results,
         builder: (context, snapshot) {
           if (_results != null && snapshot.connectionState != ConnectionState.done) {
-            return const LinearProgressIndicator(semanticsLabel: 'Searching notices');
+            return LinearProgressIndicator(semanticsLabel: 'Searching ${widget.noun}');
           }
           if (_results != null && snapshot.hasError) {
             return Column(children: [
-              const Text('Could not search notices.'),
-              TextButton(onPressed: () => _search(_keyword), child: const Text('Retry')),
+              Text('Could not search ${widget.noun}.'),
+              TextButton(onPressed: () => _search(_keyword,_filter), child: const Text('Retry')),
             ]);
           }
-          final notices = _results == null ? widget.notices : snapshot.requireData;
-          if (notices.isEmpty) {
-            return _EmptyView(title: _keyword.isEmpty ? 'No announcements' : 'No matching notices',
-              detail: _keyword.isEmpty ? 'Relevant campus notices will appear here.' : 'Try another word or clear the search.');
+          final rows = _results == null ? widget.initial : snapshot.requireData;
+          if (rows.isEmpty) {
+            return _EmptyView(title: _results == null ? 'No ${widget.noun} yet' : 'No matching ${widget.noun}',
+              detail: _results == null ? 'Published campus updates will appear here.' : 'Change your filters or clear the search.');
           }
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (notices.length == 100) const Text('Showing the newest 100 notices.'),
-            ...notices.map(widget.card),
+            if (rows.length == 100) Text('Showing up to 100 ${widget.noun}.'),
+            ...rows.map(widget.card),
           ]);
         },
       ),

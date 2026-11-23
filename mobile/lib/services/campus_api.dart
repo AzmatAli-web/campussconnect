@@ -443,6 +443,11 @@ class CampusApi {
     asJsonList(await _request('/me/lost-found-items?limit=100'))
       .map(CampusLostFoundItem.fromJson).toList(growable:false);
 
+  Future<List<CampusLostFoundMatch>> getLostFoundMatches(String reportId) async {
+    final rows = await _request('/me/lost-found-items/${Uri.encodeComponent(reportId)}/matches');
+    return asJsonList(rows).map(CampusLostFoundMatch.fromJson).toList(growable: false);
+  }
+
   Future<CampusLostFoundItem> createLostFoundItem({
     required String kind,required String title,required String description,
     required String category,required String locationText,

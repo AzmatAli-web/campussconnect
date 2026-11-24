@@ -48,6 +48,7 @@ export function eventCampusStamp(value){
 }
 export function itemsOnCampusDay(day,{slots=[],events=[],assignments=[]}={}){
  if(!Number.isFinite(dateMs(day)))return [];
+ const midnight=Date.parse(day+'T00:00:00+05:00');
  const weekday=(new Date(day+'T00:00:00Z').getUTCDay()+6)%7+1;
  const items=[];
  for(const slot of slots){
@@ -58,9 +59,11 @@ export function itemsOnCampusDay(day,{slots=[],events=[],assignments=[]}={}){
  }
  for(const event of events){
   const stamp=eventCampusStamp(event?.startsAt);
-  if(event?.status!=='published'||!stamp||stamp.day!==day)continue;
+  if(event?.status!=='published'||!event.startsAt||!stamp||stamp.day>day)continue;
+  const continuing=stamp.day<day;
+  if(continuing && !(Date.parse(event.endsAt)>midnight))continue;
   items.push({id:'event:'+event.id,kind:'event',title:event.title||'Campus event',
-   time:stamp.time,detail:event.venue||''});
+   time:continuing?'':stamp.time,detail:[continuing?'Continues from an earlier day':'',event.venue].filter(Boolean).join(' · ')});
  }
  for(const item of assignments){
   if(item?.done!==false||item.due!==day)continue;

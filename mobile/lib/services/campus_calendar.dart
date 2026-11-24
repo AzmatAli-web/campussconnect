@@ -33,10 +33,16 @@ class CalendarFeeds {
     if(sources.contains(CalendarSource.events)){
       for(final event in events){
         final start=event.startsAt;
-        if(start==null || campusDate(start)!=date)continue;
+        if(start==null)continue;
+        final firstDay=campusDate(start);
+        final continuing=date.isAfter(firstDay);
+        final midnight=date.subtract(const Duration(hours:5));
+        if(date.isBefore(firstDay) || (continuing && !(event.endsAt?.isAfter(midnight) ?? false)))continue;
         final pkt=start.toUtc().add(const Duration(hours:5));
         final time='${pkt.hour.toString().padLeft(2,'0')}:${pkt.minute.toString().padLeft(2,'0')}';
-        rows.add(AgendaItem(CalendarSource.events,event.title,event.venue,time));
+        rows.add(AgendaItem(CalendarSource.events,event.title,
+          [if(continuing) 'Continues from an earlier day',if(event.venue.isNotEmpty) event.venue].join(' · '),
+          continuing ? '' : time));
       }
     }
     if(sources.contains(CalendarSource.deadlines)){

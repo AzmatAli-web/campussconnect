@@ -36,6 +36,17 @@ void main(){
     expect(shiftCalendarMonth(DateTime.utc(2028,1,31),1),DateTime.utc(2028,2,29));
   });
 
+  test('overnight events continue until their exclusive PKT end',(){
+    final feeds=CalendarFeeds([], [CampusEvent.fromJson({'title':'Festival',
+      'startsAt':'2026-12-31T16:00:00Z','endsAt':'2027-01-02T19:00:00Z'})], []);
+    final sources={CalendarSource.events};
+    expect(feeds.agenda(DateTime.utc(2026,12,31),sources).single.time,'21:00');
+    for(final day in [1,2]){
+      expect(feeds.agenda(DateTime.utc(2027,1,day),sources).single.detail,contains('Continues'));
+    }
+    expect(feeds.agenda(DateTime.utc(2027,1,3),sources),isEmpty);
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

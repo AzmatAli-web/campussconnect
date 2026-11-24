@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -45,8 +46,9 @@ class CampusDaySchedule {
 class TimetablePanel extends StatefulWidget {
   final CampusApi api;
   final bool previewMode;
+  final String accountKey;
   const TimetablePanel({
-    super.key, required this.api, this.previewMode = false,
+    super.key, required this.api, this.previewMode = false, this.accountKey = '',
   });
 
   @override
@@ -92,8 +94,16 @@ class _TimetablePanelState extends State<TimetablePanel> {
     try {
       final result = await widget.api.getTimetableGroups();
       if (!mounted) return;
-      final selected = result.any((g) => g.key == _selected)
-          ? _selected : result.isNotEmpty ? result.first.key : null;
+      var preferred = _selected;
+      if(preferred == null && widget.accountKey.isNotEmpty){
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          preferred = prefs.getString('timetable-group:${widget.accountKey}');
+        } catch (_) { /* Timetables also work without device storage. */ }
+      }
+      if (!mounted) return;
+      final selected = result.any((g) => g.key == preferred)
+          ? preferred : result.isNotEmpty ? result.first.key : null;
       setState(() {
         _groups = result;
         _selected = selected;
@@ -111,6 +121,20 @@ class _TimetablePanelState extends State<TimetablePanel> {
           _loadingGroups = false;
         });
       }
+    }
+  }
+
+  Future<void> _chooseGroup(CampusTimetableGroup group) async {
+    final key = 'timetable-group:${widget.accountKey}';
+    _loadSlots(group);
+    if(widget.accountKey.isEmpty)return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if(!mounted || _selected!=group.key)return;
+      if(!await prefs.setString(key,group.key))throw StateError('Write failed');
+    } catch (_) {
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Could not remember the group on this device.')));
     }
   }
 
@@ -187,7 +211,7 @@ class _TimetablePanelState extends State<TimetablePanel> {
               onChanged: (value) {
                 if (value == null) return;
                 for (final g in _groups) {
-                  if (g.key == value) { _loadSlots(g); return; }
+                  if (g.key == value) { _chooseGroup(g); return; }
                 }
               },
             ),

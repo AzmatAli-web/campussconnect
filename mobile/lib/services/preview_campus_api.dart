@@ -65,7 +65,8 @@ class PreviewCampusApi extends CampusApi {
     final end=to.add(const Duration(hours:19));
     return (await getEvents()).where((event){
       final time=event.startsAt;
-      return time!=null && !time.isBefore(start) && time.isBefore(end);
+      return time!=null && time.isBefore(end) &&
+          (event.endsAt?.isAfter(start) ?? !time.isBefore(start));
     }).skip((page-1)*100).take(100).toList();
   }
 

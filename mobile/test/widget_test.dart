@@ -77,6 +77,12 @@ void main() {
     expect(find.text('Previous seminar'),findsOneWidget);
     expect(find.textContaining('Event cancelled'),findsOneWidget);
     expect(find.textContaining('Alumni Hall'),findsOneWidget);
+    await tester.enterText(find.byType(TextFormField),'no such venue');
+    await tester.pumpAndSettle();
+    expect(find.text('No matching registrations.'),findsOneWidget);
+    await tester.enterText(find.byType(TextFormField),'ALUMNI');
+    await tester.pumpAndSettle();
+    expect(find.text('Previous seminar'),findsOneWidget);
   });
 
   test('mobile search sends combined filters to the authenticated endpoints', () async {

@@ -90,10 +90,11 @@ export function eventBrowseQuery(query,now=new Date()){
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start||end-start>41*86400000){
    throw new HttpError(400,'INVALID_EVENT_RANGE','Choose a campus date range of 1 to 42 days');
   }
-  filter.startsAt={$gte:new Date(start),$lt:new Date(end+86400000)};
+  filter.startsAt={$lt:new Date(end+86400000)};
+  filter.endsAt={$gt:new Date(start)};
  }
- if(when==='upcoming')filter.endsAt={$gt:now};
- if(when==='past')filter.endsAt={$lte:now};
+ if(when==='upcoming' && !(filter.endsAt?.$gt > now))filter.endsAt={$gt:now};
+ if(when==='past')filter.endsAt={...filter.endsAt,$lte:now};
  if(search){
   const literal=search.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
   filter.$or=['title','venue'].map(key=>({[key]:{$regex:literal,$options:'i'}}));

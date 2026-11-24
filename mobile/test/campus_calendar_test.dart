@@ -7,6 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class PagedEvents extends PreviewCampusApi {
+  final requests=<(DateTime,DateTime,int)>[];
+  @override
+  Future<List<CampusEvent>> calendarEventPage(DateTime from,DateTime to,int page) async {
+    requests.add((from,to,page));
+    return List.generate(page==1?100:1,(i)=>CampusEvent.fromJson({
+      'id':'$page-$i','title':page==2?'Second page event':'Sample event',
+      'startsAt':from.toIso8601String(),
+    }));
+  }
+}
+
 void main(){
   test('agenda combines recurring classes, PKT event dates and open deadlines',(){
     final monday=DateTime.utc(2027,1,4);
@@ -30,14 +42,19 @@ void main(){
     tester.view.devicePixelRatio=1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final api=PreviewCampusApi();
+    final api=PagedEvents();
     addTearDown(api.dispose);
     await tester.pumpWidget(MaterialApp(home:CampusCalendar(api:api,accountKey:'preview')));
     await tester.pumpAndSettle();
+    expect(api.requests.map((r)=>r.$3),[1,2]);
+    expect(api.requests.first.$2.difference(api.requests.first.$1).inDays,6);
     await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
+    expect(api.requests.last.$2.difference(api.requests.last.$1).inDays,41);
+    final monthStart=api.requests.last.$1;
     await tester.tap(find.byTooltip('Next period'));
     await tester.pumpAndSettle();
+    expect(api.requests.last.$1.isAfter(monthStart),isTrue);
     await tester.tap(find.text('Today'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Search whole week'));

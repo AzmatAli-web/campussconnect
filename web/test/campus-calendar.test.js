@@ -51,3 +51,13 @@ test('combines weekly recurring classes, published events and open personal dead
  assert.deepEqual(itemsOnCampusDay('2026-11-25',fixtures).map(x=>x.kind),['class']);
  assert.deepEqual(itemsOnCampusDay('2026-11-26',fixtures),[]);
 });
+
+test('an event carries across the year and stops at its exclusive PKT midnight',()=>{
+ const events=[{id:'festival',status:'published',startsAt:'2026-12-31T16:00:00Z',
+  endsAt:'2027-01-02T19:00:00Z',venue:'Main hall'}];
+ assert.equal(itemsOnCampusDay('2026-12-31',{events})[0].time,'21:00');
+ for(const day of ['2027-01-01','2027-01-02']){
+  assert.equal(itemsOnCampusDay(day,{events})[0].detail,'Continues from an earlier day · Main hall');
+ }
+ assert.deepEqual(itemsOnCampusDay('2027-01-03',{events}),[]);
+});

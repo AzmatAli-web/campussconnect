@@ -72,10 +72,16 @@ test('announcement search uses literal title and body terms and bounds audience 
 });
 
 test('calendar date ranges include both PKT dates and bound the grid to 42 days',()=>{
- const range=(from,to)=>eventBrowseQuery({from,to}).filter.startsAt;
+ const range=(from,to)=>eventBrowseQuery({from,to}).filter;
  assert.deepEqual(range('2028-02-29','2028-03-01'),{
-  $gte:new Date('2028-02-28T19:00:00Z'),$lt:new Date('2028-03-01T19:00:00Z')
+  endsAt:{$gt:new Date('2028-02-28T19:00:00Z')},startsAt:{$lt:new Date('2028-03-01T19:00:00Z')}
  });
+ const query={from:'2028-02-29',to:'2028-03-01'};
+ const boundary=new Date('2028-02-28T19:00:00Z');
+ const before=new Date('2028-02-01'),during=new Date('2028-03-01');
+ assert.deepEqual(eventBrowseQuery({...query,when:'upcoming'},before).filter.endsAt,{$gt:boundary});
+ assert.deepEqual(eventBrowseQuery({...query,when:'upcoming'},during).filter.endsAt,{$gt:during});
+ assert.deepEqual(eventBrowseQuery({...query,when:'past'},during).filter.endsAt,{$gt:boundary,$lte:during});
  assert.ok(range('2026-12-01','2027-01-11'));
  for(const query of [{from:'2027-01-01'},{to:'2027-01-01'},{from:'2027-02-29',to:'2027-03-01'},
   {from:'2027-02-01',to:'2027-01-31'},{from:'2026-12-01',to:'2027-01-12'}]){

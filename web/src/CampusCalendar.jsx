@@ -17,7 +17,10 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  const [anchor,setAnchor]=useState(calendarToday);
  const [selected,setSelected]=useState(calendarToday);
  const [tasks,setTasks]=useState(()=>readAssignments(assignmentKey));
- const [results,setResults]=useState({loading:true,events:[],slots:[],group:null,errors:[],limited:false});
+ const [results,setResults]=useState({loading:true,slots:[],group:null,errors:[]});
+ const dates=useMemo(()=>calendarDates(view,anchor),[view,anchor]);
+ const from=dates[0],to=dates.at(-1);
+ const [eventFeed,setEventFeed]=useState(null);
  const [reload,setReload]=useState(0);
  const [enabled,setEnabled]=useState({class:true,event:true,assignment:true});
  useEffect(()=>{
@@ -34,14 +37,9 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
   let current=true;
   setResults(previous=>({...previous,loading:true,errors:[]}));
   (async()=>{
-   const [eventsResult,groupsResult]=await Promise.allSettled([
-    call('/events?when=all&limit=100'),
-    call('/timetable/groups')
-   ]);
+   const [groupsResult]=await Promise.allSettled([call('/timetable/groups')]);
    if(!current)return;
    const errors=[];
-   const events=eventsResult.status==='fulfilled'&&Array.isArray(eventsResult.value)?eventsResult.value:[];
-   if(eventsResult.status!=='fulfilled')errors.push('Published events could not be loaded.');
    const groups=groupsResult.status==='fulfilled'&&Array.isArray(groupsResult.value)?groupsResult.value:[];
    if(groupsResult.status!=='fulfilled')errors.push('Academic timetable groups could not be loaded.');
    const group=chooseTimetableGroup(groups,readTimetablePreference(preferenceKey));
@@ -57,15 +55,33 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
      slots=response;
     }catch{if(current)errors.push('Classes for the selected timetable could not be loaded.');}
    }
-   if(current)setResults({loading:false,events,slots,group,errors,limited:events.length>=100});
+   if(current)setResults({loading:false,slots,group,errors});
   })();
   return()=>{current=false;};
  },[call,preferenceKey,reload]);
- const dates=useMemo(()=>calendarDates(view,anchor),[view,anchor]);
+ useEffect(()=>{
+  let current=true;
+  (async()=>{
+   const events=new Map();
+   try{
+    for(let page=1;current;page++){
+     const params=new URLSearchParams({from,to,when:'all',limit:'100',page:String(page)});
+     const rows=await call('/events?'+params);
+     if(!current)return;
+     if(!Array.isArray(rows))throw new Error('Invalid events response');
+     for(const row of rows)events.set(row.id,row);
+     if(rows.length<100)break;
+    }
+    if(current)setEventFeed({from,to,reload,rows:[...events.values()]});
+   }catch{if(current)setEventFeed({from,to,reload,rows:[],error:true});}
+  })();
+  return()=>{current=false;};
+ },[call,from,to,reload]);
+ const matching=eventFeed?.from===from&&eventFeed?.to===to&&eventFeed?.reload===reload?eventFeed:null;
  const agenda=useMemo(()=>{
-  const catalog={slots:results.slots,events:results.events,assignments:tasks};
+  const catalog={slots:results.slots,events:matching?.rows??[],assignments:tasks};
   return new Map(dates.map(date=>[date,itemsOnCampusDay(date,catalog).filter(x=>enabled[x.kind])]));
- },[dates,results.slots,results.events,tasks,enabled]);
+ },[dates,results.slots,matching,tasks,enabled]);
  const activeAgenda=agenda.get(selected)??[];
  function navigate(direction){
   const next=moveCalendar(view,anchor,direction);
@@ -100,9 +116,9 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
      <input type="checkbox" checked={enabled[key]} onChange={event=>setEnabled(current=>({...current,[key]:event.target.checked}))}/>
      {' '+label}</label>)}
    </div>
-   {results.loading&&<p role="status">Loading published campus calendar…</p>}
+   {(results.loading||!matching)&&<p role="status">Loading published campus calendar…</p>}
    {results.errors.map(error=><p role="alert" key={error}>{error}</p>)}
-   {results.limited&&<p className="wc-resource-muted">The event feed shows only the first 100 published events. More events may exist.</p>}
+   {matching?.error&&<p role="alert">Published events could not be loaded.</p>}
    {!results.loading&&!results.group&&!results.errors.some(x=>x.includes('timetable'))&&
     <p className="wc-resource-muted">No timetable group has been published. Class dates will appear when one is available.</p>}
    {results.group&&<p className="wc-resource-muted">Class group: {results.group.program} · Semester {results.group.semester} · Section {results.group.section}. Change it on the Timetable page.</p>}

@@ -60,6 +60,16 @@ class PreviewCampusApi extends CampusApi {
   }).toList(growable: false);
 
   @override
+  Future<List<CampusEvent>> calendarEventPage(DateTime from,DateTime to,int page) async {
+    final start=from.subtract(const Duration(hours:5));
+    final end=to.add(const Duration(hours:19));
+    return (await getEvents()).where((event){
+      final time=event.startsAt;
+      return time!=null && !time.isBefore(start) && time.isBefore(end);
+    }).skip((page-1)*100).take(100).toList();
+  }
+
+  @override
   Future<List<CampusEvent>> searchEvents(String keyword, String when) async {
     final term = keyword.trim().toLowerCase();
     final now = DateTime.now();

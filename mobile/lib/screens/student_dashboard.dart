@@ -11,6 +11,9 @@ import '../services/live_diagnostics.dart';
 import '../services/dashboard_feeds.dart';
 import 'timetable_panel.dart';
 import 'assignment_tracker.dart';
+import 'study_planner.dart';
+import '../services/study_plan.dart';
+import '../services/assignments.dart';
 import 'academic_resources_panel.dart';
 import 'my_complaints_screen.dart';
 import 'my_fees_screen.dart';
@@ -68,7 +71,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Future<void> _reload() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _studySummary=null; });
     try {
       final data = await loadDashboardFeeds(
         widget.api,
@@ -295,7 +298,19 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   String get _accountKey => widget.previewMode ? 'preview' : 'live:${widget.api.baseUri}:${widget.profile.id}';
 
+  Future<StudyPlan>? _studySummary;
+  String? _summaryAccount;
+
+  Future<void> _openStudyPage(Widget page) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>page));
+    if(mounted)setState(()=>_studySummary=null);
+  }
+
   Widget _overview() {
+    if(widget.profile.canRegister && (_studySummary==null || _summaryAccount!=_accountKey)){
+      _summaryAccount=_accountKey;
+      _studySummary=StudyPlan.read(_accountKey);
+    }
     final upcoming = _events.where((e) =>
       e.startsAt == null || e.startsAt!.isAfter(DateTime.now())).toList();
     return Column(
@@ -306,11 +321,25 @@ class _StudentDashboardState extends State<StudentDashboard> {
         const SizedBox(height: 4),
         const Text('Your campus at a glance', style: TextStyle(color: _muted)),
         const SizedBox(height: 12),
-        if (widget.profile.canRegister)
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => AssignmentTracker(accountKey: _accountKey))),
-            icon: const Icon(Icons.assignment_outlined), label: const Text('My assignments')),
+        if(widget.profile.canRegister)...[
+          FutureBuilder<StudyPlan>(future:_studySummary,builder:(context,snapshot){
+            if(snapshot.connectionState!=ConnectionState.done)return const SizedBox.shrink();
+            if(snapshot.hasError)return TextButton(onPressed:()=>setState(()=>_studySummary=null),child:const Text('Retry study overview'));
+            final plan=snapshot.requireData;
+            final week=studyWeek(DateTime.now());
+            final goals=plan.goals.where((g)=>g.week==week);
+            final complete=goals.where((g)=>g.complete(plan.assignments)).length;
+            final deadlines=sortedAssignments(plan.assignments).where((a)=>!a.done).take(3);
+            return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text('This week: $complete of ${goals.length} study goals complete'),
+              for(final item in deadlines)Text('${item.due.toIso8601String().substring(0,10)} · ${item.title}'),
+            ]);
+          }),
+          Wrap(spacing:8,children:[
+            OutlinedButton(onPressed:()=>_openStudyPage(StudyPlanner(accountKey:_accountKey)),child:const Text('Weekly study planner')),
+            OutlinedButton(onPressed:()=>_openStudyPage(AssignmentTracker(accountKey:_accountKey)),child:const Text('My assignments')),
+          ]),
+        ],
         SizedBox(width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: _openMarketplace,

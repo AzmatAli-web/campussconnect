@@ -9,19 +9,24 @@ String? eventCalendar(CampusEvent event, DateTime now) {
       event.title.trim().isEmpty || !RegExp(r'^[\w-]+$').hasMatch(event.id)) {
     return null;
   }
-  String stamp(DateTime time) {
+  final lines = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Campus Events//EN',
+    'BEGIN:VEVENT','UID:${event.id}@events.campusconnect.invalid','DTSTAMP:${calendarStamp(now)}',
+    'DTSTART:${calendarStamp(start)}','DTEND:${calendarStamp(end)}','SUMMARY:${calendarEscape(event.title)}',
+    if(event.venue.trim().isNotEmpty) 'LOCATION:${calendarEscape(event.venue)}','END:VEVENT','END:VCALENDAR',
+  ];
+  return calendarLines(lines);
+}
+
+String calendarStamp(DateTime time) {
     final seconds = time.toUtc().toIso8601String().split('.').first;
     return "${seconds.replaceAll('-', '').replaceAll(':', '')}Z";
   }
-  String escape(String text) => text.replaceAll(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'), '')
+String calendarEscape(String text) => text.replaceAll(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'), '')
       .replaceAll('\\', r'\\').replaceAll(RegExp(r'\r\n|\r|\n'), r'\n')
       .replaceAll(',', r'\,').replaceAll(';', r'\;');
-  final lines = [
-    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Campus Events//EN',
-    'BEGIN:VEVENT','UID:${event.id}@events.campusconnect.invalid','DTSTAMP:${stamp(now)}',
-    'DTSTART:${stamp(start)}','DTEND:${stamp(end)}','SUMMARY:${escape(event.title)}',
-    if(event.venue.trim().isNotEmpty) 'LOCATION:${escape(event.venue)}','END:VEVENT','END:VCALENDAR',
-  ];
+
+String calendarLines(List<String> lines) {
   final output = StringBuffer();
   for (final line in lines) {
     var length = 0;

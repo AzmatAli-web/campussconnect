@@ -164,6 +164,12 @@ class CampusApi {
           .map(CampusEvent.fromJson)
           .toList();
 
+  Future<List<CampusEvent>> calendarEventPage(DateTime from,DateTime to,int page) async {
+    String date(DateTime value)=>value.toIso8601String().substring(0,10);
+    final query=Uri(queryParameters:{'from':date(from),'to':date(to),'page':'$page','limit':'100'}).query;
+    return asJsonList(await _request('/events?$query')).map(CampusEvent.fromJson).toList();
+  }
+
   Future<List<CampusEvent>> searchEvents(String keyword, String when) async {
     final query = Uri(queryParameters: {
       'limit':'100', 'when':when, if (keyword.trim().isNotEmpty) 'q':keyword.trim(),

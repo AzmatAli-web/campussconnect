@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import '../services/event_calendar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -366,6 +370,25 @@ class _StudentDashboardState extends State<StudentDashboard> {
     initial:_events, search:widget.api.searchEvents, card:_eventCard, noun:'events',
   );
 
+  Future<void> _openCalendar(CampusEvent event) async {
+    final contents = eventCalendar(event, DateTime.now());
+    if (contents == null) {
+      _snack('Only upcoming events with valid dates can be exported.');
+      return;
+    }
+    try {
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/campus-event-${event.id}.ics');
+      await file.writeAsString(contents, flush: true);
+      final result = await OpenFilex.open(file.path, type: 'text/calendar', uti: 'com.apple.ical.ics');
+      if (mounted && result.type != ResultType.done) {
+        _snack('Install a calendar app that can open .ics files.', error: true);
+      }
+    } catch (_) {
+      if (mounted) _snack('Could not open the calendar file.', error: true);
+    }
+  }
+
   Widget _eventCard(CampusEvent event) {
     final registered = studentIsRegistered(event.id, _registrations);
     final canRegister = widget.profile.canRegister &&
@@ -430,6 +453,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   ),
                 ),
               ),
+              if (event.startsAt?.isAfter(DateTime.now()) == true && event.endsAt?.isAfter(event.startsAt!) == true)
+                OutlinedButton.icon(onPressed: () => _openCalendar(event), icon: const Icon(Icons.event),
+                  label: const Text('Add to phone calendar')),
               if (registered)
                 const Padding(
                   padding: EdgeInsets.only(top: 9),

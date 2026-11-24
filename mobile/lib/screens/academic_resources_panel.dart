@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:open_filex/open_filex.dart';
@@ -14,8 +16,9 @@ const _muted=Color(0xFF73889B);
 class AcademicResourcesPanel extends StatefulWidget {
   final CampusApi api;
   final bool previewMode;
+  final String accountKey;
   const AcademicResourcesPanel({
-    super.key, required this.api, this.previewMode=false,
+    super.key, required this.api, this.previewMode=false, this.accountKey='',
   });
 
   @override
@@ -27,6 +30,46 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
   final _course=TextEditingController();
   final _keyword=TextEditingController();
   int _semester=0;
+  Map<String,String> _saved={};
+  bool _savedView=false, _writing=true;
+  String get _storageKey=>'resource-bookmarks:${widget.accountKey}';
+
+  Future<void> _readSaved() async {
+    try {
+      if(widget.accountKey.isNotEmpty){
+        final prefs=await SharedPreferences.getInstance();
+        final stored=prefs.getString(_storageKey);
+        if(stored!=null && mounted){
+          setState(()=>_saved=Map<String,String>.from(jsonDecode(stored) as Map));
+        }
+      }
+    } catch (_) {
+      if(mounted) _message('Saved notes could not be loaded.');
+    } finally {
+      if(mounted) setState(()=>_writing=false);
+    }
+  }
+
+  Future<void> _toggleSaved(String id,String title) async {
+    if(_writing)return;
+    setState(()=>_writing=true);
+    final next=Map.of(_saved);
+    if(next.containsKey(id)){next.remove(id);}else{next[id]=title;}
+    try {
+      if(widget.accountKey.isNotEmpty){
+        final prefs=await SharedPreferences.getInstance();
+        if(!await prefs.setString(_storageKey,jsonEncode(next))){
+          throw StateError('Write failed');
+        }
+      }
+      if(mounted)setState(()=>_saved=next);
+    } catch (_) {
+      if(mounted)_message('Could not save your bookmark change.');
+    } finally {
+      if(mounted)setState(()=>_writing=false);
+    }
+  }
+
   List<CampusAcademicResource> _resources=const [];
   bool _loading=true;
   String? _error;
@@ -35,6 +78,7 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
   @override
   void initState(){
     super.initState();
+    _readSaved();
     _load();
   }
 
@@ -142,6 +186,19 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
         : 'Only verified campus accounts can download Faculty PDFs.',
         style:const TextStyle(fontSize:12,color:_muted,height:1.5)),
       const SizedBox(height:16),
+      Wrap(spacing:8,children:[
+        ChoiceChip(label:const Text('Browse'),selected:!_savedView,onSelected:(_)=>setState(()=>_savedView=false)),
+        ChoiceChip(label:const Text('Saved'),selected:_savedView,onSelected:(_)=>setState(()=>_savedView=true)),
+      ]),
+      if(_savedView)...[
+        if(_writing) const LinearProgressIndicator(),
+        if(!_writing && _saved.isEmpty) const Text('No saved resources on this device.'),
+        for(final entry in _saved.entries)
+          ListTile(title:Text(entry.value),leading:const Icon(Icons.picture_as_pdf),
+            onTap:widget.previewMode||_downloadingId!=null?null:()=>_openPdf(CampusAcademicResource.fromJson({'id':entry.key})),
+            trailing:IconButton(tooltip:'Remove bookmark',icon:const Icon(Icons.bookmark_remove),
+              onPressed:_writing?null:()=>_toggleSaved(entry.key,entry.value))),
+      ] else ...[
       Card(child:Padding(
         padding:const EdgeInsets.all(16),
         child:Column(
@@ -248,6 +305,9 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
                       style:const TextStyle(color:_muted,fontSize:11)),
                   ]),
                   const SizedBox(height:15),
+                  TextButton.icon(onPressed:_writing?null:()=>_toggleSaved(resource.id,resource.title),
+                    icon:Icon(_saved.containsKey(resource.id)?Icons.bookmark:Icons.bookmark_border),
+                    label:Text(_saved.containsKey(resource.id)?'Remove bookmark':'Save resource')),
                   Text(resource.title,style:const TextStyle(
                     color:_ink,fontSize:16,fontWeight:FontWeight.w900)),
                   const SizedBox(height:7),
@@ -270,6 +330,7 @@ class _AcademicResourcesPanelState extends State<AcademicResourcesPanel> {
             )),
           ),
         ],
+      ],
       ],
     ],
   );

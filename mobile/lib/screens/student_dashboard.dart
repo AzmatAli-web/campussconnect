@@ -50,6 +50,7 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   int _tab = 0;
+  String _receiptQuery='';
   bool _loading = true;
   String? _error;
   String? _busyEvent;
@@ -135,7 +136,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       ));
   }
 
-  void _selectTab(int value) => setState(() => _tab = value);
+  void _selectTab(int value) => setState(() { _tab=value; _receiptQuery=''; });
 
   void _openMarketplace() {
     Navigator.of(context).push(MaterialPageRoute<void>(
@@ -171,6 +172,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final accountKey = widget.previewMode ? 'preview' : 'live:${widget.api.baseUri}:${widget.profile.id}';
     const pages = ['Overview', 'Campus events', 'My registrations', 'Announcements', 'My profile', 'Timetable', 'Academic resources'];
     return Scaffold(
       appBar: AppBar(
@@ -229,11 +231,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 search:(q, scope)=>widget.api.searchAnnouncements(q, scope:scope),
                               ),
                               4 => _profilePage(),
-                              5 => TimetablePanel(
+                              5 => TimetablePanel(key:ValueKey(accountKey),accountKey:accountKey,
                                 api: widget.api,
                                 previewMode: widget.previewMode,
                               ),
-                              _ => AcademicResourcesPanel(
+                              _ => AcademicResourcesPanel(key:ValueKey(accountKey),accountKey:accountKey,
                                 api: widget.api,
                                 previewMode: widget.previewMode,
                               ),
@@ -471,7 +473,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _myRegistrations() => Column(
+  Widget _myRegistrations() {
+    final byId={for(final event in _events)event.id:event};
+    final rows=_registrations.where((r){
+      final event=byId[r.eventId];
+      final title=r.event?.title??event?.title??'';
+      final venue=r.event?.venue??event?.venue??'';
+      return title.toLowerCase().contains(_receiptQuery) || venue.toLowerCase().contains(_receiptQuery);
+    }).toList();
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _SectionHeader(title: 'My confirmed registrations'),
@@ -482,16 +492,20 @@ class _StudentDashboardState extends State<StudentDashboard> {
               style: TextStyle(color: _muted, fontSize: 12),
             ),
           ),
+          if(_registrations.isNotEmpty) TextFormField(
+            initialValue:_receiptQuery,maxLength:80,
+            decoration:const InputDecoration(labelText:'Search my registrations',hintText:'Event title or venue'),
+            onChanged:(value)=>setState(()=>_receiptQuery=value.trim().toLowerCase())),
+          if(_registrations.length==100) const Text('Searching your 100 most recent registrations.'),
           if (_registrations.isEmpty)
             const _EmptyView(
               title: 'No registrations yet',
               detail: 'Browse events and register during an open registration window.',
             )
+          else if(rows.isEmpty) const Text('No matching registrations.')
           else
-            ..._registrations.map((registration) {
-              final matching = _events.where((event) =>
-                  event.id == registration.eventId).toList();
-              final event = matching.isEmpty ? null : matching.first;
+            ...rows.map((registration) {
+              final event=byId[registration.eventId];
               final details = registration.event;
               final venue = details?.venue ?? event?.venue ?? '';
               final lines = [
@@ -525,6 +539,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
           ),
         ],
       );
+
+  }
 
   Widget _announcementCard(CampusAnnouncement announcement) => Padding(
         padding: const EdgeInsets.only(bottom: 13),

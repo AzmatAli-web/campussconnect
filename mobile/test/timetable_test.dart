@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 import 'package:campusconnect_mobile/services/campus_api.dart';
@@ -9,7 +10,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+class TwoGroups extends PreviewCampusApi {
+  @override
+  Future<List<CampusTimetableGroup>> getTimetableGroups() async => [
+    for(final section in ['A','B']) CampusTimetableGroup(term:'Fall',program:'BSE',semester:7,section:section),
+  ];
+}
+
 void main() {
+  testWidgets('timetable restores only the signed-in account’s published group', (tester) async {
+    final api=TwoGroups();
+    addTearDown(api.dispose);
+    final groups=await api.getTimetableGroups();
+    SharedPreferences.setMockInitialValues({'timetable-group:a':groups.last.key,'timetable-group:b':'expired'});
+    for(final account in ['a','b']){
+      await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(
+        child:TimetablePanel(key:ValueKey(account),api:api,accountKey:account)))));
+      await tester.pumpAndSettle();
+      expect(tester.widget<DropdownButton<String>>(find.byType(DropdownButton<String>)).value,
+        account=='a'?groups.last.key:groups.first.key);
+    }
+  });
+
   test('today follows PKT midnight and treats class end times as exclusive', () {
     CampusTimetableSlot slot(String id, String start, String end) =>
         CampusTimetableSlot.fromJson({'id':id,'startTime':start,'endTime':end,'dayOfWeek':1});

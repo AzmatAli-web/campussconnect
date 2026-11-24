@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -109,6 +110,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(search).controller!.text,isEmpty);
     expect(find.text('BSE · Semester 7 · CSC494'),findsOneWidget);
+  });
+
+  testWidgets('bookmarks survive reopening under the same account and stay private', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final api=PreviewCampusApi();
+    addTearDown(api.dispose);
+    Future<void> open(String account) async {
+      await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(
+        child:AcademicResourcesPanel(key:ValueKey(account),api:api,previewMode:true,accountKey:account)))));
+      await tester.pumpAndSettle();
+    }
+    Future<void> tap(String label) async {
+      final button=find.text(label);
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+    await open('student-a');
+    await tap('Save resource');
+    await open('student-b');
+    await tap('Saved');
+    expect(find.text('No saved resources on this device.'),findsOneWidget);
+    await open('student-a');
+    await tap('Saved');
+    expect(find.text('Introduction to Software Engineering'),findsOneWidget);
+    await tester.tap(find.byTooltip('Remove bookmark'));
+    await tester.pumpAndSettle();
+    expect(find.text('No saved resources on this device.'),findsOneWidget);
   });
 
   test('offline demo never makes an actual PDF download',()async{

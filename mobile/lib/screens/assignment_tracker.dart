@@ -18,6 +18,7 @@ class AssignmentTracker extends StatefulWidget {
 
 class _AssignmentTrackerState extends State<AssignmentTracker> {
   List<Assignment> items=[];
+  String query='', status='All';
   bool busy=true, failed=false;
   String get keyName=>'assignments:${widget.accountKey}';
 
@@ -82,6 +83,9 @@ class _AssignmentTrackerState extends State<AssignmentTracker> {
     final open=items.where((r)=>!r.done);
     final overdue=open.where((r)=>r.due.isBefore(today)).length;
     final week=open.where((r){final days=r.due.difference(today).inDays;return days>=0&&days<7;}).length;
+    final visible=sortedAssignments(items).where((row)=>
+      (status=='All' || (status=='Completed')==row.done) &&
+      (row.title.toLowerCase().contains(query) || row.course.toLowerCase().contains(query)));
     return Scaffold(appBar:AppBar(title:const Text('My assignments')),body:ListView(
       padding:const EdgeInsets.all(16),children:[
         const Text('Personal deadlines saved on this device. Dates follow Pakistan time.'),
@@ -93,8 +97,15 @@ class _AssignmentTrackerState extends State<AssignmentTracker> {
             FilledButton(onPressed:busy?null:()=>edit(),child:const Text('Add assignment')),
             OutlinedButton(onPressed:busy||open.isEmpty?null:export,child:const Text('Export open deadlines')),
           ]),
+          if(items.isNotEmpty)...[
+            TextField(decoration:const InputDecoration(labelText:'Search assignments by title or course'),
+              onChanged:(v)=>setState(()=>query=v.trim().toLowerCase())),
+            Wrap(spacing:6,children:[for(final value in ['All','Open','Completed'])
+              ChoiceChip(label:Text(value),selected:status==value,onSelected:(_)=>setState(()=>status=value))]),
+            if(visible.isEmpty)const Text('No matching assignments.'),
+          ],
           if(!busy&&items.isEmpty)const Text('No assignments yet.'),
-          for(final row in sortedAssignments(items)) Card(child:ListTile(
+          for(final row in visible) Card(child:ListTile(
             leading:Checkbox(value:row.done,onChanged:busy?null:(_)=>save([
               for(final item in items)item.id==row.id?item.toggle():item])),
             title:Text(row.title),

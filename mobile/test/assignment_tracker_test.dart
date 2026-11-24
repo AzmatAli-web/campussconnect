@@ -28,6 +28,8 @@ void main(){
     await tester.tap(find.text('Add assignment'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first,'Lab report');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save'));
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(find.text('Lab report'),findsOneWidget);

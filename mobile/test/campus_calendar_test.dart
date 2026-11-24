@@ -47,6 +47,20 @@ void main(){
     expect(feeds.agenda(DateTime.utc(2027,1,3),sources),isEmpty);
   });
 
+  test('weekly export includes each selected item once with campus-local class times',(){
+    final monday=DateTime.utc(2027,1,4);
+    final event=CampusEvent.fromJson({'id':'e','title':'Festival','startsAt':'2027-01-02T12:00:00Z','endsAt':'2027-01-05T12:00:00Z'});
+    final task=Assignment('a','Essay','',monday,AssignmentPriority.medium,false);
+    final feeds=CalendarFeeds([CampusTimetableSlot.fromJson({'id':'s','dayOfWeek':1,
+      'courseTitle':'Algorithms','startTime':'09:00','endTime':'10:00'})],[event,event],[task,task.toggle()]);
+    final file=weeklyCalendar(monday,feeds,CalendarSource.values.toSet(),monday)!;
+    expect('BEGIN:VEVENT'.allMatches(file).length,3);
+    expect(file,contains('DTSTART:20270104T040000Z'));
+    expect(file,contains('DTSTART:20270102T120000Z'));
+    expect(file,contains('DTEND;VALUE=DATE:20270105'));
+    expect(weeklyCalendar(monday,feeds,{},monday),isNull);
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

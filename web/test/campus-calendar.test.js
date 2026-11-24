@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
+import {weeklyCalendarFile,addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
 
 test('Monday-based weeks and 42-day month grid cross year boundaries cleanly',()=>{
  assert.equal(campusWeekStart('2026-11-23'),'2026-11-23');
@@ -60,4 +60,17 @@ test('an event carries across the year and stops at its exclusive PKT midnight',
   assert.equal(itemsOnCampusDay(day,{events})[0].detail,'Continues from an earlier day · Main hall');
  }
  assert.deepEqual(itemsOnCampusDay('2027-01-03',{events}),[]);
+});
+
+test('weekly export combines selected categories and includes overlapping events once',()=>{
+ const slot={id:'s1',dayOfWeek:1,startTime:'09:00',endTime:'10:00',courseTitle:'Algorithms'};
+ const event={id:'e1',status:'published',title:'Festival',startsAt:'2027-01-02T12:00:00Z',endsAt:'2027-01-05T12:00:00Z'};
+ const task={id:'a1',done:false,title:'Essay',due:'2027-01-10'};
+ const file=weeklyCalendarFile('2027-01-06',[slot],[event,event],[task,{...task,id:'late',due:'2027-01-11'}],
+  {class:true,event:true,assignment:true});
+ assert.equal(file.name,'campusconnect-week-2027-01-04.ics');
+ assert.equal(file.contents.match(/BEGIN:VEVENT/g).length,3);
+ for(const expected of ['DTSTART:20270104T040000Z','DTSTART:20270102T120000Z','DTEND;VALUE=DATE:20270111'])
+  assert.ok(file.contents.includes(expected));
+ assert.equal(weeklyCalendarFile('2027-01-06',[slot],[event],[task],{}),null);
 });

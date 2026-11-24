@@ -12,6 +12,7 @@ import '../services/dashboard_feeds.dart';
 import 'timetable_panel.dart';
 import 'assignment_tracker.dart';
 import 'study_planner.dart';
+import 'campus_calendar.dart';
 import '../services/study_plan.dart';
 import '../services/assignments.dart';
 import 'academic_resources_panel.dart';
@@ -336,6 +337,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ]);
           }),
           Wrap(spacing:8,children:[
+            OutlinedButton(onPressed:()=>_openStudyPage(CampusCalendar(api:widget.api,accountKey:_accountKey)),child:const Text('Campus calendar')),
             OutlinedButton(onPressed:()=>_openStudyPage(StudyPlanner(accountKey:_accountKey)),child:const Text('Weekly study planner')),
             OutlinedButton(onPressed:()=>_openStudyPage(AssignmentTracker(accountKey:_accountKey)),child:const Text('My assignments')),
           ]),

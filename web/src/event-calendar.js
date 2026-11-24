@@ -22,15 +22,15 @@ function eventTimes(event, now) {
 
 export const canExportEvent = (event, now = Date.now()) => eventTimes(event, now) !== null;
 
-const textValue = value => value
+export const textValue = value => value
   .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
   .replace(/\\/g, '\\\\')
   .replace(/\r\n|\r|\n/g, '\\n')
   .replace(/[,;]/g, '\\$&');
 
-const utc = value => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+export const utc = value => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 
-function foldLine(line) {
+export function foldLine(line) {
   let folded = '';
   let bytes = 0;
   for (const character of line) {
@@ -62,7 +62,10 @@ export function buildEventCalendar(event, now = Date.now()) {
 
 export function downloadEventCalendar(event) {
   const file = buildEventCalendar(event);
-  if (!file) return;
+  if (file) downloadCalendarFile(file);
+}
+
+export function downloadCalendarFile(file) {
   const url = URL.createObjectURL(new Blob([file.contents], {type: 'text/calendar;charset=utf-8'}));
   const link = document.createElement('a');
   link.href = url;

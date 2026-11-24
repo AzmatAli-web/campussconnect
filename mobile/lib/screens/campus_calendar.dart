@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/campus_models.dart';
@@ -98,6 +102,24 @@ class _CampusCalendarState extends State<CampusCalendar> {
     if(firstDay!=oldStart || month!=oldMonth)loadEvents();
   }
 
+  Future<void> exportWeek() async {
+    final contents=weeklyCalendar(selected,feeds,sources,DateTime.now());
+    String? message;
+    if(contents==null){
+      message='No calendar items to export for this week.';
+    }else{
+      try{
+        final directory=await getTemporaryDirectory();
+        final monday=_label(calendarMonday(selected));
+        final file=File('${directory.path}/campusconnect-week-$monday-${const Uuid().v4()}.ics');
+        await file.writeAsString(contents,flush:true);
+        final result=await OpenFilex.open(file.path,type:'text/calendar',uti:'com.apple.ical.ics');
+        if(result.type!=ResultType.done)message='Open this file with a compatible calendar app.';
+      }catch(_){message='Could not open the weekly calendar.';}
+    }
+    if(mounted && message!=null)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(message)));
+  }
+
   void move(int step)=>navigate(month?shiftCalendarMonth(selected,step):selected.add(Duration(days:7*step)),month);
 
   @override
@@ -107,6 +129,8 @@ class _CampusCalendarState extends State<CampusCalendar> {
     final agendaDays=weeklyAgenda?List.generate(7,(i)=>week.add(Duration(days:i))):[selected];
     final agenda={for(final day in agendaDays) day:feeds.agenda(day,sources,query:weeklyAgenda?search.text:'')};
     return Scaffold(appBar:AppBar(title:const Text('Campus calendar'),actions:[
+      IconButton(tooltip:'Export selected week (.ics)',onPressed:loading||eventLoading||eventFailed||warning.isNotEmpty?null:exportWeek,
+        icon:const Icon(Icons.file_download)),
       IconButton(tooltip:'Refresh calendar',onPressed:loading?null:load,icon:const Icon(Icons.refresh)),
     ]),body:ListView(padding:const EdgeInsets.all(16),children:[
       if(loading||eventLoading)const LinearProgressIndicator(),

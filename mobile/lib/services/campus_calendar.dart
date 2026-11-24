@@ -1,3 +1,4 @@
+import 'event_calendar.dart';
 import 'assignments.dart';
 import '../models/campus_models.dart';
 
@@ -57,4 +58,46 @@ class CalendarFeeds {
         return time!=0?time:a.title.compareTo(b.title);
       });
   }
+}
+
+String? weeklyCalendar(DateTime selected,CalendarFeeds feeds,Set<CalendarSource> sources,DateTime now){
+  final monday=calendarMonday(selected),rows=<String>[],seen=<String>{};
+  final start=monday.subtract(const Duration(hours:5)),end=start.add(const Duration(days:7));
+  String day(DateTime value)=>value.toIso8601String().substring(0,10);
+  void entry(String id,String domain,String title,List<String> times,[String location='']){
+    final uid='$id@$domain.campusconnect.invalid';
+    if(!RegExp(r'^[-\w]+$').hasMatch(id)||title.isEmpty||!seen.add(uid))return;
+    rows.addAll(['BEGIN:VEVENT','UID:$uid','DTSTAMP:${calendarStamp(now)}',...times,
+      'SUMMARY:${calendarEscape(title)}',if(location.isNotEmpty)'LOCATION:${calendarEscape(location)}','END:VEVENT']);
+  }
+  if(sources.contains(CalendarSource.classes)){
+    for(final slot in feeds.slots){
+      if(slot.dayOfWeek<1||slot.dayOfWeek>7||slot.id.isEmpty)continue;
+      final date=day(monday.add(Duration(days:slot.dayOfWeek-1)));
+      final from=DateTime.tryParse('${date}T${slot.startTime}:00+05:00');
+      final to=DateTime.tryParse('${date}T${slot.endTime}:00+05:00');
+      if(from!=null&&to!=null&&to.isAfter(from)){
+        entry('${slot.id}-$date','classes',slot.courseTitle.isEmpty?slot.courseCode:slot.courseTitle,
+          ['DTSTART:${calendarStamp(from)}','DTEND:${calendarStamp(to)}'],slot.room);
+      }
+    }
+  }
+  if(sources.contains(CalendarSource.events)){
+    for(final event in feeds.events){
+      final from=event.startsAt,to=event.endsAt;
+      if(from!=null&&to!=null&&from.isBefore(end)&&to.isAfter(start)&&to.isAfter(from)){
+        entry(event.id,'events',event.title,['DTSTART:${calendarStamp(from)}','DTEND:${calendarStamp(to)}'],event.venue);
+      }
+    }
+  }
+  if(sources.contains(CalendarSource.deadlines)){
+    for(final task in feeds.deadlines){
+      if(!task.done&&!task.due.isBefore(monday)&&task.due.isBefore(monday.add(const Duration(days:7)))){
+        entry(task.id,'assignments',task.title,['DTSTART;VALUE=DATE:${day(task.due).replaceAll('-','')}',
+          'DTEND;VALUE=DATE:${day(task.due.add(const Duration(days:1))).replaceAll('-','')}']);
+      }
+    }
+  }
+  if(rows.isEmpty)return null;
+  return calendarLines(['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Weekly Agenda//EN',...rows,'END:VCALENDAR']);
 }

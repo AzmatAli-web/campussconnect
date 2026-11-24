@@ -1,3 +1,4 @@
+import {foldLine,textValue,utc} from './event-calendar.js';
 import {todayAtCampus} from './assignment-planner.js';
 
 const datePattern=/^20\d\d-\d\d-\d\d$/;
@@ -75,3 +76,39 @@ export function itemsOnCampusDay(day,{slots=[],events=[],assignments=[]}={}){
   ||rank[a.kind]-rank[b.kind]||a.title.localeCompare(b.title));
 }
 export function calendarToday(now=new Date()){return todayAtCampus(now);}
+
+export function weeklyCalendarFile(selected,slots,events,assignments,enabled,now=Date.now()){
+ const dates=calendarDates('week',selected);
+ if(!dates.length||dates.some(day=>!day))return null;
+ const start=Date.parse(dates[0]+'T00:00:00+05:00'),end=start+7*dayMs;
+ const rows=[],seen=new Set();
+ function entry(id,domain,title,times,location){
+  if(typeof id!=='string'||!/^[-\w]+$/.test(id)||!title)return;
+  const uid=id+'@'+domain+'.campusconnect.invalid';
+  if(seen.has(uid))return;
+  seen.add(uid);
+  rows.push('BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+utc(now),...times,'SUMMARY:'+textValue(title),
+   ...(location?['LOCATION:'+textValue(location)]:[]),'END:VEVENT');
+ }
+ if(enabled.class)for(const slot of slots){
+  const day=dates[slot.dayOfWeek-1];
+  if(!day||!slot.id)continue;
+  const from=Date.parse(day+'T'+slot.startTime+':00+05:00'),to=Date.parse(day+'T'+slot.endTime+':00+05:00');
+  if(to>from)entry(slot.id+'-'+day,'classes',slot.courseTitle||slot.courseCode,['DTSTART:'+utc(from),'DTEND:'+utc(to)],slot.room);
+ }
+ if(enabled.event)for(const event of events){
+  const from=Date.parse(event.startsAt),to=Date.parse(event.endsAt);
+  if(event.status==='published'&&from<end&&to>start&&to>from)
+   entry(event.id,'events',event.title,['DTSTART:'+utc(from),'DTEND:'+utc(to)],event.venue);
+ }
+ if(enabled.assignment)for(const task of assignments){
+  if(task.done===false&&dates.includes(task.due)){
+   const due=dateMs(task.due);
+   entry(task.id,'assignments',task.title,['DTSTART;VALUE=DATE:'+iso(due).replaceAll('-',''),
+    'DTEND;VALUE=DATE:'+iso(due+dayMs).replaceAll('-','')]);
+  }
+ }
+ if(!rows.length)return null;
+ const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Weekly Agenda//EN',...rows,'END:VCALENDAR'];
+ return {name:'campusconnect-week-'+dates[0]+'.ics',contents:lines.map(foldLine).join('\r\n')+'\r\n'};
+}

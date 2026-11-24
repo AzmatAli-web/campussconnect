@@ -1,7 +1,8 @@
+import {downloadCalendarFile} from './event-calendar.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {readAssignments} from './assignment-planner.js';
 import {chooseTimetableGroup,readTimetablePreference} from './timetable-preference.js';
-import {calendarDates,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
+import {calendarDates,weeklyCalendarFile,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
 import './campus-calendar.css';
 
 const weekdays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -82,6 +83,10 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
   const catalog={slots:results.slots,events:matching?.rows??[],assignments:tasks};
   return new Map(dates.map(date=>[date,itemsOnCampusDay(date,catalog).filter(x=>enabled[x.kind])]));
  },[dates,results.slots,matching,tasks,enabled]);
+ const weeklyFile=useMemo(()=>{
+  if(results.loading||results.errors.length||!matching||matching.error)return null;
+  return weeklyCalendarFile(selected,results.slots,matching.rows,tasks,enabled);
+ },[selected,results,matching,tasks,enabled]);
  const activeAgenda=agenda.get(selected)??[];
  function navigate(direction){
   const next=moveCalendar(view,anchor,direction);
@@ -100,7 +105,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
    </div></div>
    <div className="wc-calendar-toolbar">
     <div role="group" aria-label="Calendar view">
-     <button type="button" className="wc-outline" aria-pressed={view==='week'} onClick={()=>setView('week')}>Week</button>
+     <button type="button" className="wc-outline" aria-pressed={view==='week'} onClick={()=>{setAnchor(selected);setView('week');}}>Week</button>
      <button type="button" className="wc-outline" aria-pressed={view==='month'} onClick={()=>setView('month')}>Month</button>
     </div>
     <div>
@@ -108,6 +113,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
      <strong aria-live="polite">{periodLabel}</strong>
      <button type="button" className="wc-outline" onClick={()=>navigate(1)}>Next {view}</button>
      <button type="button" className="wc-outline" onClick={todayClick}>Today</button>
+     <button type="button" className="wc-outline" disabled={!weeklyFile} onClick={()=>downloadCalendarFile(weeklyFile)}>Export selected week (.ics)</button>
      <button type="button" className="wc-outline" onClick={()=>setReload(n=>n+1)}>Refresh schedule</button>
     </div>
    </div>

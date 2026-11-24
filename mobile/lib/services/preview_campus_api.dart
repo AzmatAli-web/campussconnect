@@ -242,9 +242,10 @@ class PreviewCampusApi extends CampusApi {
 
   @override
   Future<List<CampusMarketplaceItem>> getMarketplace({
-    String? query,String? category,
+    String? query,String? category,int? minPrice,int? maxPrice,
   }) async => _demoMarketplace.where((item)=>
     item.status=='published' &&
+    (minPrice==null || item.pricePkr>=minPrice) && (maxPrice==null || item.pricePkr<=maxPrice) &&
     (category==null||category.isEmpty||item.category==category) &&
     (query==null||query.trim().isEmpty||
       item.title.toLowerCase().contains(query.trim().toLowerCase())||

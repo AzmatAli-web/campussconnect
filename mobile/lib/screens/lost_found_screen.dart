@@ -28,7 +28,8 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
   List<CampusLostFoundItem> _reports=const [];
   List<CampusLostFoundItem> _mine=const [];
   String _kind='lost',_category='electronics';
-  String _contact='helpdesk',_kindFilter='';
+  String _contact='helpdesk',_kindFilter='', _categoryFilter='';
+  int _revision=0;
   String? _editing,_error;
   bool _loading=true,_busy=false;
 
@@ -46,13 +47,14 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
     super.dispose();
   }
   Future<void> _load() async {
+    final revision=++_revision;
     setState(()=>_loading=true);
     try{
       final reports=await widget.api.getLostFoundItems(
-        query:_query.text.trim(),kind:_kindFilter,
+        query:_query.text.trim(),kind:_kindFilter,category:_categoryFilter,
       );
       final mine=await widget.api.getMyLostFoundItems();
-      if(mounted){
+      if(mounted && revision==_revision){
         setState((){
           _reports=reports;
           _mine=mine;
@@ -60,15 +62,15 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
         });
       }
     }on CampusApiException catch(error){
-      if(mounted){
+      if(mounted && revision==_revision){
         setState(()=>_error=error.message);
       }
     }catch(_){
-      if(mounted){
+      if(mounted && revision==_revision){
         setState(()=>_error='Unable to retrieve campus reports.');
       }
     }finally{
-      if(mounted){
+      if(mounted && revision==_revision){
         setState(()=>_loading=false);
       }
     }
@@ -290,6 +292,12 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
             suffixIcon:IconButton(icon:const Icon(Icons.search),
               onPressed:_load),
           )),
+        DropdownButtonFormField<String>(
+          initialValue:_categoryFilter,decoration:const InputDecoration(labelText:'Filter by item category'),
+          items:[const DropdownMenuItem(value:'',child:Text('All categories')),
+            ..._categories.map((c)=>DropdownMenuItem(value:c,child:Text(c)))],
+          onChanged:(v){setState(()=>_categoryFilter=v??'');_load();},
+        ),
         DropdownButtonFormField<String>(
           initialValue:_kindFilter,
           decoration:const InputDecoration(labelText:'Report type'),

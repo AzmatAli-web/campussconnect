@@ -321,10 +321,12 @@ class CampusApi {
 
   /// All Marketplace calls enforce identity, tenant scope and ownership on Express.
   Future<List<CampusMarketplaceItem>> getMarketplace({
-    String? query,String? category,
+    String? query,String? category,int? minPrice,int? maxPrice,
   }) async {
     final q=Uri(queryParameters:{
       'limit':'100',
+      if(minPrice!=null)'minPrice':'$minPrice',
+      if(maxPrice!=null)'maxPrice':'$maxPrice',
       if(query!=null && query.trim().isNotEmpty)'q':query.trim(),
       if(category!=null && category.isNotEmpty)'category':category,
     }).query;

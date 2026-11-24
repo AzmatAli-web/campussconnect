@@ -28,6 +28,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final _title=TextEditingController();
   final _description=TextEditingController();
   final _price=TextEditingController();
+  final _minimum=TextEditingController(), _maximum=TextEditingController();
+  int _revision=0;
   final _search=TextEditingController();
   final Map<String,Future<Uint8List>> _photoCache={};
   List<CampusMarketplaceItem> _feed=const [],_mine=const [];
@@ -40,7 +42,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void initState(){super.initState();_reload();}
   @override
   void dispose(){
-    _title.dispose();_description.dispose();_price.dispose();_search.dispose();
+    _title.dispose();_description.dispose();_price.dispose();_search.dispose();_minimum.dispose();_maximum.dispose();
     super.dispose();
   }
   void _notify(String message,{bool error=false}){
@@ -51,23 +53,31 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     ));
   }
   Future<void> _reload()async{
+    final revision=++_revision;
+    final low=_minimum.text.trim(), high=_maximum.text.trim();
+    final min=low.isEmpty?0:int.tryParse(low), max=high.isEmpty?5000000:int.tryParse(high);
+    if(min==null || max==null || min<0 || max>5000000 || min>max){
+      setState((){_loading=false;_error='Use whole PKR amounts from 0 to 5,000,000, with minimum at or below maximum.';});
+      return;
+    }
     setState(()=>_loading=true);
     try{
       final feed=await widget.api.getMarketplace(
         query:_search.text.trim(),category:_categoryFilter,
+        minPrice:low.isEmpty?null:min,maxPrice:high.isEmpty?null:max,
       );
       final mine=await widget.api.getMyMarketplace();
-      if(mounted){
+      if(mounted && revision==_revision){
         setState((){
           _feed=feed;_mine=mine;_error=null;_photoCache.clear();
         });
       }
     }on CampusApiException catch(e){
-      if(mounted)setState(()=>_error=e.message);
+      if(mounted && revision==_revision)setState(()=>_error=e.message);
     }catch(_){
-      if(mounted)setState(()=>_error='Unable to load campus Marketplace.');
+      if(mounted && revision==_revision)setState(()=>_error='Unable to load campus Marketplace.');
     }finally{
-      if(mounted)setState(()=>_loading=false);
+      if(mounted && revision==_revision)setState(()=>_loading=false);
     }
   }
   void _clearForm(){
@@ -329,6 +339,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           decoration:InputDecoration(labelText:'Search title or description',
             suffixIcon:IconButton(icon:const Icon(Icons.search),
               onPressed:_reload))),
+        Row(children:[
+          Expanded(child:TextField(controller:_minimum,keyboardType:TextInputType.number,
+            decoration:const InputDecoration(labelText:'Min price (PKR)'))),
+          const SizedBox(width:10),
+          Expanded(child:TextField(controller:_maximum,keyboardType:TextInputType.number,
+            decoration:const InputDecoration(labelText:'Max price (PKR)'))),
+        ]),
+        TextButton(onPressed:_reload,child:const Text('Apply price range')),
         DropdownButtonFormField<String>(
           initialValue:_categoryFilter,
           decoration:const InputDecoration(labelText:'Filter category'),

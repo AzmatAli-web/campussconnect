@@ -35,13 +35,21 @@ void main(){
     expect(find.text('Lab report'),findsOneWidget);
     await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Completed'),findsOneWidget);
+    expect(find.textContaining(' · Completed'),findsOneWidget);
     await open('two');
     expect(find.text('Lab report'),findsNothing);
     await open('one');
-    expect(find.textContaining('Completed'),findsOneWidget);
+    expect(find.textContaining(' · Completed'),findsOneWidget);
     await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Completed'),findsNothing);
+    expect(find.textContaining(' · Completed'),findsNothing);
+    await tester.tap(find.text('Completed'));
+    await tester.pumpAndSettle();
+    expect(find.text('No matching assignments.'),findsOneWidget);
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField),'REPORT');
+    await tester.pumpAndSettle();
+    expect(find.text('Lab report'),findsOneWidget);
   });
 }

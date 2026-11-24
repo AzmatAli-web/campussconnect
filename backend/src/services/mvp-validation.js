@@ -68,7 +68,7 @@ export function pagination(query){
  return {page,limit,skip:(page-1)*limit};
 }
 export function eventBrowseQuery(query,now=new Date()){
- const allowed=['page','limit','q','when'];
+ const allowed=['page','limit','q','when','from','to'];
  if(Object.keys(query).some(key=>!allowed.includes(key)||typeof query[key]!=='string')){
   throw new HttpError(400,'INVALID_EVENT_FILTER','Unsupported event filter');
  }
@@ -79,6 +79,19 @@ export function eventBrowseQuery(query,now=new Date()){
   throw new HttpError(400,'INVALID_EVENT_FILTER','Invalid event search or date filter');
  }
  const filter={};
+ if(query.from!==undefined || query.to!==undefined){
+  const midnight=value=>{
+   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return NaN;
+   const utc=Date.parse(value+'T00:00:00Z');
+   if(!Number.isFinite(utc)||new Date(utc).toISOString().slice(0,10)!==value)return NaN;
+   return utc-5*3600000;
+  };
+  const start=midnight(query.from),end=midnight(query.to);
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start||end-start>41*86400000){
+   throw new HttpError(400,'INVALID_EVENT_RANGE','Choose a campus date range of 1 to 42 days');
+  }
+  filter.startsAt={$gte:new Date(start),$lt:new Date(end+86400000)};
+ }
  if(when==='upcoming')filter.endsAt={$gt:now};
  if(when==='past')filter.endsAt={$lte:now};
  if(search){

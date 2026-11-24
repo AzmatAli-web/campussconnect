@@ -133,8 +133,10 @@ class _TimetablePanelState extends State<TimetablePanel> {
       if(!mounted || _selected!=group.key)return;
       if(!await prefs.setString(key,group.key))throw StateError('Write failed');
     } catch (_) {
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content:Text('Could not remember the group on this device.')));
+      }
     }
   }
 

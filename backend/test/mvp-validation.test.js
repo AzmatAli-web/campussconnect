@@ -70,3 +70,15 @@ test('announcement search uses literal title and body terms and bounds audience 
  }
  assert.throws(()=>announcementBrowseQuery({page:'0'}),{code:'INVALID_PAGINATION'});
 });
+
+test('calendar date ranges include both PKT dates and bound the grid to 42 days',()=>{
+ const range=(from,to)=>eventBrowseQuery({from,to}).filter.startsAt;
+ assert.deepEqual(range('2028-02-29','2028-03-01'),{
+  $gte:new Date('2028-02-28T19:00:00Z'),$lt:new Date('2028-03-01T19:00:00Z')
+ });
+ assert.ok(range('2026-12-01','2027-01-11'));
+ for(const query of [{from:'2027-01-01'},{to:'2027-01-01'},{from:'2027-02-29',to:'2027-03-01'},
+  {from:'2027-02-01',to:'2027-01-31'},{from:'2026-12-01',to:'2027-01-12'}]){
+  assert.throws(()=>eventBrowseQuery(query),{code:'INVALID_EVENT_RANGE'});
+ }
+});

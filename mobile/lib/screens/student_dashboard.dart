@@ -10,6 +10,7 @@ import '../services/campus_api.dart';
 import '../services/live_diagnostics.dart';
 import '../services/dashboard_feeds.dart';
 import 'timetable_panel.dart';
+import 'assignment_tracker.dart';
 import 'academic_resources_panel.dart';
 import 'my_complaints_screen.dart';
 import 'my_fees_screen.dart';
@@ -172,7 +173,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final accountKey = widget.previewMode ? 'preview' : 'live:${widget.api.baseUri}:${widget.profile.id}';
+    final accountKey = _accountKey;
     const pages = ['Overview', 'Campus events', 'My registrations', 'Announcements', 'My profile', 'Timetable', 'Academic resources'];
     return Scaffold(
       appBar: AppBar(
@@ -292,6 +293,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
       );
 
+  String get _accountKey => widget.previewMode ? 'preview' : 'live:${widget.api.baseUri}:${widget.profile.id}';
+
   Widget _overview() {
     final upcoming = _events.where((e) =>
       e.startsAt == null || e.startsAt!.isAfter(DateTime.now())).toList();
@@ -303,6 +306,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
         const SizedBox(height: 4),
         const Text('Your campus at a glance', style: TextStyle(color: _muted)),
         const SizedBox(height: 12),
+        if (widget.profile.canRegister)
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => AssignmentTracker(accountKey: _accountKey))),
+            icon: const Icon(Icons.assignment_outlined), label: const Text('My assignments')),
         SizedBox(width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: _openMarketplace,

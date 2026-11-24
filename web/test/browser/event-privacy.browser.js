@@ -92,7 +92,7 @@ test('real React workspace: two students share event counts, never receipts or r
           const from=url.searchParams.get('from'),to=url.searchParams.get('to');
           const span=(Date.parse(to)-Date.parse(from))/86400000+1;
           assert.ok([7,42].includes(span));
-          const sample={...row(),startsAt:from+'T12:00:00Z'};
+          const sample={...row(),startsAt:from+'T12:00:00Z',endsAt:from+'T13:00:00Z'};
           return send(route,pageNumber===1
             ? Array.from({length:100},(_,i)=>({...sample,id:'range-'+i}))
             : [{...sample,id:'range-last',title:'Calendar page two'}]);
@@ -494,6 +494,9 @@ test('real React workspace: two students share event counts, never receipts or r
   assert.equal(await a.getByRole('group',{name:'Month dates'}).getByRole('button').count(),42);
   await a.getByRole('group',{name:'Month dates'}).getByRole('button').first().click();
   await a.getByText('Calendar page two',{exact:true}).waitFor();
+  const [weekFile]=await Promise.all([a.waitForEvent('download'),
+    a.getByRole('button',{name:'Export selected week (.ics)'}).click()]);
+  assert.match(weekFile.suggestedFilename(),/^campusconnect-week-.*\.ics$/);
   await a.getByRole('button', {name:'Next month'}).click();
   await a.getByRole('button', {name:'Today',exact:true}).click();
   await a.getByRole('group',{name:'Calendar categories'}).getByLabel('Campus event').uncheck();

@@ -56,6 +56,7 @@ export function itemsOnCampusDay(day,{slots=[],events=[],assignments=[]}={}){
   if(slot?.dayOfWeek!==weekday||typeof slot.startTime!=='string')continue;
   items.push({id:'class:'+slot.id+':'+day,kind:'class',
    title:slot.courseTitle||slot.courseCode||'Class',time:slot.startTime,
+   start:Date.parse(day+'T'+slot.startTime+':00+05:00'),end:Date.parse(day+'T'+slot.endTime+':00+05:00'),
    detail:[slot.courseCode,slot.room].filter(Boolean).join(' · ')});
  }
  for(const event of events){
@@ -64,12 +65,22 @@ export function itemsOnCampusDay(day,{slots=[],events=[],assignments=[]}={}){
   const continuing=stamp.day<day;
   if(continuing && !(Date.parse(event.endsAt)>midnight))continue;
   items.push({id:'event:'+event.id,kind:'event',title:event.title||'Campus event',
+   start:Math.max(midnight,Date.parse(event.startsAt)),end:Math.min(midnight+dayMs,Date.parse(event.endsAt)),
    time:continuing?'':stamp.time,detail:[continuing?'Continues from an earlier day':'',event.venue].filter(Boolean).join(' · ')});
  }
  for(const item of assignments){
   if(item?.done!==false||item.due!==day)continue;
   items.push({id:'assignment:'+item.id,kind:'assignment',title:item.title,
    time:'',detail:[item.course,item.priority+' priority'].filter(Boolean).join(' · ')});
+ }
+ const timed=items.filter(item=>item.end>item.start).sort((a,b)=>a.start-b.start);
+ let latestEnd=null;
+ for(const item of timed){
+  if(latestEnd && item.start<latestEnd.end){
+   item.conflict=true;
+   latestEnd.conflict=true;
+  }
+  if(!latestEnd || item.end>latestEnd.end)latestEnd=item;
  }
  const rank={class:0,event:1,assignment:2};
  return items.sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99')

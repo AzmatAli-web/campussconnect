@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {eventInput,registrationInput,announcementInput,availability,pagination,eventBrowseQuery,announcementBrowseQuery} from '../src/services/mvp-validation.js';
+import {dateField,eventInput,registrationInput,announcementInput,availability,pagination,eventBrowseQuery,announcementBrowseQuery} from '../src/services/mvp-validation.js';
 
 const now=new Date('2026-10-30T12:00:00Z');
 const event={
@@ -87,4 +87,11 @@ test('calendar date ranges include both PKT dates and bound the grid to 42 days'
   {from:'2027-02-01',to:'2027-01-31'},{from:'2026-12-01',to:'2027-01-12'}]){
   assert.throws(()=>eventBrowseQuery(query),{code:'INVALID_EVENT_RANGE'});
  }
+});
+
+test('validate the original civil date before converting its timezone',()=>{
+ for(const value of ['2027-02-29T10:00Z','2028-04-31T10:00:00+05:00','2028-02-29T24:00Z']){
+  assert.throws(()=>dateField(value,'start'),{code:'INVALID_DATE'});
+ }
+ assert.equal(dateField('2028-02-29T00:30+05:00','start').toISOString(),'2028-02-28T19:30:00.000Z');
 });

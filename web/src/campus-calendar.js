@@ -123,3 +123,31 @@ export function weeklyCalendarFile(selected,slots,events,assignments,enabled,now
  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Weekly Agenda//EN',...rows,'END:VCALENDAR'];
  return {name:'campusconnect-week-'+dates[0]+'.ics',contents:lines.map(foldLine).join('\r\n')+'\r\n'};
 }
+
+export function overlapDetails(item,items){
+ return items.filter(other=>other!==item && other.start<item.end && item.start<other.end)
+  .map(other=>({title:other.title,kind:other.kind,start:Math.max(item.start,other.start),end:Math.min(item.end,other.end)}))
+  .filter(pair=>pair.end>pair.start).sort((a,b)=>a.start-b.start||a.end-b.end||a.title.localeCompare(b.title));
+}
+
+export function conflictSummary(items){
+ const changes=new Map();
+ for(const {start,end} of items){
+  if(!(end>start))continue;
+  changes.set(start,(changes.get(start)??0)+1);
+  changes.set(end,(changes.get(end)??0)-1);
+ }
+ let active=0,peak=0,duration=0,previous=0;
+ for(const [time,delta] of [...changes].sort((a,b)=>a[0]-b[0])){
+  if(active>=2)duration+=time-previous;
+  active+=delta;
+  peak=Math.max(peak,active);
+  previous=time;
+ }
+ return {duration,peak};
+}
+
+export function durationLabel(milliseconds){
+ const seconds=Math.ceil(milliseconds/1000);
+ return [Math.floor(seconds/60)+' min',seconds%60?seconds%60+' sec':''].filter(Boolean).join(' ');
+}

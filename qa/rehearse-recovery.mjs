@@ -16,6 +16,7 @@ const run = (...args) => docker('exec', name, ...args);
 const mongo = js => run('mongosh', '--norc', '--quiet', '--host', host, '--eval', js);
 const rows = [{_id: 'event-1', title: 'Synthetic Campus Workshop', room: 'Lab 2'},
   {_id: 'event-2', title: 'Synthetic Campus Fair', room: 'Hall 1'}];
+const receipt = {_id:'receipt-1', eventId:'event-1', studentId:'synthetic-student'};
 const started = performance.now();
 let ownsContainer = false;
 
@@ -32,7 +33,10 @@ try {
 
   await mongo(`const events = db.getSiblingDB('${source}').events;
     events.createIndex({title: 1}, {name:'unique_title',unique:true});
-    events.insertMany(${JSON.stringify(rows)});`);
+    events.insertMany(${JSON.stringify(rows)});
+    const registrations = db.getSiblingDB('${source}').event_registrations;
+    registrations.createIndex({eventId:1,studentId:1},{unique:true});
+    registrations.insertOne(${JSON.stringify(receipt)});`);
   await run('mongodump', '--host', host, '--db=' + source, '--archive=' + archive, '--gzip');
   await run('test', '-s', archive);
   // Change the source after backup so verification proves recovery of earlier data.
@@ -44,11 +48,16 @@ try {
   const {stdout: verification} = await mongo(`
     const recovered = db.getSiblingDB('${restored}').events;
     const s = db.getSiblingDB('${source}').events;
-    print(JSON.stringify({rows:recovered.find().sort({_id:1}).toArray(),
+    const registrations = db.getSiblingDB('${restored}').event_registrations;
+    print(JSON.stringify({receipt:registrations.findOne({_id:'receipt-1'}),registrationIndexes:registrations.getIndexes(),rows:recovered.find().sort({_id:1}).toArray(),
       indexes:recovered.getIndexes(), source:s.find().sort({_id:1}).toArray()}));
   `);
   const result = JSON.parse(verification.trim());
   assert.deepEqual(result.rows, rows, 'Restored documents differ from the backup fixture');
+  assert.deepEqual(result.receipt, receipt, 'Registration did not survive the restore');
+  assert.ok(result.rows.some(event => event._id === result.receipt.eventId), 'Restored registration refers to a missing event');
+  assert.ok(result.registrationIndexes.some(index => index.unique &&
+    JSON.stringify(index.key) === JSON.stringify({eventId:1,studentId:1})), 'Registration uniqueness index was not restored');
   assert.deepEqual(result.source, [rows[1]], 'Restore unexpectedly changed the source database');
   assert.ok(result.indexes.some(index => index.name === 'unique_title' &&
     index.unique === true && index.key?.title === 1), 'Unique title index was not recovered');

@@ -164,12 +164,12 @@ String durationLabel(int milliseconds){
 
 typedef FreeWindow=({DateTime start, DateTime end});
 
-List<FreeWindow> freeWindows(List<AgendaItem> items,DateTime start,DateTime end,int minimumMinutes){
+List<FreeWindow> freeWindows(List<AgendaItem> items,DateTime start,DateTime end,int minimumMinutes,{Iterable<FreeWindow> reservations=const []}){
   final gaps=<FreeWindow>[];
-  final busy=items.where((item){
-    final from=item.start,to=item.end;
-    return from!=null && to!=null && to.isAfter(from) && to.isAfter(start) && from.isBefore(end);
-  }).toList()..sort((a,b)=>a.start!.compareTo(b.start!));
+  final busy=[...reservations,for(final item in items)
+    if(item.start!=null && item.end!=null)(start:item.start!,end:item.end!)]
+    .where((row)=>row.end.isAfter(row.start)&&row.end.isAfter(start)&&row.start.isBefore(end))
+    .toList()..sort((a,b)=>a.start.compareTo(b.start));
   var cursor=start;
   void addGap(DateTime until){
     if(until.isAfter(cursor) && until.difference(cursor).inMinutes>=minimumMinutes){
@@ -177,8 +177,8 @@ List<FreeWindow> freeWindows(List<AgendaItem> items,DateTime start,DateTime end,
     }
   }
   for(final item in busy){
-    addGap(item.start!);
-    if(item.end!.isAfter(cursor))cursor=item.end!;
+    addGap(item.start);
+    if(item.end.isAfter(cursor))cursor=item.end;
   }
   addGap(end);
   return gaps;

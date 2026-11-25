@@ -500,6 +500,12 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByText('Calendar page two',{exact:true}).waitFor();
   await a.getByRole('region',{name:'Selected day agenda'}).getByText('Scheduling conflict',{exact:true}).first().waitFor();
   await a.getByLabel('Show conflicts only in agenda').uncheck();
+  const finder=a.getByRole('region',{name:'Free-time finder'});
+  await finder.getByLabel('Minimum gap').selectOption('60');
+  await finder.getByLabel('Search hours').selectOption('08-12');
+  await finder.getByRole('button',{name:'Next available day this week'}).click();
+  await a.getByText('Tuesday a',{exact:true}).waitFor();
+  await a.getByRole('button',{name:'Previous conflict day'}).click();
   const [weekFile]=await Promise.all([a.waitForEvent('download'),
     a.getByRole('button',{name:'Export selected week (.ics)'}).click()]);
   assert.match(weekFile.suggestedFilename(),/^campusconnect-week-.*\.ics$/);

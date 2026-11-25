@@ -25,6 +25,8 @@ class CampusCalendar extends StatefulWidget {
 class _CampusCalendarState extends State<CampusCalendar> {
   DateTime selected=campusDate(DateTime.now());
   bool conflictsOnly=false;
+  int minimumGap=30;
+  (int,int) searchHours=(8,18);
   bool month=false, weeklyAgenda=false, loading=true;
   final sources=CalendarSource.values.toSet();
   final search=TextEditingController();
@@ -207,6 +209,7 @@ class _CampusCalendarState extends State<CampusCalendar> {
       SwitchListTile(title:const Text('Search whole week'),value:weeklyAgenda,onChanged:(v)=>setState(()=>weeklyAgenda=v)),
       if(weeklyAgenda)TextField(controller:search,decoration:const InputDecoration(labelText:'Search weekly agenda'),
         onChanged:(_)=>setState((){})),
+      if(ready)freeTimeFinder(week),
       for(final entry in agenda.entries)if(entry.value.isNotEmpty || !weeklyAgenda)...[
         Text('${_label(entry.key)} · PKT',style:Theme.of(context).textTheme.titleMedium),
         if(ready)Text('Time with overlapping items: ${durationLabel(summaries[entry.key]!.milliseconds)} · Peak simultaneous items: ${summaries[entry.key]!.peak}'),
@@ -217,6 +220,40 @@ class _CampusCalendarState extends State<CampusCalendar> {
       ],
       if(!loading && !eventLoading && !eventFailed && agenda.values.every((rows)=>rows.isEmpty))const Text('No matching items for this period.'),
     ]));
+  }
+
+  Widget freeTimeFinder(DateTime week){
+    final all=<({DateTime day,FreeWindow gap})>[];
+    for(var index=0;index<7;index++){
+      final day=week.add(Duration(days:index));
+      final midnight=day.subtract(const Duration(hours:5));
+      final gaps=freeWindows(feeds.agenda(day,{CalendarSource.classes,CalendarSource.events}),
+        midnight.add(Duration(hours:searchHours.$1)),midnight.add(Duration(hours:searchHours.$2)),minimumGap);
+      for(final gap in gaps){all.add((day:day,gap:gap));}
+    }
+    final daily=all.where((item)=>item.day==selected);
+    int length(FreeWindow gap)=>gap.end.difference(gap.start).inMilliseconds;
+    String clock(DateTime value)=>value.toUtc().add(const Duration(hours:5)).toIso8601String().substring(11,19);
+    String describe(FreeWindow gap)=>'${clock(gap.start)}–${clock(gap.end)} · ${durationLabel(length(gap))}';
+    final total=all.fold<int>(0,(sum,item)=>sum+length(item.gap));
+    final longest=all.isEmpty?null:all.reduce((a,b)=>length(b.gap)>length(a.gap)?b:a);
+    final next=all.where((item)=>item.day.isAfter(selected)).firstOrNull;
+    return ExpansionTile(title:const Text('Free-time finder'),children:[
+      const Text('Based on your timetable and published campus events. All times are in PKT.'),
+      const Text('Minimum gap'),
+      Wrap(children:[for(final minutes in [15,30,60,90])ChoiceChip(label:Text('$minutes min'),
+        selected:minimumGap==minutes,onSelected:(_)=>setState(()=>minimumGap=minutes))]),
+      const Text('Search hours'),
+      Wrap(children:[for(final hours in [(8,18),(8,12),(12,18)])ChoiceChip(
+        label:Text('${hours.$1}:00–${hours.$2}:00'),selected:searchHours==hours,
+        onSelected:(_)=>setState(()=>searchHours=hours))]),
+      Text('Free on ${_label(selected)}'),
+      if(daily.isEmpty)const Text('No gaps match these settings on this day.'),
+      for(final item in daily)Text(describe(item.gap)),
+      Text('Matching free time this week: ${durationLabel(total)}'),
+      if(longest!=null)Text('Longest gap this week: ${_label(longest.day)}, ${describe(longest.gap)}'),
+      TextButton(onPressed:next==null?null:()=>navigate(next.day,month),child:const Text('Next available day this week')),
+    ]);
   }
 
   Widget dayButton(DateTime day,List<AgendaItem> items){

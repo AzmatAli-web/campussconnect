@@ -161,3 +161,25 @@ String durationLabel(int milliseconds){
   final seconds=(milliseconds/1000).ceil();
   return ['${seconds~/60} min',if(seconds%60!=0)'${seconds%60} sec'].join(' ');
 }
+
+typedef FreeWindow=({DateTime start, DateTime end});
+
+List<FreeWindow> freeWindows(List<AgendaItem> items,DateTime start,DateTime end,int minimumMinutes){
+  final gaps=<FreeWindow>[];
+  final busy=items.where((item){
+    final from=item.start,to=item.end;
+    return from!=null && to!=null && to.isAfter(from) && to.isAfter(start) && from.isBefore(end);
+  }).toList()..sort((a,b)=>a.start!.compareTo(b.start!));
+  var cursor=start;
+  void addGap(DateTime until){
+    if(until.isAfter(cursor) && until.difference(cursor).inMinutes>=minimumMinutes){
+      gaps.add((start:cursor,end:until));
+    }
+  }
+  for(final item in busy){
+    addGap(item.start!);
+    if(item.end!.isAfter(cursor))cursor=item.end!;
+  }
+  addGap(end);
+  return gaps;
+}

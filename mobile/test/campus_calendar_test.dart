@@ -86,6 +86,16 @@ void main(){
     expect(durationLabel(90500),'1 min 31 sec');
   });
 
+  test('free gaps clip overnight bookings, merge overlaps and include exact thresholds',(){
+    final day=DateTime.utc(2027,1,4);
+    DateTime at(int n)=>day.add(Duration(minutes:n));
+    AgendaItem busy(int a,int b)=>AgendaItem(CalendarSource.events,'Event','','',start:at(a),end:at(b));
+    final items=[busy(-600,10),busy(5,20),busy(50,65),busy(65,80),busy(115,180)];
+    expect(freeWindows(items,day,at(120),30),[(start:at(20),end:at(50)),(start:at(80),end:at(115))]);
+    expect(freeWindows(items,day,at(120),60),isEmpty);
+    expect(freeWindows([],day,at(120),30),[(start:day,end:at(120))]);
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

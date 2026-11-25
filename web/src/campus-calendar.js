@@ -151,3 +151,19 @@ export function durationLabel(milliseconds){
  const seconds=Math.ceil(milliseconds/1000);
  return [Math.floor(seconds/60)+' min',seconds%60?seconds%60+' sec':''].filter(Boolean).join(' ');
 }
+
+export function freeWindows(items,start,end,minimumMinutes){
+ const gaps=[];
+ const busy=items.filter(row=>row.end>row.start && row.end>start && row.start<end)
+  .sort((a,b)=>a.start-b.start);
+ let cursor=start;
+ function addGap(until){
+  if(until>cursor && until-cursor>=minimumMinutes*60000)gaps.push({start:cursor,end:until});
+ }
+ for(const row of busy){
+  addGap(row.start);
+  cursor=Math.max(cursor,row.end);
+ }
+ addGap(end);
+ return gaps;
+}

@@ -506,6 +506,11 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByText('Days with scheduling conflicts this week: 2').waitFor();
   await a.getByRole('button',{name:'Next conflict day'}).click();
   await a.getByText('Tuesday a',{exact:true}).waitFor();
+  const tuesdayItem=a.getByRole('listitem').filter({has:a.getByText('Tuesday a',{exact:true})});
+  await tuesdayItem.getByRole('button',{name:'Conflict details'}).click();
+  await tuesdayItem.getByText(/Tuesday b · 17:00:00–18:00:00 PKT · 60 min/).waitFor();
+  await a.getByRole('button',{name:'Previous conflict day'}).click();
+  await a.getByText('Calendar page two',{exact:true}).waitFor();
   await a.getByLabel('Jump to date').fill('2027-02-10');
   await a.getByRole('region',{name:'Selected day agenda'}).getByRole('heading',{name:/10 February 2027/}).waitFor();
   await a.getByRole('button', {name:'Next month'}).click();

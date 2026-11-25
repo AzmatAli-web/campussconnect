@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {overlapDetails,conflictSummary,durationLabel,weeklyCalendarFile,addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
+import {freeWindows,overlapDetails,conflictSummary,durationLabel,weeklyCalendarFile,addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
 
 test('Monday-based weeks and 42-day month grid cross year boundaries cleanly',()=>{
  assert.equal(campusWeekStart('2026-11-23'),'2026-11-23');
@@ -96,4 +96,14 @@ test('conflict details keep individual intersections while totals count shared t
  assert.deepEqual(conflictSummary(items),{peak:3,duration:2400000});
  assert.deepEqual(conflictSummary([items[0],items[3]]),{peak:1,duration:0});
  assert.equal(durationLabel(90500),'1 min 31 sec');
+});
+
+test('free windows merge busy periods and include gaps that exactly meet the minimum',()=>{
+ const minute=60000;
+ const busy=[[-600,10],[5,20],[50,65],[65,80],[115,180]].map(([start,end])=>({start:start*minute,end:end*minute}));
+ busy.push({title:'Deadline'});
+ const gaps=freeWindows(busy,0,120*minute,30);
+ assert.deepEqual(gaps.map(g=>[g.start/minute,g.end/minute]),[[20,50],[80,115]]);
+ assert.deepEqual(freeWindows(busy,0,120*minute,60),[]);
+ assert.deepEqual(freeWindows([],0,120*minute,30),[{start:0,end:120*minute}]);
 });

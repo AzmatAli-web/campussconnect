@@ -7,7 +7,9 @@ enum CalendarSource { classes, events, deadlines }
 class AgendaItem {
   final CalendarSource source;
   final String title, detail, time;
-  const AgendaItem(this.source, this.title, this.detail, this.time);
+  final DateTime? start,end;
+  bool conflict=false;
+  AgendaItem(this.source, this.title, this.detail, this.time,{this.start,this.end});
 }
 
 DateTime calendarMonday(DateTime date) => date.subtract(Duration(days:date.weekday-1));
@@ -25,10 +27,14 @@ class CalendarFeeds {
 
   List<AgendaItem> agenda(DateTime date, Set<CalendarSource> sources, {String query=''}) {
     final rows=<AgendaItem>[];
+    final day=date.toIso8601String().substring(0,10);
+    final midnight=date.subtract(const Duration(hours:5));
+    final tomorrow=midnight.add(const Duration(days:1));
     if(sources.contains(CalendarSource.classes)){
       for(final slot in slots.where((s)=>s.dayOfWeek==date.weekday)){
         rows.add(AgendaItem(CalendarSource.classes,slot.courseTitle,
-          '${slot.courseCode} · ${slot.room} · ${slot.startTime}–${slot.endTime}',slot.startTime));
+          '${slot.courseCode} · ${slot.room} · ${slot.startTime}–${slot.endTime}',slot.startTime,
+          start:DateTime.tryParse('${day}T${slot.startTime}:00+05:00'),end:DateTime.tryParse('${day}T${slot.endTime}:00+05:00')));
       }
     }
     if(sources.contains(CalendarSource.events)){
@@ -37,19 +43,29 @@ class CalendarFeeds {
         if(start==null)continue;
         final firstDay=campusDate(start);
         final continuing=date.isAfter(firstDay);
-        final midnight=date.subtract(const Duration(hours:5));
+        final end=event.endsAt;
         if(date.isBefore(firstDay) || (continuing && !(event.endsAt?.isAfter(midnight) ?? false)))continue;
         final pkt=start.toUtc().add(const Duration(hours:5));
         final time='${pkt.hour.toString().padLeft(2,'0')}:${pkt.minute.toString().padLeft(2,'0')}';
         rows.add(AgendaItem(CalendarSource.events,event.title,
           [if(continuing) 'Continues from an earlier day',if(event.venue.isNotEmpty) event.venue].join(' · '),
-          continuing ? '' : time));
+          continuing ? '' : time,start:continuing?midnight:start,end:end!=null&&end.isAfter(tomorrow)?tomorrow:end));
       }
     }
     if(sources.contains(CalendarSource.deadlines)){
       for(final item in deadlines.where((a)=>!a.done && a.due==date)){
         rows.add(AgendaItem(CalendarSource.deadlines,item.title,item.course,''));
       }
+    }
+    final timed=rows.where((r)=>r.start!=null && (r.end?.isAfter(r.start!)??false)).toList()
+      ..sort((a,b)=>a.start!.compareTo(b.start!));
+    AgendaItem? latestEnd;
+    for(final item in timed){
+      if(latestEnd!=null && item.start!.isBefore(latestEnd.end!)){
+        latestEnd.conflict=true;
+        item.conflict=true;
+      }
+      if(latestEnd==null || item.end!.isAfter(latestEnd.end!))latestEnd=item;
     }
     final term=query.trim().toLowerCase();
     return rows.where((r)=>r.title.toLowerCase().contains(term)||r.detail.toLowerCase().contains(term)).toList()

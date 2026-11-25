@@ -2,17 +2,20 @@ import {downloadCalendarFile} from './event-calendar.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {readAssignments} from './assignment-planner.js';
 import {chooseTimetableGroup,readTimetablePreference} from './timetable-preference.js';
-import {calendarDates,weeklyCalendarFile,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
+import {overlapDetails,conflictSummary,durationLabel,calendarDates,weeklyCalendarFile,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
 import './campus-calendar.css';
 
 const weekdays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const labels={class:'Class',event:'Campus event',assignment:'Personal deadline'};
 const monthName=new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
 const dateName=new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+const campusClock=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+const clock=time=>campusClock.format(time);
 function displayDate(date,format){
  return format.format(new Date(date+'T00:00:00Z'));
 }
 export default function CampusCalendar({call,assignmentKey,preferenceKey}){
+ const [detailKey,setDetailKey]=useState(null);
  const [today,setToday]=useState(calendarToday);
  const [view,setView]=useState('month');
  const [anchor,setAnchor]=useState(calendarToday);
@@ -92,6 +95,10 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  const conflictDays=dates.filter(day=>agenda.get(day)?.some(item=>item.conflict));
  const weeklyCount=calendarDates('week',selected).filter(day=>conflictDays.includes(day)).length;
  const nextConflict=conflictDays.find(day=>day>selected)??conflictDays.find(day=>day!==selected);
+ const previousConflict=conflictDays.findLast(day=>day<selected)??conflictDays.findLast(day=>day!==selected);
+ const dayRows=agenda.get(selected)??[];
+ const daySummary=conflictSummary(dayRows);
+ const weeklyDuration=calendarDates('week',selected).reduce((total,day)=>total+conflictSummary(agenda.get(day)??[]).duration,0);
  const activeAgenda=(agenda.get(selected)??[]).filter(item=>!conflictsOnly||item.conflict);
  function jump(day){
   if(day>='2001-01-01'&&day<='2098-12-31'&&calendarDates('week',day).length){setSelected(day);setAnchor(day);}
@@ -133,10 +140,12 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
    <div className="wc-calendar-toolbar">
     <label>Jump to date <input type="date" min="2001-01-01" max="2098-12-31" value={selected} onChange={event=>jump(event.target.value)}/></label>
     <label><input type="checkbox" checked={conflictsOnly} onChange={event=>setConflictsOnly(event.target.checked)}/> Show conflicts only in agenda</label>
+    <button className="wc-outline" disabled={!ready||!previousConflict} onClick={()=>setSelected(previousConflict)}>Previous conflict day</button>
     <button className="wc-outline" disabled={!ready||!nextConflict} onClick={()=>setSelected(nextConflict)}>Next conflict day</button>
    </div>
    {ready&&<p role="status">Days with scheduling conflicts this week: {weeklyCount}</p>}
    {(results.loading||!matching)&&<p role="status">Loading published campus calendar…</p>}
+   {ready&&<p>Time with overlapping items this week: {durationLabel(weeklyDuration)}</p>}
    {results.errors.map(error=><p role="alert" key={error}>{error}</p>)}
    {matching?.error&&<p role="alert">Published events could not be loaded.</p>}
    {!results.loading&&!results.group&&!results.errors.some(x=>x.includes('timetable'))&&
@@ -165,10 +174,18 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
   <section className="wc-panel" aria-label="Selected day agenda">
    <div className="wc-head"><div><span className="wc-kicker">DAY AGENDA</span>
     <h2>{displayDate(selected,dateName)}</h2><p>Personal deadlines do not represent official faculty submissions.</p></div></div>
+   {ready&&<p>Time with overlapping items: {durationLabel(daySummary.duration)} · Peak simultaneous items: {daySummary.peak}</p>}
    {activeAgenda.length===0?<p>No matching calendar items on this date.</p>:
     <ul className="wc-calendar-agenda">{activeAgenda.map(item=><li key={item.id}>
      <span className={'wc-tag '+(item.kind==='assignment'?'warn':item.kind==='class'?'blue':'good')}>{labels[item.kind]}</span>
      <strong>{item.title}</strong>{item.conflict&&<small>Scheduling conflict</small>}<small>{item.time?item.time+' PKT · ':''}{item.detail}</small>
+     {item.conflict&&<div>
+      <button type="button" className="wc-outline" aria-expanded={detailKey===selected+item.id}
+       onClick={()=>setDetailKey(detailKey===selected+item.id?null:selected+item.id)}>Conflict details</button>
+      {detailKey===selected+item.id&&<ul>{overlapDetails(item,dayRows).map((pair,index)=><li key={index}>
+       {labels[pair.kind]} · {pair.title} · {clock(pair.start)}–{clock(pair.end)} PKT · {durationLabel(pair.end-pair.start)}
+      </li>)}</ul>}
+     </div>}
     </li>)}</ul>}
   </section>
  </div>;

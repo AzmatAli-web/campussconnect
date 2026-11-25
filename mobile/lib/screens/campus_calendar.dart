@@ -16,6 +16,16 @@ String _label(DateTime day)=>day.toIso8601String().substring(0,10);
 
 typedef StudyBlock=({String id,String title,FreeWindow window});
 
+List<StudyBlock> moveStudyBlock(List<StudyBlock> current,StudyBlock source,DateTime start,List<AgendaItem> campus){
+  if(!current.contains(source))throw StateError('Original reservation changed');
+  final end=start.add(source.window.end.difference(source.window.start));
+  final available=freeWindows(campus,start,end,0,
+    reservations:current.where((row)=>row.id!=source.id).map((row)=>row.window));
+  if(available.length!=1||available.single!=(start:start,end:end))throw StateError('Destination occupied');
+  return [for(final row in current)if(row.id==source.id)
+    (id:row.id,title:row.title,window:(start:start,end:end)) else row];
+}
+
 List<StudyBlock> readStudyBlocks(SharedPreferences prefs,String key){
   final rows=jsonDecode(prefs.getString(key)??'[]') as List;
   return [for(final row in rows)(id:row['id'] as String,title:row['title'] as String,
@@ -239,17 +249,34 @@ class _CampusCalendarState extends State<CampusCalendar> {
     ]));
   }
 
-  Future<void> changeBlock(StudyBlock block,{bool remove=false}) async {
+  Future<List<AgendaItem>> currentCampusRows(DateTime day) async {
+    final groups=await widget.api.getTimetableGroups();
+    final prefs=await SharedPreferences.getInstance();
+    final key=prefs.getString('timetable-group:${widget.accountKey}');
+    final group=groups.where((row)=>row.key==key).firstOrNull??groups.firstOrNull;
+    final slots=group==null?<CampusTimetableSlot>[]:await widget.api.getTimetableSlots(group);
+    final week=calendarMonday(day),events=<CampusEvent>[];
+    for(var page=1;;page++){
+      final batch=await widget.api.calendarEventPage(week,week.add(const Duration(days:6)),page);
+      events.addAll(batch);
+      if(batch.length<100)break;
+    }
+    return CalendarFeeds(slots,events,[]).agenda(day,{CalendarSource.classes,CalendarSource.events});
+  }
+
+  Future<void> changeBlock(StudyBlock block,{bool remove=false,DateTime? moveTo}) async {
     if(savingBlock)return;
     setState(()=>savingBlock=true);
     try{
       final prefs=await SharedPreferences.getInstance();
+      final campus=moveTo==null?<AgendaItem>[]:await currentCampusRows(campusDate(moveTo));
+      if(moveTo!=null)await prefs.reload();
       final current=readStudyBlocks(prefs,blockKey);
-      if(!remove && current.any((row)=>row.window.start.isBefore(block.window.end)&&row.window.end.isAfter(block.window.start))){
+      if(moveTo==null && !remove && current.any((row)=>row.window.start.isBefore(block.window.end)&&row.window.end.isAfter(block.window.start))){
         if(mounted)setState(()=>studyBlocks=current);
         throw StateError('Overlap');
       }
-      final next=[for(final row in current)if(!remove||row.id!=block.id)row,if(!remove)block];
+      final next=moveTo!=null?moveStudyBlock(current,block,moveTo,campus):[for(final row in current)if(!remove||row.id!=block.id)row,if(!remove)block];
       final saved=await prefs.setString(blockKey,jsonEncode([for(final row in next){
         'id':row.id,'title':row.title,'start':row.window.start.toIso8601String(),'end':row.window.end.toIso8601String()}]));
       if(!saved)throw StateError('Write failed');
@@ -303,6 +330,18 @@ class _CampusCalendarState extends State<CampusCalendar> {
       if(scheduled.isEmpty)const Text('No study blocks scheduled this week.'),
       for(final block in scheduled)ListTile(title:Text(block.title),
         subtitle:Text('${_label(campusDate(block.window.start))} · ${describe(block.window)} PKT'),
+        onTap:savingBlock?null:()async{
+          final choices=all.where((item)=>length(item.gap)>=length(block.window)).toList();
+          final start=await showDialog<DateTime>(context:context,builder:(context)=>SimpleDialog(
+            title:Text('Reschedule ${block.title}'),children:[
+              if(choices.isEmpty)const Text('No matching gap this week.'),
+              for(final item in choices)SimpleDialogOption(onPressed:()=>Navigator.pop(context,item.gap.start),
+                child:Text('${_label(item.day)} · ${clock(item.gap.start)}–${clock(item.gap.start.add(block.window.end.difference(block.window.start)))} PKT')),
+              SimpleDialogOption(onPressed:()=>Navigator.pop(context),child:const Text('Keep original time')),
+            ]));
+          if(mounted&&start!=null)await changeBlock(block,moveTo:start);
+        },
+        leading:const Icon(Icons.edit_calendar,semanticLabel:'Reschedule'),
         trailing:TextButton(onPressed:savingBlock?null:()=>changeBlock(block,remove:true),child:const Text('Cancel'))),
       Text('Matching free time this week: ${durationLabel(total)}'),
       if(longest!=null)Text('Longest gap this week: ${_label(longest.day)}, ${describe(longest.gap)}'),

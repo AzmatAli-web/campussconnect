@@ -14,6 +14,23 @@ const clock=time=>campusClock.format(time);
 function displayDate(date,format){
  return format.format(new Date(date+'T00:00:00Z'));
 }
+async function currentCampusRows(call,preferenceKey,day){
+ const groups=await call('/timetable/groups');
+ if(!Array.isArray(groups))throw new Error('Invalid timetable groups');
+ const group=chooseTimetableGroup(groups,readTimetablePreference(preferenceKey));
+ const slots=group?await call('/timetable/slots?'+new URLSearchParams({
+  term:group.term,program:group.program,semester:String(group.semester),section:group.section
+ })): [];
+ if(!Array.isArray(slots))throw new Error('Invalid timetable');
+ const days=calendarDates('week',day),events=[];
+ for(let page=1;;page++){
+  const rows=await call('/events?'+new URLSearchParams({from:days[0],to:days[6],when:'all',limit:'100',page:String(page)}));
+  if(!Array.isArray(rows))throw new Error('Invalid events');
+  events.push(...rows);
+  if(rows.length<100)break;
+ }
+ return itemsOnCampusDay(day,{slots,events});
+}
 export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  const [detailKey,setDetailKey]=useState(null);
  const [today,setToday]=useState(calendarToday);
@@ -171,7 +188,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
     })}
    </div>
   </section>
-  {ready&&<FreeTimeFinder storageKey={assignmentKey && assignmentKey+":study-blocks"} selected={selected} slots={results.slots} events={matching.rows} onSelect={setSelected}/>}
+  {ready&&<FreeTimeFinder verifyDay={day=>currentCampusRows(call,preferenceKey,day)} storageKey={assignmentKey && assignmentKey+":study-blocks"} selected={selected} slots={results.slots} events={matching.rows} onSelect={setSelected}/>}
   <section className="wc-panel" aria-label="Selected day agenda">
    <div className="wc-head"><div><span className="wc-kicker">DAY AGENDA</span>
     <h2>{displayDate(selected,dateName)}</h2><p>Personal deadlines do not represent official faculty submissions.</p></div></div>
@@ -192,8 +209,10 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  </div>;
 }
 
-function FreeTimeFinder({storageKey,selected,slots,events,onSelect}){
+function FreeTimeFinder({verifyDay,storageKey,selected,slots,events,onSelect}){
  const [blocks,setBlocks]=useState([]);
+ const [editing,setEditing]=useState(null);
+ const [moving,setMoving]=useState(false);
  const [topic,setTopic]=useState('');
  const [minutes,setMinutes]=useState(30);
  const [error,setError]=useState('');
@@ -208,6 +227,27 @@ function FreeTimeFinder({storageKey,selected,slots,events,onSelect}){
   window.addEventListener('storage',sync);
   return ()=>window.removeEventListener('storage',sync);
  },[storageKey]);
+ async function move(original,gap){
+  setMoving(true);
+  try{
+   const rows=await verifyDay(gap.day);
+   const end=gap.start+original.end-original.start;
+   const commit=()=>{
+    const current=readBlocks(storageKey);
+    const source=current.find(row=>row.id===original.id);
+    setBlocks(current);
+    if(!source||source.start!==original.start||source.end!==original.end||source.title!==original.title)
+     throw new Error('The original block changed. Reopen it to reschedule.');
+    if([...rows,...current.filter(row=>row.id!==source.id)].some(row=>row.start<end&&row.end>gap.start))
+     throw new Error('The new time is occupied. Choose another gap.');
+    const next=current.map(row=>row.id===source.id?{...row,start:gap.start,end}:row);
+    localStorage.setItem(storageKey,JSON.stringify(next));
+    setBlocks(next);setError('');setEditing(null);
+   };
+   if(navigator.locks)await navigator.locks.request(storageKey,commit);else commit();
+  }catch(err){setError(err.message||'Could not reschedule the study block.');}
+  finally{setMoving(false);}
+ }
  async function change(block,remove=false){
   const save=()=>{
    const current=readBlocks(storageKey);
@@ -266,7 +306,14 @@ function FreeTimeFinder({storageKey,selected,slots,events,onSelect}){
   <h3>Study blocks this week</h3>
   {scheduled.length?<ul>{scheduled.map(block=><li key={block.id}>
    <strong>{block.title}</strong> · {dateName.format(block.start)} · {clock(block.start)}–{clock(block.end)} PKT
-   <button type="button" aria-label={'Cancel '+block.title} onClick={()=>change(block,true)}>Cancel</button>
+   <button type="button" disabled={moving} onClick={()=>setEditing(editing===block.id?null:block.id)}>Reschedule</button>
+   {editing===block.id&&<fieldset><legend>Choose a new gap this week</legend>
+    {gaps.filter(gap=>gap.end-gap.start>=block.end-block.start).length===0&&<p>No matching gap this week.</p>}
+    {gaps.filter(gap=>gap.end-gap.start>=block.end-block.start).map(gap=>
+     <button type="button" key={gap.start} disabled={moving} onClick={()=>move(block,gap)}>
+      Move to {gap.day} · {clock(gap.start)}–{clock(gap.start+block.end-block.start)} PKT</button>)}
+   </fieldset>}
+   <button type="button" disabled={moving} aria-label={'Cancel '+block.title} onClick={()=>change(block,true)}>Cancel</button>
   </li>)}</ul>:<p>No study blocks scheduled this week.</p>}
   </>}
  </section>;

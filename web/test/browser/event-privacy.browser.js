@@ -505,6 +505,29 @@ test('real React workspace: two students share event counts, never receipts or r
   await finder.getByLabel('Block length').selectOption('15');
   await finder.getByRole('button',{name:'Reserve 15 min'}).first().click();
   await finder.getByText('Algorithms revision',{exact:true}).waitFor();
+  const readStudy=()=>a.evaluate(()=>{
+    const key=Object.keys(localStorage).find(key=>key.endsWith(':study-blocks'));
+    return {key,rows:JSON.parse(localStorage.getItem(key))};
+  });
+  const original=await readStudy();
+  const source=original.rows[0];
+  await finder.getByRole('button',{name:'Reschedule',exact:true}).click();
+  const destination=finder.getByRole('button',{name:/^Move to /}).first();
+  const [,day,time]=/Move to (\d{4}-\d{2}-\d{2}) · (\d{2}:\d{2}:\d{2})/.exec(await destination.innerText());
+  const start=Date.parse(day+'T'+time+'+05:00');
+  const blocker={...source,id:'other-reservation',start,end:start+900000};
+  await a.evaluate(({key,rows})=>localStorage.setItem(key,JSON.stringify(rows)),
+    {key:original.key,rows:[source,blocker]});
+  await destination.click();
+  await finder.getByText('The new time is occupied. Choose another gap.').waitFor();
+  assert.deepEqual((await readStudy()).rows[0],source);
+  await finder.getByRole('button',{name:/^Move to /}).first().click();
+  await finder.getByRole('group',{name:'Choose a new gap this week'}).waitFor({state:'hidden'});
+  const moved=(await readStudy()).rows.find(row=>row.id===source.id);
+  assert.equal(moved.title,source.title);
+  assert.equal(moved.end-moved.start,source.end-source.start);
+  assert.notEqual(moved.start,source.start);
+  await a.evaluate(({key,rows})=>localStorage.setItem(key,JSON.stringify(rows)),{key:original.key,rows:[moved]});
   await a.getByRole('button',{name:'Refresh schedule'}).click();
   await finder.getByRole('button',{name:'Cancel Algorithms revision'}).click();
   await finder.getByText('No study blocks scheduled this week.').waitFor();

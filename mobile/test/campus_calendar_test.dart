@@ -20,6 +20,23 @@ class PagedEvents extends PreviewCampusApi {
 }
 
 void main(){
+  test('moves one study block atomically and preserves the original on conflicts',(){
+    final start=DateTime.utc(2027,1,4,4);
+    const duration=Duration(minutes:30);
+    final source=(id:'a',title:'Revision',window:(start:start,end:start.add(duration)));
+    final target=start.add(const Duration(days:1));
+    final other=(id:'b',title:'Other',window:(start:target,end:target.add(duration)));
+    final current=[source,other];
+    expect(()=>moveStudyBlock(current,source,target,[]),throwsStateError);
+    expect(()=>moveStudyBlock([other],source,start,[]),throwsStateError);
+    final event=AgendaItem(CalendarSource.events,'Talk','','',start:target,end:target.add(duration));
+    expect(()=>moveStudyBlock([source],source,target,[event]),throwsStateError);
+    expect(current.first,source);
+    final moved=moveStudyBlock(current,source,other.window.end,[]);
+    expect(moved.first,(id:'a',title:'Revision',window:(start:other.window.end,end:other.window.end.add(duration))));
+    expect(moved.last,other);
+  });
+
   test('agenda combines recurring classes, PKT event dates and open deadlines',(){
     final monday=DateTime.utc(2027,1,4);
     final assignment=Assignment('a','Report','Networks',monday,AssignmentPriority.medium,false);

@@ -74,3 +74,16 @@ test('weekly export combines selected categories and includes overlapping events
   assert.ok(file.contents.includes(expected));
  assert.equal(weeklyCalendarFile('2027-01-06',[slot],[event],[task],{}),null);
 });
+
+test('clashes include nested and overnight intervals, excluding touching items and deadlines',()=>{
+ const slot={id:'slot',courseTitle:'Class',dayOfWeek:1,startTime:'09:00',endTime:'10:00'};
+ const events=[
+  ['overnight','2027-01-03T18:00:00Z','2027-01-04T04:30:00Z'],
+  ['inside','2027-01-04T04:10:00Z','2027-01-04T04:20:00Z'],
+  ['touch','2027-01-04T05:00:00Z','2027-01-04T06:00:00Z'],
+ ].map(([id,startsAt,endsAt])=>({id,title:id,startsAt,endsAt,status:'published'}));
+ const day='2027-01-04';
+ const items=itemsOnCampusDay(day,{slots:[slot],events,assignments:[{due:day,id:'a',title:'Task',done:false}]});
+ assert.deepEqual(items.filter(r=>r.conflict).map(r=>r.title).sort(),['Class','inside','overnight']);
+ assert.equal(itemsOnCampusDay(day,{slots:[slot]}).some(r=>r.conflict),false);
+});

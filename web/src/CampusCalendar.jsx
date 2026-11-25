@@ -2,7 +2,7 @@ import {downloadCalendarFile} from './event-calendar.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {readAssignments} from './assignment-planner.js';
 import {chooseTimetableGroup,readTimetablePreference} from './timetable-preference.js';
-import {overlapDetails,conflictSummary,durationLabel,calendarDates,weeklyCalendarFile,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
+import {freeWindows,overlapDetails,conflictSummary,durationLabel,calendarDates,weeklyCalendarFile,moveCalendar,itemsOnCampusDay,calendarToday} from './campus-calendar.js';
 import './campus-calendar.css';
 
 const weekdays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -171,6 +171,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
     })}
    </div>
   </section>
+  {ready&&<FreeTimeFinder selected={selected} slots={results.slots} events={matching.rows} onSelect={setSelected}/>}
   <section className="wc-panel" aria-label="Selected day agenda">
    <div className="wc-head"><div><span className="wc-kicker">DAY AGENDA</span>
     <h2>{displayDate(selected,dateName)}</h2><p>Personal deadlines do not represent official faculty submissions.</p></div></div>
@@ -189,4 +190,38 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
     </li>)}</ul>}
   </section>
  </div>;
+}
+
+function FreeTimeFinder({selected,slots,events,onSelect}){
+ const [minimum,setMinimum]=useState(30);
+ const [period,setPeriod]=useState('08-18');
+ const week=calendarDates('week',selected);
+ const [from,to]=period.split('-');
+ const gaps=week.flatMap(day=>{
+  const rows=itemsOnCampusDay(day,{slots,events});
+  return freeWindows(rows,Date.parse(day+'T'+from+':00:00+05:00'),
+   Date.parse(day+'T'+to+':00:00+05:00'),minimum).map(gap=>({...gap,day}));
+ });
+ const today=gaps.filter(gap=>gap.day===selected);
+ const total=gaps.reduce((sum,gap)=>sum+gap.end-gap.start,0);
+ const longest=gaps.reduce((best,gap)=>!best||gap.end-gap.start>best.end-best.start?gap:best,null);
+ const next=gaps.find(gap=>gap.day>selected);
+ return <section className="wc-panel" aria-label="Free-time finder">
+  <h2>Free-time finder</h2>
+  <p>Based on your timetable and published campus events. All times are in PKT.</p>
+  <div className="wc-calendar-toolbar">
+   <label>Minimum gap <select value={minimum} onChange={e=>setMinimum(Number(e.target.value))}>
+    {[15,30,60,90].map(n=><option key={n} value={n}>{n} minutes</option>)}
+   </select></label>
+   <label>Search hours <select value={period} onChange={e=>setPeriod(e.target.value)}>
+    {['08-18','08-12','12-18'].map(value=><option key={value} value={value}>{value.replace('-','–')+' PKT'}</option>)}
+   </select></label>
+  </div>
+  <h3>Free on {displayDate(selected,dateName)}</h3>
+  {today.length?<ul>{today.map(gap=><li key={gap.start}>{clock(gap.start)}–{clock(gap.end)} · {durationLabel(gap.end-gap.start)}</li>)}</ul>:
+   <p>No gaps match these settings on this day.</p>}
+  <p>Matching free time this week: {durationLabel(total)}</p>
+  {longest&&<p>Longest gap this week: {displayDate(longest.day,dateName)}, {clock(longest.start)}–{clock(longest.end)} · {durationLabel(longest.end-longest.start)}</p>}
+  <button className="wc-outline" disabled={!next} onClick={()=>onSelect(next.day)}>Next available day this week</button>
+ </section>;
 }

@@ -116,6 +116,7 @@ class _CampusCalendarState extends State<CampusCalendar> {
   }
 
   void navigate(DateTime date,bool monthView){
+    if(date.year<2000 || date.year>2099)return;
     final oldStart=firstDay,oldMonth=month;
     setState((){selected=date;month=monthView;});
     if(firstDay!=oldStart || month!=oldMonth)loadEvents();

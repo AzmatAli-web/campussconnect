@@ -69,6 +69,12 @@ class CampusApi {
     });
     if (body != null) request.body = jsonEncode(body);
 
+    return _sendEnvelope(request);
+  }
+
+  Future<dynamic> _sendEnvelope(http.BaseRequest request,{
+    String fallbackCode='REQUEST_FAILED',String fallbackMessage='Request failed.',
+  }) async {
     http.StreamedResponse response;
     try {
       response = await client.send(request).timeout(requestTimeout);
@@ -84,24 +90,28 @@ class CampusApi {
       );
     }
 
-    dynamic decoded;
+    late Json envelope;
     try {
       final content = await response.stream.bytesToString().timeout(requestTimeout);
-      decoded = jsonDecode(content);
+      envelope = asJson(jsonDecode(content));
     } on TimeoutException {
       throw const CampusApiException('NETWORK_TIMEOUT', 'Backend response timed out.');
+    } on http.ClientException {
+      throw const CampusApiException('NETWORK_FAILURE','Backend response was interrupted.');
     } on FormatException {
+      if(response.statusCode<200||response.statusCode>=300){
+        throw CampusApiException(fallbackCode,fallbackMessage,response.statusCode);
+      }
       throw const CampusApiException(
         'INVALID_RESPONSE',
         'Backend returned an invalid response.',
       );
     }
-    final envelope = asJson(decoded);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final error = envelope['error'] is Map ? asJson(envelope['error']) : <String, dynamic>{};
       throw CampusApiException(
-        stringField(error, 'code', 'REQUEST_FAILED'),
-        stringField(error, 'message', 'Request failed.'),
+        stringField(error, 'code', fallbackCode),
+        stringField(error, 'message', fallbackMessage),
         response.statusCode,
       );
     }
@@ -428,23 +438,7 @@ class CampusApi {
     request.headers['Authorization']='Bearer $token';
     request.files.add(http.MultipartFile.fromBytes('file',bytes,
       filename:fileName,contentType:MediaType.parse(mime)));
-    late http.StreamedResponse response;
-    try{
-      response=await client.send(request).timeout(requestTimeout);
-    }on TimeoutException{
-      throw const CampusApiException('NETWORK_TIMEOUT','Image upload timed out.');
-    }on http.ClientException{
-      throw const CampusApiException('NETWORK_FAILURE','Cannot reach CampusConnect.');
-    }
-    final text=await response.stream.bytesToString().timeout(requestTimeout);
-    if(response.statusCode<200||response.statusCode>=300){
-      dynamic payload;
-      try{payload=jsonDecode(text);}catch(_){payload=null;}
-      final error=payload is Map && payload['error'] is Map
-        ? asJson(payload['error']):<String,dynamic>{};
-      throw CampusApiException(stringField(error,'code','UPLOAD_FAILED'),
-        stringField(error,'message','Image upload failed.'),response.statusCode);
-    }
+    await _sendEnvelope(request,fallbackCode:'UPLOAD_FAILED',fallbackMessage:'Image upload failed.');
   }
 
 

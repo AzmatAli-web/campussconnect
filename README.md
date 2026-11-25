@@ -4,83 +4,73 @@ A **college campus services platform** with a Flutter Android student app, React
 
 ## Current status
 
-**Development prototype — not production-deployed.** The connected development environment has been tested for a real Student sign-in and dashboard. Staff/Faculty/Admin/Finance Officer privileged flows remain subject to isolated automated tests and authorized acceptance testing. Current feature development lives in **stacked, draft GitHub pull requests**, not necessarily on `main`.
+The integrated development prototype is on `main` through Milestone 112 (PR #67). Students can use the Flutter app and React portal for campus services, calendars and personal study planning. Assignment reminders, weekly goals and study blocks are account-specific on the current device. The API uses campus authentication and server-enforced roles for shared data.
 
-Implemented MVP modules on the stacked development branches: university email authentication and server-side roles; events and registrations; announcements; academic timetables; Faculty PDF resources; student complaints and tracking; read-only student fees and authorized offline receipt records; **Student Marketplace listings, seller-email consent, reports and Admin moderation (Milestone 21 automated CI passed)**; **Lost & Found reports, owner tracking and Admin moderation (Milestone 22 automated CI passed; live acceptance pending)**; **Society Membership (Milestone 23: student join/leave, assigned-manager approval and member administration; automated CI passed, live acceptance pending)**; **Notifications and optimization (Milestone 24 CI passed: private inbox, shared announcements, optional Android push)**; **Milestone 25 QA (announcement authorization fix, indexed synthetic benchmark and React bundle observability; CI passed)**; **Milestone 26 Controlled Pilot Readiness (staging preflight, read-only smoke contract, pilot acceptance and rollback runbook; automated CI passed, live staging remains NO-GO)**. The financial ledger is **not a bank or payment processor**.
+The repository includes automated QA and an isolated Admin Lab. The development environment has a recorded student sign-in and dashboard check. Live acceptance of privileged roles, physical Android validation and a production release remain pending. See the [pilot acceptance record](docs/PILOT_ACCEPTANCE_RECORD.md) and [release QA guide](docs/RELEASE_QA.md).
 
-## Milestone 41 personal assignment tracker (draft)
+## Personal assignment tracker
 
 Active students can add, edit, complete, reopen and remove personal deadline reminders under **Assignment Tracker**. Due-date labels follow Pakistan Standard Time. Reminders stay in the current browser under the campus account's profile key. They are not synced, shared with faculty, or used as official submission records. Clearing browser data removes the planner entries.
 
-## Milestone 40 recovery and mobile web QA (draft)
+## Milestone 40 recovery and mobile web QA
 
 GitHub Actions runs a backup and restore rehearsal with fictional MongoDB records and an isolated Docker container. The signed-in web fixture checks reflow and keyboard navigation on mobile, tablet, and desktop widths. See the [QA guide](qa/README.md). This does not schedule or verify production backups.
 
-## Milestone 39 society discovery (draft)
+## Milestone 39 society discovery
 
 Search active campus societies by name or description. The web directory and private membership history have separate pagination, so searching doesn't hide your past requests. Manager approval and roster permissions are unchanged. See the [society membership guide](docs/SOCIETY_MEMBERSHIP_MVP.md).
 
-## Milestone 38 timetable Today view (draft)
+## Milestone 38 timetable Today view
 
 The web timetable has a Today view in Pakistan Standard Time (PKT). It shows the selected group's classes for the campus day and identifies the class in progress and the next class starting today. The full weekly timetable remains available. It reflects the published recurring schedule, not ad hoc holiday or cancellation notices.
 
-## Milestone 37 announcement discovery (draft)
+## Milestone 37 announcement discovery
 
 Search campus notices by title or message and filter by university, department, or society. Results are paginated newest first and only include published notices the current account is authorized to see.
 
-## Milestone 36 private registration history (draft)
+## Milestone 36 private registration history
 
 My registrations on the web shows a student's own receipts with event details, current event status, and pagination. A past or cancelled event is distinguished from a missing record. Public event browsing and roster permissions are unchanged.
 
-## Milestone 35 event discovery (draft)
+## Milestone 35 event discovery
 
 Explore events on the web supports title or venue search, upcoming/in-progress and past filters, and page controls. Only published events for the current campus are included. Existing registration and attendee permissions are unchanged.
 
-## Milestone 34 saved notes (draft)
+## Milestone 34 saved notes
 
 Students can bookmark published PDFs in Academic Resources and revisit them from Saved notes. Bookmarks are per campus account in the current browser. They do not store PDF files or override campus download permissions.
 
-## Milestone 33 isolated Admin Lab (draft)
+## Milestone 33 isolated Admin Lab
 
 Use the [Admin Lab guide](docs/ADMIN_TEST_LAB.md) to test the real Admin dashboard and API locally with fictional accounts. It runs separately from the connected app and does not use Firebase or Atlas.
 
-## Milestone 32 remembered timetable selection (draft)
+## Milestone 32 remembered timetable selection
 
 The connected web timetable remembers the last group a student explicitly chose in the same browser and account. This is a viewing preference only and does not set enrollment or affect access. See the [timetable guide](docs/ACADEMIC_TIMETABLE_MVP.md).
 
-## Milestone 31 MVP release candidate (draft)
+## Milestone 31 MVP release candidate
 
 Use `feature/milestone31-mvp-release-candidate` for one checkout of the milestone stack for review. The [setup and demo guide](docs/MILESTONE31_MVP_RELEASE_CANDIDATE.md) covers the credential-free web demo and the separate connected portal. Live web and Android acceptance remains deferred.
 
-## Milestone 30 event calendar export (draft)
+## Milestone 30 event calendar export
 
 Upcoming published events in the React portal can be downloaded as an iCalendar file. It includes event details only and does not register the student or expose any attendee data. Live staging acceptance remains deferred.
 
-## Milestone 29 browser privacy rehearsal (draft)
+## Milestone 29 browser privacy rehearsal
 
 The React workspace now has a repeatable Chromium test for two fictional student sessions and an organizer, including a mobile-width browser. See the [browser rehearsal guide](docs/MILESTONE29_BROWSER_PRIVACY_REHEARSAL.md). This test does not connect to staging services.
 
-## Milestone 28 event privacy acceptance (draft)
+## Milestone 28 event privacy acceptance
 
 Students can browse published events and see aggregate seat counts and their own registration. The attendee list is restricted to the authorized organizer or an administrator. Milestone 28 adds a two-student regression and a required staging evidence gate. See the [event privacy acceptance guide](docs/MILESTONE28_EVENT_PRIVACY_ACCEPTANCE.md).
 
-## Milestone 27 staging acceptance evidence (draft)
+## Milestone 27 staging acceptance evidence
 
 `feature/milestone27-staging-acceptance-evidence` builds on Milestone 26. Its offline checker tracks each acceptance gate against an immutable candidate and reports whether the record is ready for human review. It does not run live tests or approve the pilot. See the [Milestone 27 acceptance guide](docs/MILESTONE27_STAGING_ACCEPTANCE.md).
 
-## Milestone 26 baseline (draft; not merged)
+## Verify the integrated checkout
 
-`feature/milestone26-controlled-pilot-readiness` builds on the CI-green Milestone 25 branch, which stacks on Milestones 24, 23, 22, 21, 20 and the Milestone 19 QA baseline. Earlier PRs remain stacked and unmerged. **Milestones 21–26 passed automated CI, including Milestone 26's fail-closed pilot guards, backend regression, React and Flutter tests. Live staging has not been deployed, tested or approved.** Physical device and production acceptance remain pending. All remain in draft, undeployed and not yet accepted on a physical Android device.
-
-```powershell
-git fetch origin
-git switch feature/milestone26-controlled-pilot-readiness
-git pull --ff-only origin feature/milestone26-controlled-pilot-readiness
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\verify-all.ps1
-```
-
-If tracked local files prevent switching, preserve them before checkout; **do not overwrite local backend credentials**.
+From the repository root on Windows, run `scripts/verify-all.ps1` for the project's checks. The milestone sections above describe the features at their original review dates.
 
 ## Local run
 

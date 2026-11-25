@@ -24,6 +24,7 @@ class CampusCalendar extends StatefulWidget {
 
 class _CampusCalendarState extends State<CampusCalendar> {
   DateTime selected=campusDate(DateTime.now());
+  bool conflictsOnly=false;
   bool month=false, weeklyAgenda=false, loading=true;
   final sources=CalendarSource.values.toSet();
   final search=TextEditingController();
@@ -120,6 +121,12 @@ class _CampusCalendarState extends State<CampusCalendar> {
     if(mounted && message!=null)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(message)));
   }
 
+  Future<void> jumpToDate() async {
+    final date=await showDatePicker(context:context,initialDate:selected,
+      firstDate:DateTime(2000),lastDate:DateTime(2099,12,31));
+    if(mounted && date!=null)navigate(DateTime.utc(date.year,date.month,date.day),month);
+  }
+
   void move(int step)=>navigate(month?shiftCalendarMonth(selected,step):selected.add(Duration(days:7*step)),month);
 
   @override
@@ -127,7 +134,16 @@ class _CampusCalendarState extends State<CampusCalendar> {
     final first=calendarMonday(month?DateTime.utc(selected.year,selected.month):selected);
     final week=calendarMonday(selected);
     final agendaDays=weeklyAgenda?List.generate(7,(i)=>week.add(Duration(days:i))):[selected];
-    final agenda={for(final day in agendaDays) day:feeds.agenda(day,sources,query:weeklyAgenda?search.text:'')};
+    final days=List.generate(month?42:7,(i)=>first.add(Duration(days:i)));
+    final rows={for(final day in days) day:feeds.agenda(day,sources)};
+    final conflictDays=days.where((day)=>rows[day]!.any((item)=>item.conflict)).toList();
+    final nextConflict=conflictDays.where((day)=>day.isAfter(selected)).firstOrNull
+      ??conflictDays.where((day)=>day!=selected).firstOrNull;
+    final weeklyCount=conflictDays.where((day)=>calendarMonday(day)==week).length;
+    final term=weeklyAgenda?search.text.trim().toLowerCase():'';
+    final agenda={for(final day in agendaDays) day:(rows[day]??<AgendaItem>[]).where((r)=>
+      (!conflictsOnly||r.conflict)&&(r.title.toLowerCase().contains(term)||r.detail.toLowerCase().contains(term))).toList()};
+    final ready=!loading&&!eventLoading&&!eventFailed&&warning.isEmpty;
     return Scaffold(appBar:AppBar(title:const Text('Campus calendar'),actions:[
       IconButton(tooltip:'Export selected week (.ics)',onPressed:loading||eventLoading||eventFailed||warning.isNotEmpty?null:exportWeek,
         icon:const Icon(Icons.file_download)),
@@ -140,6 +156,7 @@ class _CampusCalendarState extends State<CampusCalendar> {
       Wrap(spacing:8,children:[
         for(final value in [false,true])ChoiceChip(label:Text(value?'Month':'Week'),selected:month==value,
           onSelected:(_)=>navigate(selected,value)),
+        TextButton(onPressed:jumpToDate,child:const Text('Jump to date')),
         TextButton(onPressed:()=>navigate(campusDate(DateTime.now()),month),child:const Text('Today')),
       ]),
       Row(children:[
@@ -149,34 +166,42 @@ class _CampusCalendarState extends State<CampusCalendar> {
       ]),
       Row(children:[for(final day in _days)Expanded(child:Center(child:Text(day)))]),
       for(var row=0;row<(month?6:1);row++)Row(children:[
-        for(var col=0;col<7;col++)Expanded(child:dayButton(first.add(Duration(days:row*7+col)))),
+        for(var col=0;col<7;col++)Expanded(child:dayButton(days[row*7+col],rows[days[row*7+col]]!)),
       ]),
       Wrap(spacing:6,children:[for(final source in CalendarSource.values)
         FilterChip(label:Text(_labels[source]!),selected:sources.contains(source),
           onSelected:(on)=>setState((){if(on){sources.add(source);}else{sources.remove(source);}}))]),
+      Wrap(spacing:8,children:[
+        FilterChip(label:const Text('Conflicts only'),selected:conflictsOnly,
+          onSelected:(on)=>setState(()=>conflictsOnly=on)),
+        TextButton(onPressed:ready && nextConflict!=null?()=>navigate(nextConflict,month):null,
+          child:const Text('Next conflict day')),
+      ]),
+      if(ready)Text('Days with scheduling conflicts this week: $weeklyCount'),
       SwitchListTile(title:const Text('Search whole week'),value:weeklyAgenda,onChanged:(v)=>setState(()=>weeklyAgenda=v)),
       if(weeklyAgenda)TextField(controller:search,decoration:const InputDecoration(labelText:'Search weekly agenda'),
         onChanged:(_)=>setState((){})),
       for(final entry in agenda.entries)if(entry.value.isNotEmpty || !weeklyAgenda)...[
         Text('${_label(entry.key)} · PKT',style:Theme.of(context).textTheme.titleMedium),
         for(final item in entry.value)ListTile(title:Text(item.title),subtitle:Text([
-          _labels[item.source]!,if(item.time.isNotEmpty)item.time,if(item.detail.isNotEmpty)item.detail].join(' · '))),
+          _labels[item.source]!,if(item.conflict)'Scheduling conflict',if(item.time.isNotEmpty)item.time,if(item.detail.isNotEmpty)item.detail].join(' · '))),
       ],
       if(!loading && !eventLoading && !eventFailed && agenda.values.every((rows)=>rows.isEmpty))const Text('No matching items for this period.'),
     ]));
   }
 
-  Widget dayButton(DateTime day){
-    final count=feeds.agenda(day,sources).length;
+  Widget dayButton(DateTime day,List<AgendaItem> items){
+    final count=items.length;
+    final conflict=items.any((item)=>item.conflict);
     final active=day==selected;
-    return Semantics(button:true,selected:active,label:'${_label(day)}, $count items',
+    return Semantics(button:true,selected:active,label:'${_label(day)}, $count items${conflict?', scheduling conflict':''}',
       child:InkWell(onTap:()=>navigate(day,month),child:ExcludeSemantics(child:Container(
         constraints:const BoxConstraints(minHeight:48),alignment:Alignment.center,
         color:active?Theme.of(context).colorScheme.secondaryContainer:null,
         child:Column(mainAxisSize:MainAxisSize.min,children:[
           Text('${day.day}',style:TextStyle(fontWeight:active?FontWeight.bold:FontWeight.normal,
             color:month && day.month!=selected.month?Theme.of(context).hintColor:null)),
-          if(count>0)const Icon(Icons.circle,size:6),
+          if(conflict)const Icon(Icons.warning_amber,size:14) else if(count>0)const Icon(Icons.circle,size:6),
         ])))));
   }
 }

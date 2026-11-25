@@ -293,7 +293,8 @@ class _CampusAccountGateState extends State<CampusAccountGate> {
             ],
           );
         }
-        return StudentDashboard(api: _api, profile: profile);
+        return StudentDashboard(api: _api, profile: profile,
+          onProfileChanged: (updated) => setState(() => _profile = Future.value(updated)));
       },
     );
   }

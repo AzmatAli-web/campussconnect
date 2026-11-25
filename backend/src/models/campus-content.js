@@ -38,7 +38,7 @@ assignmentSchema.index({societyId:1,userId:1},{unique:true});
 assignmentSchema.index({universityId:1,userId:1,status:1,societyId:1});
 const societySchema=new Schema({
  universityId:oid,name:{type:String,required:true},slug:{type:String,required:true},
- description:{type:String,required:true},createdBy:oid,status:{type:String,enum:['active','archived'],required:true,default:'active'}
+ description:{type:String,required:true},contactEmail:{type:String,default:null},createdBy:oid,status:{type:String,enum:['active','archived'],required:true,default:'active'}
 },{timestamps:true,collection:'societies',versionKey:false});
 societySchema.index({universityId:1,slug:1},{unique:true});
 societySchema.index({universityId:1,status:1,name:1,_id:1});

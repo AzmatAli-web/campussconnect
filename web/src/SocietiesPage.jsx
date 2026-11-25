@@ -100,7 +100,7 @@ export default function SocietiesPage({profile,call,act,busy,revision}){
       const mayRequest=!m||['rejected','cancelled','left'].includes(m.status);
       return <article key={s.id} className="wc-society-card">
        <span className="wc-kicker">VERIFIED UNIVERSITY SOCIETY</span>
-       <h3>{s.name}</h3><p>{s.description}</p>
+       <h3>{s.name}</h3><p>{s.description}</p>{s.contactEmail&&<p>Contact: {s.contactEmail}</p>}
        {m&&<p className="wc-society-status">Your status: <strong>{statuses[m.status]||m.status}</strong></p>}
        {student&&<div className="wc-society-actions">
         <button className="wc-primary" disabled={busy||!mayRequest}
@@ -153,6 +153,20 @@ export default function SocietiesPage({profile,call,act,busy,revision}){
      </select></label>
      <button type="button" className="wc-outline" onClick={queue.reload}>Refresh queue</button>
     </div>
+    {assignments.rows.filter(row=>row.id===selected).map(society=>
+     <form className="wc-stack" key={society.id} onSubmit={async event=>{
+      event.preventDefault();
+      const values=new FormData(event.currentTarget);
+      await act(()=>call('/managed-societies/'+society.id+'/profile',{method:'PATCH',
+       body:{description:values.get('description').trim(),contactEmail:values.get('contactEmail').trim()||null}
+      }),'Society profile updated.');
+     }}>
+      <label>Directory description<textarea required minLength={10} maxLength={1000}
+       name="description" defaultValue={society.description}/></label>
+      <label>Public society contact email (optional)<input type="email" maxLength={254}
+       name="contactEmail" defaultValue={society.contactEmail||''}/></label>
+      <button className="wc-primary" disabled={busy}>Save society profile</button>
+     </form>)}
     {queue.loading?<p role="status">Loading authorized member records…</p>:
      queue.rows.length?<div className="wc-society-queue">{queue.rows.map(m=><article key={m.id} className="wc-society-member">
       <div className="wc-society-membertop"><div>

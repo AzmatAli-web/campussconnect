@@ -126,6 +126,15 @@ test('only test fixture Admin can initialize society and assign manager',async()
  assert.equal(mine.status,200,JSON.stringify(mine.body));
  assert.equal(mine.body.data.length,1);
  assert.equal(mine.body.data[0].id,societyId);
+ const edit=(id,body)=>request(app).patch('/api/v1/managed-societies/'+id+'/profile')
+  .set(auth('fixture-manager')).send(body);
+ const updatedProfile={description:'Software Engineering Student Society',contactEmail:'guild@example.test'};
+ assert.equal((await edit(societyId,{...updatedProfile,status:'archived'})).status,422);
+ assert.equal((await edit(String(new mongoose.Types.ObjectId()),updatedProfile)).status,403);
+ assert.equal((await edit(societyId,updatedProfile)).status,200);
+ const directory=await request(app).get('/api/v1/societies').set(auth('fixture-student-10'));
+ assert.equal(directory.body.data.find(row=>row.id===societyId)?.contactEmail,updatedProfile.contactEmail);
+
  const notMine=await request(app).get('/api/v1/me/managed-societies').set(auth('fixture-unauthorized'));
  assert.equal(notMine.status,403);
 
@@ -248,6 +257,9 @@ test('revoked Society Manager loses ability to publish and audit trail records t
   .post('/api/v1/admin/society-manager-assignments/'+assignment._id+'/revoke')
   .set(auth('fixture-admin')).send({reason:'End of test fixture assignment'});
  assert.equal(revoked.status,200,JSON.stringify(revoked.body));
+ const editAfterRevocation=await request(app).patch('/api/v1/managed-societies/'+assignment.societyId+'/profile')
+  .set(auth('fixture-manager')).send({description:'Former manager change',contactEmail:null});
+ assert.equal(editAfterRevocation.status,403);
  const society=await Society.findOne({slug:'software-guild'});
  const denied=await request(app).post('/api/v1/events')
   .set(auth('fixture-manager')).send({...makeEvent('Revoked manager event'),societyId:String(society._id)});

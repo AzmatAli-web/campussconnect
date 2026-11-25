@@ -1608,3 +1608,36 @@ test('Milestone 25: announcements and inbox enforce identical membership, depart
  assert.ok(!(await fetchIds('fixture-admin')).includes(String(another._id)));
  assert.equal((await queryFor('fixture-admin',{scope:'university',q:'foreign university'})).body.meta.total,0);
 },{timeout:90000});
+
+test('QR tickets rotate, expire and admit only once at the correct published event',async()=>{
+ const student='fixture-student-10',faculty='fixture-faculty';
+ const create=await request(app).post('/api/v1/events').set(auth(faculty)).send(makeEvent('QR attendance fixture',2));
+ assert.equal(create.status,201);
+ const eventId=create.body.data.id;
+ const receipt=await request(app).post('/api/v1/events/'+eventId+'/registrations')
+  .set({...auth(student),'Idempotency-Key':'attendance-ticket-001'}).send({universityEmail:student+'@'+DOMAIN});
+ assert.equal(receipt.status,201);
+ const id=receipt.body.data.id;
+ const issue=(uid=student)=>request(app).post('/api/v1/me/event-registrations/'+id+'/ticket').set(auth(uid));
+ const scan=(code,uid=faculty)=>request(app).post('/api/v1/events/'+eventId+'/check-in').set(auth(uid)).send({code});
+ assert.equal((await issue('fixture-student-11')).status,404);
+ const first=await issue();
+ assert.equal(first.status,200);
+ assert.match(first.body.data.image,/^data:image\/png;base64,/);
+ assert.equal((await scan(first.body.data.code)).status,409);
+ await Event.updateOne({_id:eventId},{$set:{startsAt:new Date(),endsAt:new Date(Date.now()+3600000)}});
+ const fresh=await issue();
+ assert.equal((await scan(first.body.data.code)).status,409);
+ assert.equal((await scan(fresh.body.data.code,student)).status,403);
+ await EventRegistration.updateOne({_id:id},{$set:{ticketExpiresAt:new Date(0)}});
+ assert.equal((await scan(fresh.body.data.code)).status,409);
+ const valid=(await issue()).body.data.code;
+ await Event.updateOne({_id:eventId},{$set:{status:'cancelled'}});
+ assert.equal((await scan(valid)).status,409);
+ await Event.updateOne({_id:eventId},{$set:{status:'published'}});
+ const twice=await Promise.all([scan(valid),scan(valid)]);
+ assert.deepEqual(twice.map(r=>r.status).sort(),[200,409]);
+ assert.equal((await issue()).status,409);
+ const roster=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth(faculty));
+ assert.ok(roster.body.data.find(row=>row.id===id)?.checkedInAt);
+});

@@ -29,7 +29,8 @@
     "firebase-admin": "^14.2.0",
     "helmet": "^8.0.0",
     "mongoose": "^8.9.5",
-    "multer": "^2.5.0"
+    "multer": "^2.5.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "mongodb-memory-server": "^10.2.3",

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -565,6 +566,18 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ),
                     title: Text(details?.title ?? event?.title ?? 'Event unavailable or cancelled',
                         style: const TextStyle(fontWeight: FontWeight.w800)),
+                    trailing:!widget.previewMode && details?.status=='published' && event?.endsAt?.isBefore(DateTime.now())!=true?IconButton(
+                      tooltip:'Show QR ticket',icon:const Icon(Icons.qr_code),onPressed:()async{
+                        try{
+                          final ticket=await widget.api.issueEventTicket(registration.id);
+                          final bytes=base64Decode((ticket['image'] as String).split(',').last);
+                          if(!mounted)return;
+                          await showDialog<void>(context:context,builder:(context)=>AlertDialog(
+                            title:const Text('Private event ticket'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+                              Image.memory(bytes),Text('Expires ${_date(DateTime.parse(ticket['expiresAt'] as String))}')
+                            ]),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+                        }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Ticket unavailable. Refresh your registration and try again.')));}
+                      }):null,
                     subtitle: Text(lines.join('\n')),
                     isThreeLine: true,
                   ),

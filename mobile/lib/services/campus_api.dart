@@ -187,6 +187,9 @@ class CampusApi {
     return asJsonList(await _request('/events?$query')).map(CampusEvent.fromJson).toList();
   }
 
+  Future<Json> issueEventTicket(String id) async =>
+      asJson(await _request('/me/event-registrations/${Uri.encodeComponent(id)}/ticket',method:'POST'));
+
   Future<List<CampusRegistration>> getMyRegistrations() async =>
       asJsonList(await _request('/me/event-registrations?limit=100&includeEvent=1'))
           .map(CampusRegistration.fromJson)

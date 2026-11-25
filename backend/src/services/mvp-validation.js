@@ -1,7 +1,7 @@
 import {HttpError} from '../lib/http-error.js';
 
 const OBJECT_ID=/^[a-f\d]{24}$/i;
-const OFFSET=/(?:Z|[+-]\d\d:\d\d)$/;
+const ISO_INSTANT=/^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/i;
 const EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function requireObjectId(value) {
@@ -17,8 +17,16 @@ export function textField(value,name,min=1,max=2000) {
  if(typeof value!=='string'||value.trim().length<min||value.trim().length>max) throw new HttpError(422,'INVALID_'+name.toUpperCase(),name+' must contain '+min+'-'+max+' characters');
  return value.trim();
 }
+function validDay(value){
+ if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+ const date=new Date(value+'T00:00:00Z');
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
 export function dateField(value,name) {
- if(typeof value!=='string'||!OFFSET.test(value)||!Number.isFinite(Date.parse(value))) throw new HttpError(422,'INVALID_DATE',name+' requires an ISO date-time with timezone');
+ const match=typeof value==='string'&&ISO_INSTANT.exec(value);
+ if(!match||!validDay(match[1])||!Number.isFinite(Date.parse(value))){
+  throw new HttpError(422,'INVALID_DATE',name+' requires a valid ISO date-time with timezone');
+ }
  return new Date(value);
 }
 export function eventInput(input,now=new Date()) {
@@ -81,10 +89,7 @@ export function eventBrowseQuery(query,now=new Date()){
  const filter={};
  if(query.from!==undefined || query.to!==undefined){
   const midnight=value=>{
-   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return NaN;
-   const utc=Date.parse(value+'T00:00:00Z');
-   if(!Number.isFinite(utc)||new Date(utc).toISOString().slice(0,10)!==value)return NaN;
-   return utc-5*3600000;
+   return validDay(value)?Date.parse(value+'T00:00:00+05:00'):NaN;
   };
   const start=midnight(query.from),end=midnight(query.to);
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start||end-start>41*86400000){

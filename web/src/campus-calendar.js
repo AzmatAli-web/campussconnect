@@ -1,7 +1,7 @@
 import {foldLine,textValue,utc} from './event-calendar.js';
 import {todayAtCampus} from './assignment-planner.js';
 
-const datePattern=/^20\d\d-\d\d-\d\d$/;
+const datePattern=/^(?:1999|20\d\d|2100)-\d\d-\d\d$/;
 const dayMs=86400000;
 function dateMs(value){
  if(typeof value!=='string'||!datePattern.test(value))return NaN;
@@ -14,7 +14,7 @@ export function addCampusDays(value,days){
  const start=dateMs(value);
  if(!Number.isFinite(start)||!Number.isInteger(days)||Math.abs(days)>370)return null;
  const result=iso(start+days*dayMs);
- return result.startsWith('20')?result:null;
+ return datePattern.test(result)?result:null;
 }
 export function campusWeekStart(value){
  const ms=dateMs(value);
@@ -31,7 +31,10 @@ export function calendarDates(view,anchor){
 }
 export function moveCalendar(view,anchor,direction){
  if(![-1,1].includes(direction)||!Number.isFinite(dateMs(anchor)))return null;
- if(view==='week')return addCampusDays(anchor,direction*7);
+ if(view==='week'){
+  const next=addCampusDays(anchor,direction*7);
+  return next?.startsWith('20')?next:null;
+ }
  if(view!=='month')return null;
  const year=Number(anchor.slice(0,4)),month=Number(anchor.slice(5,7));
  const result=new Date(Date.UTC(year,month-1+direction,1)).toISOString().slice(0,10);

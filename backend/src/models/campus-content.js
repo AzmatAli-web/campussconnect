@@ -17,7 +17,8 @@ eventSchema.pre('validate',function(next){if(this.confirmedCount>this.capacity)r
 const registrationSchema=new Schema({
  universityId:oid,eventId:oid,studentId:oid,universityEmailNormalized:{type:String,required:true},
  studentNameSnapshot:{type:String,required:true},registrationNoSnapshot:{type:String,default:null},
- status:{type:String,enum:['confirmed'],default:'confirmed',required:true},confirmedAt:{type:Date,required:true}
+ status:{type:String,enum:['confirmed'],default:'confirmed',required:true},confirmedAt:{type:Date,required:true},
+ ticketHash:{type:String,select:false},ticketExpiresAt:Date,checkedInAt:Date,checkedInBy:Schema.Types.ObjectId
 },{timestamps:true,collection:'event_registrations',versionKey:false});
 registrationSchema.index({eventId:1,studentId:1},{unique:true});
 registrationSchema.index({universityId:1,eventId:1,confirmedAt:-1,_id:-1});

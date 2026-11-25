@@ -20,7 +20,7 @@ function EventCard({event,registrations=[],profile,busy,register,showRoster,open
     {privateView&&<button className="wc-outline" onClick={()=>showRoster(event.id)}>{openRoster===event.id?'Hide private roster':'View private attendees'}</button>}
    </div>
    {own&&!privateView&&<p className="wc-private-note">Your registration is visible to you and authorized organizers only.</p>}
-   {privateView&&openRoster===event.id&&<div className="wc-roster"><strong>Restricted attendee list</strong><small>Available only to this event's current organizer or an Administrator.</small>{!rosters[event.id]?<p>Loading authorized attendee records…</p>:rosters[event.id].length===0?<p>No registered attendees yet.</p>:<ul>{rosters[event.id].map(person=><li key={person.id}><strong>{person.studentName||'Attendee'}</strong><small>{person.universityEmail||''} {person.registrationNo||''}</small></li>)}</ul>}</div>}
+   {privateView&&openRoster===event.id&&<div className="wc-roster"><strong>Restricted attendee list</strong><small>Available only to this event's current organizer or an Administrator.</small>{!rosters[event.id]?<p>Loading authorized attendee records…</p>:rosters[event.id].length===0?<p>No registered attendees yet.</p>:<ul>{rosters[event.id].map(person=><li key={person.id}><strong>{person.studentName||'Attendee'}</strong><small>{person.universityEmail||''} {person.registrationNo||''}</small>{person.checkedInAt&&<small>Checked in {formatDate(person.checkedInAt)}</small>}</li>)}</ul>}</div>}
   </div></article>;
 }
 export function Overview({data,profile,choose}){
@@ -87,6 +87,27 @@ export function Events({data,profile,user,busy,register,revision}){
    </>}
  </section>;
 }
+function Ticket({id,user}){
+ const [image,setImage]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ async function issue(){
+  setBusy(true);setError('');setImage(null);
+  try{setImage(await callApi('/me/event-registrations/'+id+'/ticket',user,{method:'POST'}));}
+  catch(err){setError(err.message);}finally{setBusy(false);}
+ }
+ return <div><button disabled={busy} onClick={issue}>{image?'Refresh QR ticket':'Show QR ticket'}</button>
+  {image&&<div><img width="200" alt="Your private event check-in ticket" src={image.image}/>
+   <small>Valid until {formatDate(image.expiresAt)}</small></div>}{error&&<p role="alert">{error}</p>}</div>;
+}
+function CheckIn({eventId,call}){
+ const [code,setCode]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
+ async function submit(e){
+  e.preventDefault();setBusy(true);setStatus('');
+  try{await call('/events/'+eventId+'/check-in',{method:'POST',body:{code:code.trim()}});setStatus('Attendance recorded.');setCode('');}
+  catch(err){setStatus(err.message);}finally{setBusy(false);}
+ }
+ return <form onSubmit={submit}><label>Scan ticket with a QR reader<input required autoComplete="off" value={code} onChange={e=>setCode(e.target.value)}/></label>
+  <button disabled={busy}>Check in</button><p role="status">{status}</p></form>;
+}
 export function Registrations({user,choose,revision}){
  const [page,setPage]=useState(1);
  const [retry,setRetry]=useState(0);
@@ -128,6 +149,7 @@ export function Registrations({user,choose,revision}){
        <strong>{event?.title||'Event details unavailable'}</strong>
        {event&&<small>{formatDate(event.startsAt)} · {event.venue}</small>}
        <small>Registration confirmed {formatDate(receipt.confirmedAt)}</small>
+       {event&&!cancelled&&!ended&&<Ticket id={receipt.id} user={user}/>}
       </div>
       <Tag kind={cancelled?'warn':state==='Upcoming'?'good':'neutral'}>{state}</Tag>
      </div>;
@@ -233,7 +255,7 @@ export function Organizer({data,profile,act,call,busy,showRoster,openRoster,rost
     <button disabled={busy||(!faculty&&!managed.length)} className="wc-primary">Publish notice ↗</button>
    </form></section></div>
   <section className="wc-panel"><Head tag="AUTHORIZED ORGANIZER" title="My managed events" detail="Individual attendee details are available only to the event's current organizer or Admin."/>
-   {organized.length?<div className="wc-event-grid">{organized.map(e=><EventCard event={e} key={e.id} privateView profile={profile} showRoster={showRoster} openRoster={openRoster} rosters={rosters}/>)}</div>:<Empty title="No managed events" detail="Create an event above to manage registrations and see a private roster."/>}
+   {organized.length?<div className="wc-event-grid">{organized.map(e=><div key={e.id}><EventCard event={e} privateView profile={profile} showRoster={showRoster} openRoster={openRoster} rosters={rosters}/><CheckIn call={call} eventId={e.id}/></div>)}</div>:<Empty title="No managed events" detail="Create an event above to manage registrations and see a private roster."/>}
   </section>
  </div>;
 }

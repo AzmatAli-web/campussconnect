@@ -1,6 +1,7 @@
 import {Router} from 'express';
 import mongoose from 'mongoose';
-import {createHash} from 'node:crypto';
+import QRCode from 'qrcode';
+import {createHash,randomBytes} from 'node:crypto';
 import {HttpError,asyncHandler} from '../lib/http-error.js';
 import {campusUserMiddleware,needRole,verifiedFaculty} from '../middleware/campus-user.js';
 import {Event,EventRegistration,IdempotencyKey,Society,SocietyManagerAssignment} from '../models/campus-content.js';
@@ -87,6 +88,37 @@ export function eventsRouter(deps){
    const receipt=registrationView(row);
    return {...receipt,event:byId.get(receipt.eventId)??null};
   }),meta});
+ }));
+ router.post('/me/event-registrations/:id/ticket',noStore,auth,asyncHandler(async(req,res)=>{
+  needRole(req,'student');
+  const filter={_id:requireObjectId(req.params.id),studentId:req.currentUser._id,universityId:deps.config.universityId,status:'confirmed'};
+  const receipt=await EventRegistration.findOne(filter).lean();
+  if(!receipt)throw new HttpError(404,'NOT_FOUND','Registration unavailable');
+  const event=await Event.findOne({_id:receipt.eventId,universityId:filter.universityId,status:'published',endsAt:{$gt:new Date()}}).lean();
+  if(!event)throw new HttpError(409,'EVENT_UNAVAILABLE','Event unavailable');
+  const code=receipt._id+'.'+randomBytes(24).toString('hex');
+  const expiresAt=new Date(Math.min(Date.now()+5*60000,event.endsAt.getTime()));
+  const image=await QRCode.toDataURL(code,{width:300,margin:4});
+  const changed=await EventRegistration.updateOne({...filter,checkedInAt:null},{$set:{
+   ticketHash:createHash('sha256').update(code).digest('hex'),ticketExpiresAt:expiresAt
+  }});
+  if(!changed.matchedCount)throw new HttpError(409,'ALREADY_CHECKED_IN','Registration already checked in');
+  res.json({data:{code,image,expiresAt}});
+ }));
+ router.post('/events/:id/check-in',noStore,auth,asyncHandler(async(req,res)=>{
+  const universityId=deps.config.universityId,eventId=requireObjectId(req.params.id);
+  const event=await Event.findOne({_id:eventId,universityId}).lean();
+  if(!event||!await authorizedOrganizer(req,event,universityId))throw new HttpError(403,'FORBIDDEN','Current event organizer or admin required');
+  const now=new Date();
+  if(event.status!=='published'||event.endsAt<=now||event.startsAt.getTime()>now.getTime()+30*60000)
+   throw new HttpError(409,'CHECK_IN_CLOSED','Check-in opens 30 minutes before the event and closes at its end');
+  const {code}=requireBody(req.body,['code']);
+  if(typeof code!=='string'||!/^[a-f0-9]{24}\.[a-f0-9]{48}$/.test(code))throw new HttpError(422,'INVALID_TICKET','Invalid ticket');
+  const result=await EventRegistration.updateOne({_id:code.slice(0,24),eventId,universityId,status:'confirmed',
+   ticketHash:createHash('sha256').update(code).digest('hex'),ticketExpiresAt:{$gt:now},checkedInAt:null},
+   {$set:{checkedInAt:now,checkedInBy:req.currentUser._id},$unset:{ticketHash:1,ticketExpiresAt:1}});
+  if(!result.modifiedCount)throw new HttpError(409,'TICKET_UNAVAILABLE','Ticket expired, replaced, already used or for another event');
+  res.json({data:{checkedInAt:now}});
  }));
  router.get('/events',auth,asyncHandler(async(req,res)=>{
   const {page,limit,skip,filter:criteria,sort}=eventBrowseQuery(req.query);

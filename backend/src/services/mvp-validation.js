@@ -146,6 +146,6 @@ export function announcementView(doc){
 
 export function privateRegistrationView(doc){
  const r=doc.toObject?doc.toObject():doc;
- return {...registrationView(r),studentName:r.studentNameSnapshot,
+ return {...registrationView(r),...(r.checkedInAt ? {checkedInAt:r.checkedInAt} : {}),studentName:r.studentNameSnapshot,
   universityEmail:r.universityEmailNormalized,registrationNo:r.registrationNoSnapshot};
 }

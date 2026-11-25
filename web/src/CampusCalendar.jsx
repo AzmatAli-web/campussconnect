@@ -23,6 +23,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  const from=dates[0],to=dates.at(-1);
  const [eventFeed,setEventFeed]=useState(null);
  const [reload,setReload]=useState(0);
+ const [conflictsOnly,setConflictsOnly]=useState(false);
  const [enabled,setEnabled]=useState({class:true,event:true,assignment:true});
  useEffect(()=>{
   const sync=event=>{
@@ -80,14 +81,21 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
  },[call,from,to,reload]);
  const matching=eventFeed?.from===from&&eventFeed?.to===to&&eventFeed?.reload===reload?eventFeed:null;
  const agenda=useMemo(()=>{
-  const catalog={slots:results.slots,events:matching?.rows??[],assignments:tasks};
-  return new Map(dates.map(date=>[date,itemsOnCampusDay(date,catalog).filter(x=>enabled[x.kind])]));
+  const catalog={slots:enabled.class?results.slots:[],events:enabled.event?(matching?.rows??[]):[],assignments:enabled.assignment?tasks:[]};
+  return new Map(dates.map(date=>[date,itemsOnCampusDay(date,catalog)]));
  },[dates,results.slots,matching,tasks,enabled]);
  const weeklyFile=useMemo(()=>{
   if(results.loading||results.errors.length||!matching||matching.error)return null;
   return weeklyCalendarFile(selected,results.slots,matching.rows,tasks,enabled);
  },[selected,results,matching,tasks,enabled]);
- const activeAgenda=agenda.get(selected)??[];
+ const ready=!results.loading && !results.errors.length && matching && !matching.error;
+ const conflictDays=dates.filter(day=>agenda.get(day)?.some(item=>item.conflict));
+ const weeklyCount=calendarDates('week',selected).filter(day=>conflictDays.includes(day)).length;
+ const nextConflict=conflictDays.find(day=>day>selected)??conflictDays.find(day=>day!==selected);
+ const activeAgenda=(agenda.get(selected)??[]).filter(item=>!conflictsOnly||item.conflict);
+ function jump(day){
+  if(day>='2001-01-01'&&day<='2098-12-31'&&calendarDates('week',day).length){setSelected(day);setAnchor(day);}
+ }
  function navigate(direction){
   const next=moveCalendar(view,anchor,direction);
   if(next){setAnchor(next);setSelected(next);}
@@ -122,6 +130,12 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
      <input type="checkbox" checked={enabled[key]} onChange={event=>setEnabled(current=>({...current,[key]:event.target.checked}))}/>
      {' '+label}</label>)}
    </div>
+   <div className="wc-calendar-toolbar">
+    <label>Jump to date <input type="date" min="2001-01-01" max="2098-12-31" value={selected} onChange={event=>jump(event.target.value)}/></label>
+    <label><input type="checkbox" checked={conflictsOnly} onChange={event=>setConflictsOnly(event.target.checked)}/> Show conflicts only in agenda</label>
+    <button className="wc-outline" disabled={!ready||!nextConflict} onClick={()=>setSelected(nextConflict)}>Next conflict day</button>
+   </div>
+   {ready&&<p role="status">Days with scheduling conflicts this week: {weeklyCount}</p>}
    {(results.loading||!matching)&&<p role="status">Loading published campus calendar…</p>}
    {results.errors.map(error=><p role="alert" key={error}>{error}</p>)}
    {matching?.error&&<p role="alert">Published events could not be loaded.</p>}
@@ -136,9 +150,10 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
      const outside=view==='month'&&date.slice(0,7)!==anchor.slice(0,7);
      return <button type="button" key={date}
       className={'wc-calendar-day'+(outside?' outside':'')+(date===selected?' selected':'')+(date===today?' today':'')}
-      aria-pressed={date===selected} aria-label={displayDate(date,dateName)}
+      aria-pressed={date===selected} aria-label={displayDate(date,dateName)+(conflictDays.includes(date)?', scheduling conflict':'')}
       onClick={()=>setSelected(date)}>
       <span className="wc-calendar-number">{Number(date.slice(-2))}</span>
+      {conflictDays.includes(date)&&<span className="wc-calendar-clash">Conflict</span>}
       <span className="wc-calendar-counts">
        {Object.entries(count).filter(([,n])=>n>0).map(([kind,n])=>
         <span className={'wc-calendar-count '+kind} key={kind}>{n} {labels[kind]}</span>)}
@@ -153,7 +168,7 @@ export default function CampusCalendar({call,assignmentKey,preferenceKey}){
    {activeAgenda.length===0?<p>No matching calendar items on this date.</p>:
     <ul className="wc-calendar-agenda">{activeAgenda.map(item=><li key={item.id}>
      <span className={'wc-tag '+(item.kind==='assignment'?'warn':item.kind==='class'?'blue':'good')}>{labels[item.kind]}</span>
-     <strong>{item.title}</strong><small>{item.time?item.time+' PKT · ':''}{item.detail}</small>
+     <strong>{item.title}</strong>{item.conflict&&<small>Scheduling conflict</small>}<small>{item.time?item.time+' PKT · ':''}{item.detail}</small>
     </li>)}</ul>}
   </section>
  </div>;

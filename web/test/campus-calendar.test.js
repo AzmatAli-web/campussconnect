@@ -107,3 +107,9 @@ test('free windows merge busy periods and include gaps that exactly meet the min
  assert.deepEqual(freeWindows(busy,0,120*minute,60),[]);
  assert.deepEqual(freeWindows([],0,120*minute,30),[{start:0,end:120*minute}]);
 });
+
+test('boundary months include valid dates from the adjacent year',()=>{
+ assert.equal(calendarDates('month','2000-01-01')[0],'1999-12-27');
+ assert.equal(calendarDates('month','2099-12-31').at(-1),'2100-01-10');
+ assert.equal(moveCalendar('week','2000-01-02',-1),null);
+});

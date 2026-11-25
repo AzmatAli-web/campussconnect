@@ -1,4 +1,15 @@
-const base=(import.meta.env.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
+const base=(import.meta.env?.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
+async function readEnvelope(response,fallback){
+ const result=await response.json().catch(()=>null);
+ if(!response.ok){
+  const error=new Error(result?.error?.message||fallback);
+  error.status=response.status;
+  error.code=result?.error?.code;
+  throw error;
+ }
+ if(!result || !Object.hasOwn(result,'data'))throw new Error('Backend returned an invalid response');
+ return result;
+}
 export async function callApi(path,user,{method='GET',body,headers={},includeMeta=false}={}){
  const token=await user.getIdToken();
  let response;
@@ -8,14 +19,7 @@ export async function callApi(path,user,{method='GET',body,headers={},includeMet
    ...(body!==undefined?{body:JSON.stringify(body)}:{})
   });
  }catch{throw new Error('Cannot reach backend. Check that Express is running on port 4000.');}
- let result;
- try{result=await response.json();}catch{throw new Error('Backend returned an invalid response');}
- if(!response.ok){
-  const error=new Error(result?.error?.message||'Request failed');
-  error.status=response.status;
-  error.code=result?.error?.code;
-  throw error;
- }
+ const result=await readEnvelope(response,'Request failed');
  return includeMeta?{data:result.data,meta:result.meta}:result.data;
 }
 
@@ -30,14 +34,7 @@ export async function uploadAcademicPdf(user, form) {
    body:form
   });
  } catch {throw new Error('Cannot reach the campus backend for PDF upload.');}
- const payload = await response.json().catch(()=>null);
- if(!response.ok){
-  const error=new Error(payload?.error?.message||'PDF upload failed.');
-  error.code=payload?.error?.code;
-  error.status=response.status;
-  throw error;
- }
- return payload.data;
+ return (await readEnvelope(response,'PDF upload failed.')).data;
 }
 
 /** Authenticated binary download, NOT a public PDF URL. */
@@ -103,7 +100,5 @@ export async function uploadMarketplacePhoto(user,id,file){
   method:'POST',cache:'no-store',
   headers:{Authorization:'Bearer '+token},body:data
  });
- const envelope=await response.json().catch(()=>null);
- if(!response.ok)throw new Error(envelope?.error?.message||'Photo upload failed.');
- return envelope.data;
+ return (await readEnvelope(response,'Photo upload failed.')).data;
 }

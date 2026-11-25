@@ -14,6 +14,14 @@ const _labels={CalendarSource.classes:'Classes',CalendarSource.events:'Events',C
 const _days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 String _label(DateTime day)=>day.toIso8601String().substring(0,10);
 
+typedef StudyBlock=({String id,String title,FreeWindow window});
+
+List<StudyBlock> readStudyBlocks(SharedPreferences prefs,String key){
+  final rows=jsonDecode(prefs.getString(key)??'[]') as List;
+  return [for(final row in rows)(id:row['id'] as String,title:row['title'] as String,
+    window:(start:DateTime.parse(row['start'] as String).toUtc(),end:DateTime.parse(row['end'] as String).toUtc()))];
+}
+
 class CampusCalendar extends StatefulWidget {
   final CampusApi api;
   final String accountKey;
@@ -25,7 +33,11 @@ class CampusCalendar extends StatefulWidget {
 class _CampusCalendarState extends State<CampusCalendar> {
   DateTime selected=campusDate(DateTime.now());
   bool conflictsOnly=false;
-  int minimumGap=30;
+  int minimumGap=30,blockMinutes=30;
+  final topic=TextEditingController();
+  List<StudyBlock> studyBlocks=[];
+  bool savingBlock=false;
+  String get blockKey=>'study-blocks:${widget.accountKey}';
   (int,int) searchHours=(8,18);
   bool month=false, weeklyAgenda=false, loading=true;
   final sources=CalendarSource.values.toSet();
@@ -38,7 +50,7 @@ class _CampusCalendarState extends State<CampusCalendar> {
   @override
   void initState(){super.initState();load();}
   @override
-  void dispose(){search.dispose();super.dispose();}
+  void dispose(){search.dispose();topic.dispose();super.dispose();}
 
   Future<void> load() async {
     setState(()=>loading=true);
@@ -48,6 +60,10 @@ class _CampusCalendarState extends State<CampusCalendar> {
     String groupLabel='';
     final errors=<String>[];
     await Future.wait([
+      () async {
+        try{studyBlocks=readStudyBlocks(await SharedPreferences.getInstance(),blockKey);}
+        catch(_){errors.add('Saved study blocks unavailable.');}
+      }(),
       () async {
         try{
           final groups=await widget.api.getTimetableGroups();
@@ -222,13 +238,34 @@ class _CampusCalendarState extends State<CampusCalendar> {
     ]));
   }
 
+  Future<void> changeBlock(StudyBlock block,{bool remove=false}) async {
+    if(savingBlock)return;
+    setState(()=>savingBlock=true);
+    try{
+      final prefs=await SharedPreferences.getInstance();
+      final current=readStudyBlocks(prefs,blockKey);
+      if(!remove && current.any((row)=>row.window.start.isBefore(block.window.end)&&row.window.end.isAfter(block.window.start))){
+        if(mounted)setState(()=>studyBlocks=current);
+        throw StateError('Overlap');
+      }
+      final next=[for(final row in current)if(!remove||row.id!=block.id)row,if(!remove)block];
+      final saved=await prefs.setString(blockKey,jsonEncode([for(final row in next){
+        'id':row.id,'title':row.title,'start':row.window.start.toIso8601String(),'end':row.window.end.toIso8601String()}]));
+      if(!saved)throw StateError('Write failed');
+      if(mounted)setState(()=>studyBlocks=next);
+    }catch(_){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not update this study block. Refresh and try again.')));
+    }finally{if(mounted)setState(()=>savingBlock=false);}
+  }
+
   Widget freeTimeFinder(DateTime week){
     final all=<({DateTime day,FreeWindow gap})>[];
     for(var index=0;index<7;index++){
       final day=week.add(Duration(days:index));
       final midnight=day.subtract(const Duration(hours:5));
       final gaps=freeWindows(feeds.agenda(day,{CalendarSource.classes,CalendarSource.events}),
-        midnight.add(Duration(hours:searchHours.$1)),midnight.add(Duration(hours:searchHours.$2)),minimumGap);
+        midnight.add(Duration(hours:searchHours.$1)),midnight.add(Duration(hours:searchHours.$2)),minimumGap,
+        reservations:studyBlocks.map((row)=>row.window));
       for(final gap in gaps){all.add((day:day,gap:gap));}
     }
     final daily=all.where((item)=>item.day==selected);
@@ -238,6 +275,8 @@ class _CampusCalendarState extends State<CampusCalendar> {
     final total=all.fold<int>(0,(sum,item)=>sum+length(item.gap));
     final longest=all.isEmpty?null:all.reduce((a,b)=>length(b.gap)>length(a.gap)?b:a);
     final next=all.where((item)=>item.day.isAfter(selected)).firstOrNull;
+    final scheduled=studyBlocks.where((row)=>calendarMonday(campusDate(row.window.start))==week).toList()
+      ..sort((a,b)=>a.window.start.compareTo(b.window.start));
     return ExpansionTile(title:const Text('Free-time finder'),children:[
       const Text('Based on your timetable and published campus events. All times are in PKT.'),
       const Text('Minimum gap'),
@@ -249,7 +288,21 @@ class _CampusCalendarState extends State<CampusCalendar> {
         onSelected:(_)=>setState(()=>searchHours=hours))]),
       Text('Free on ${_label(selected)}'),
       if(daily.isEmpty)const Text('No gaps match these settings on this day.'),
-      for(final item in daily)Text(describe(item.gap)),
+      TextField(controller:topic,maxLength:80,decoration:const InputDecoration(labelText:'Study topic',hintText:'Personal study')),
+      const Text('Block length'),
+      Wrap(children:[for(final minutes in [15,30,60,90])ChoiceChip(label:Text('$minutes minutes'),
+        selected:blockMinutes==minutes,onSelected:(_)=>setState(()=>blockMinutes=minutes))]),
+      const Text('Reserve the start of a gap. Blocks are saved for your account on this device.'),
+      for(final item in daily)ListTile(title:Text(describe(item.gap)),trailing:TextButton(
+        onPressed:savingBlock||length(item.gap)<blockMinutes*60000?null:()=>changeBlock((
+          id:const Uuid().v4(),title:topic.text.trim().isEmpty?'Personal study':topic.text.trim(),
+          window:(start:item.gap.start,end:item.gap.start.add(Duration(minutes:blockMinutes))))),
+        child:Text('Reserve $blockMinutes min'))),
+      const Text('Study blocks this week'),
+      if(scheduled.isEmpty)const Text('No study blocks scheduled this week.'),
+      for(final block in scheduled)ListTile(title:Text(block.title),
+        subtitle:Text('${_label(campusDate(block.window.start))} · ${describe(block.window)} PKT'),
+        trailing:TextButton(onPressed:savingBlock?null:()=>changeBlock(block,remove:true),child:const Text('Cancel'))),
       Text('Matching free time this week: ${durationLabel(total)}'),
       if(longest!=null)Text('Longest gap this week: ${_label(longest.day)}, ${describe(longest.gap)}'),
       TextButton(onPressed:next==null?null:()=>navigate(next.day,month),child:const Text('Next available day this week')),

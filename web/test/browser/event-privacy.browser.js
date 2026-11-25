@@ -501,6 +501,13 @@ test('real React workspace: two students share event counts, never receipts or r
   await a.getByRole('region',{name:'Selected day agenda'}).getByText('Scheduling conflict',{exact:true}).first().waitFor();
   await a.getByLabel('Show conflicts only in agenda').uncheck();
   const finder=a.getByRole('region',{name:'Free-time finder'});
+  await finder.getByLabel('Study topic').fill('Algorithms revision');
+  await finder.getByLabel('Block length').selectOption('15');
+  await finder.getByRole('button',{name:'Reserve 15 min'}).first().click();
+  await finder.getByText('Algorithms revision',{exact:true}).waitFor();
+  await a.getByRole('button',{name:'Refresh schedule'}).click();
+  await finder.getByRole('button',{name:'Cancel Algorithms revision'}).click();
+  await finder.getByText('No study blocks scheduled this week.').waitFor();
   await finder.getByLabel('Minimum gap').selectOption('60');
   await finder.getByLabel('Search hours').selectOption('08-12');
   await finder.getByRole('button',{name:'Next available day this week'}).click();

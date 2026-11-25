@@ -96,6 +96,14 @@ void main(){
     expect(freeWindows([],day,at(120),30),[(start:day,end:at(120))]);
   });
 
+  test('a saved study block removes only its reserved time from a free gap',(){
+    final day=DateTime.utc(2027,1,4,3);
+    final end=day.add(const Duration(hours:1));
+    final reservation=(start:day,end:day.add(const Duration(minutes:15)));
+    expect(freeWindows([],day,end,30,reservations:[reservation]),[(start:reservation.end,end:end)]);
+    expect(freeWindows([],day,end,30),[(start:day,end:end)]);
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

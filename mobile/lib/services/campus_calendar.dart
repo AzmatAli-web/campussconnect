@@ -117,3 +117,47 @@ String? weeklyCalendar(DateTime selected,CalendarFeeds feeds,Set<CalendarSource>
   if(rows.isEmpty)return null;
   return calendarLines(['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CampusConnect//Weekly Agenda//EN',...rows,'END:VCALENDAR']);
 }
+
+typedef CalendarOverlap = ({AgendaItem other,DateTime start,DateTime end});
+
+List<CalendarOverlap> overlapDetails(AgendaItem item,List<AgendaItem> rows){
+  final pairs=<CalendarOverlap>[];
+  final from=item.start,to=item.end;
+  if(from==null||to==null)return pairs;
+  for(final other in rows){
+    final start=other.start,end=other.end;
+    if(identical(other,item)||start==null||end==null)continue;
+    final sharedStart=start.isAfter(from)?start:from;
+    final sharedEnd=end.isBefore(to)?end:to;
+    if(sharedEnd.isAfter(sharedStart))pairs.add((other:other,start:sharedStart,end:sharedEnd));
+  }
+  return pairs..sort((a,b){
+    final start=a.start.compareTo(b.start);
+    if(start!=0)return start;
+    final end=a.end.compareTo(b.end);
+    return end!=0?end:a.other.title.compareTo(b.other.title);
+  });
+}
+
+({int milliseconds,int peak}) conflictSummary(List<AgendaItem> items){
+  final changes=<int,int>{};
+  for(final item in items){
+    final start=item.start?.millisecondsSinceEpoch,end=item.end?.millisecondsSinceEpoch;
+    if(start==null||end==null||end<=start)continue;
+    changes[start]=(changes[start]??0)+1;
+    changes[end]=(changes[end]??0)-1;
+  }
+  var active=0,peak=0,duration=0,previous=0;
+  for(final time in changes.keys.toList()..sort()){
+    if(active>=2)duration+=time-previous;
+    active+=changes[time]!;
+    if(active>peak)peak=active;
+    previous=time;
+  }
+  return (milliseconds:duration,peak:peak);
+}
+
+String durationLabel(int milliseconds){
+  final seconds=(milliseconds/1000).ceil();
+  return ['${seconds~/60} min',if(seconds%60!=0)'${seconds%60} sec'].join(' ');
+}

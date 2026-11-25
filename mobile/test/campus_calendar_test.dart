@@ -72,6 +72,20 @@ void main(){
     expect(feeds.agenda(date,{CalendarSource.classes}).any((item)=>item.conflict),isFalse);
   });
 
+  test('conflict details and summaries count triple bookings once',(){
+    final day=DateTime.utc(2027,1,4);
+    AgendaItem row(String title,int from,int to)=>AgendaItem(CalendarSource.events,title,'','',
+      start:day.add(Duration(minutes:from)),end:day.add(Duration(minutes:to)));
+    final a=row('A',0,60),b=row('B',10,50),c=row('C',20,40),d=row('D',60,80);
+    final rows=[a,b,c,d];
+    final pairs=overlapDetails(a,rows);
+    expect(pairs.map((pair)=>pair.other.title),['B','C']);
+    expect(pairs.first.end.difference(pairs.first.start).inMinutes,40);
+    expect(conflictSummary(rows),(milliseconds:2400000,peak:3));
+    expect(conflictSummary([a,d]),(milliseconds:0,peak:1));
+    expect(durationLabel(90500),'1 min 31 sec');
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

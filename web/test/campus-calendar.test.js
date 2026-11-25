@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {weeklyCalendarFile,addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
+import {overlapDetails,conflictSummary,durationLabel,weeklyCalendarFile,addCampusDays,campusWeekStart,calendarDates,moveCalendar,eventCampusStamp,itemsOnCampusDay,calendarToday} from '../src/campus-calendar.js';
 
 test('Monday-based weeks and 42-day month grid cross year boundaries cleanly',()=>{
  assert.equal(campusWeekStart('2026-11-23'),'2026-11-23');
@@ -86,4 +86,14 @@ test('clashes include nested and overnight intervals, excluding touching items a
  const items=itemsOnCampusDay(day,{slots:[slot],events,assignments:[{due:day,id:'a',title:'Task',done:false}]});
  assert.deepEqual(items.filter(r=>r.conflict).map(r=>r.title).sort(),['Class','inside','overnight']);
  assert.equal(itemsOnCampusDay(day,{slots:[slot]}).some(r=>r.conflict),false);
+});
+
+test('conflict details keep individual intersections while totals count shared time once',()=>{
+ const items=[[0,60],[10,50],[20,40],[60,80]].map(([start,end],i)=>({
+  title:String(i),kind:'event',start:start*60000,end:end*60000
+ }));
+ assert.deepEqual(overlapDetails(items[0],items).map(p=>[p.title,p.start/60000,p.end/60000]),[['1',10,50],['2',20,40]]);
+ assert.deepEqual(conflictSummary(items),{peak:3,duration:2400000});
+ assert.deepEqual(conflictSummary([items[0],items[3]]),{peak:1,duration:0});
+ assert.equal(durationLabel(90500),'1 min 31 sec');
 });

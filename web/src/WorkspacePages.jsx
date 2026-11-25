@@ -100,13 +100,24 @@ function Ticket({id,user}){
 }
 function CheckIn({eventId,call}){
  const [code,setCode]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
+ const [attendance,setAttendance]=useState(null),[reportError,setReportError]=useState('');
+ async function refreshAttendance(){
+  setReportError('');
+  try{setAttendance(await call('/events/'+eventId+'/attendance'));}
+  catch(err){setAttendance(null);setReportError(err.message);}
+ }
  async function submit(e){
   e.preventDefault();setBusy(true);setStatus('');
-  try{await call('/events/'+eventId+'/check-in',{method:'POST',body:{code:code.trim()}});setStatus('Attendance recorded.');setCode('');}
+  try{await call('/events/'+eventId+'/check-in',{method:'POST',body:{code:code.trim()}});setStatus('Attendance recorded.');setCode('');if(attendance)await refreshAttendance();}
   catch(err){setStatus(err.message);}finally{setBusy(false);}
  }
- return <form onSubmit={submit}><label>Scan ticket with a QR reader<input required autoComplete="off" value={code} onChange={e=>setCode(e.target.value)}/></label>
-  <button disabled={busy}>Check in</button><p role="status">{status}</p></form>;
+ return <><form onSubmit={submit}><label>Scan ticket with a QR reader<input required autoComplete="off" value={code} onChange={e=>setCode(e.target.value)}/></label>
+  <button disabled={busy}>Check in</button><p role="status">{status}</p></form>
+  <button type="button" disabled={busy} onClick={async()=>{
+   setBusy(true);try{await refreshAttendance();}finally{setBusy(false);}
+  }}>{attendance?'Refresh attendance':'View attendance'}</button>
+  {reportError&&<p role="alert">{reportError}</p>}
+  {attendance&&<p role="status">{attendance.checkedIn} checked in of {attendance.registered} registered · {attendance.attendancePercent===null?'No registrations yet':attendance.attendancePercent+'% attendance'}</p>}</>;
 }
 export function Registrations({user,choose,revision}){
  const [page,setPage]=useState(1);

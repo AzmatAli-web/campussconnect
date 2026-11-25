@@ -127,6 +127,24 @@ class _CampusCalendarState extends State<CampusCalendar> {
     if(mounted && date!=null)navigate(DateTime.utc(date.year,date.month,date.day),month);
   }
 
+  void showConflictDetails(AgendaItem item,List<AgendaItem> rows){
+    final pairs=overlapDetails(item,rows);
+    String clock(DateTime time)=>time.toUtc().add(const Duration(hours:5)).toIso8601String().substring(11,19);
+    showDialog<void>(context:context,builder:(context)=>AlertDialog(
+      title:Text('Conflicts with ${item.title}'),
+      content:SizedBox(width:400,child:ListView.builder(shrinkWrap:true,itemCount:pairs.length,
+        itemBuilder:(context,index){
+          final pair=pairs[index];
+          return ListTile(title:Text(pair.other.title),subtitle:Text([
+            _labels[pair.other.source]!,
+            '${clock(pair.start)}–${clock(pair.end)} PKT',
+            durationLabel(pair.end.difference(pair.start).inMilliseconds),
+          ].join(' · ')));
+        })),
+      actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))],
+    ));
+  }
+
   void move(int step)=>navigate(month?shiftCalendarMonth(selected,step):selected.add(Duration(days:7*step)),month);
 
   @override
@@ -139,6 +157,11 @@ class _CampusCalendarState extends State<CampusCalendar> {
     final conflictDays=days.where((day)=>rows[day]!.any((item)=>item.conflict)).toList();
     final nextConflict=conflictDays.where((day)=>day.isAfter(selected)).firstOrNull
       ??conflictDays.where((day)=>day!=selected).firstOrNull;
+    final previousConflict=conflictDays.reversed.where((day)=>day.isBefore(selected)).firstOrNull
+      ??conflictDays.reversed.where((day)=>day!=selected).firstOrNull;
+    final summaries={for(final day in agendaDays) day:conflictSummary(rows[day]??[])};
+    final weeklyDuration=days.where((day)=>calendarMonday(day)==week).fold<int>(0,(total,day)=>
+      total+(summaries[day]??conflictSummary(rows[day]!)).milliseconds);
     final weeklyCount=conflictDays.where((day)=>calendarMonday(day)==week).length;
     final term=weeklyAgenda?search.text.trim().toLowerCase():'';
     final agenda={for(final day in agendaDays) day:(rows[day]??<AgendaItem>[]).where((r)=>
@@ -174,16 +197,22 @@ class _CampusCalendarState extends State<CampusCalendar> {
       Wrap(spacing:8,children:[
         FilterChip(label:const Text('Conflicts only'),selected:conflictsOnly,
           onSelected:(on)=>setState(()=>conflictsOnly=on)),
+        TextButton(onPressed:ready && previousConflict!=null?()=>navigate(previousConflict,month):null,
+          child:const Text('Previous conflict day')),
         TextButton(onPressed:ready && nextConflict!=null?()=>navigate(nextConflict,month):null,
           child:const Text('Next conflict day')),
       ]),
       if(ready)Text('Days with scheduling conflicts this week: $weeklyCount'),
+      if(ready)Text('Time with overlapping items this week: ${durationLabel(weeklyDuration)}'),
       SwitchListTile(title:const Text('Search whole week'),value:weeklyAgenda,onChanged:(v)=>setState(()=>weeklyAgenda=v)),
       if(weeklyAgenda)TextField(controller:search,decoration:const InputDecoration(labelText:'Search weekly agenda'),
         onChanged:(_)=>setState((){})),
       for(final entry in agenda.entries)if(entry.value.isNotEmpty || !weeklyAgenda)...[
         Text('${_label(entry.key)} · PKT',style:Theme.of(context).textTheme.titleMedium),
-        for(final item in entry.value)ListTile(title:Text(item.title),subtitle:Text([
+        if(ready)Text('Time with overlapping items: ${durationLabel(summaries[entry.key]!.milliseconds)} · Peak simultaneous items: ${summaries[entry.key]!.peak}'),
+        for(final item in entry.value)ListTile(
+          onTap:item.conflict?()=>showConflictDetails(item,rows[entry.key]!):null,
+          trailing:item.conflict?const Icon(Icons.info_outline,semanticLabel:'Conflict details'):null,title:Text(item.title),subtitle:Text([
           _labels[item.source]!,if(item.conflict)'Scheduling conflict',if(item.time.isNotEmpty)item.time,if(item.detail.isNotEmpty)item.detail].join(' · '))),
       ],
       if(!loading && !eventLoading && !eventFailed && agenda.values.every((rows)=>rows.isEmpty))const Text('No matching items for this period.'),

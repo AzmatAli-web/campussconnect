@@ -1,7 +1,7 @@
 // Optional, manually invoked MongoDB dump. Never runs as part of an app request.
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdir, rename, rm, stat, chmod } from 'node:fs/promises';
+import { mkdir, rename, rm, stat, chmod, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,13 +35,16 @@ const db = databaseName(required('CAMPUS_BACKUP_SOURCE_DB'));
 const config = await existingFile('CAMPUS_BACKUP_CONFIG');
 const outputDir = required('CAMPUS_BACKUP_DIR');
 if (!path.isAbsolute(outputDir)) throw new Error('CAMPUS_BACKUP_DIR must be an absolute path.');
-const root = path.resolve(fileURLToPath(new URL('../', import.meta.url)));
-const output = path.resolve(outputDir);
-const relative = path.relative(root, output);
-if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
-  throw new Error('Backup destination must be outside the Git repository.');
+const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
+function checkDestination(candidate) {
+  const relative = path.relative(root, candidate);
+  const outside = relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);
+  if (!outside) throw new Error('Backup destination must be outside the Git repository.');
 }
-await mkdir(output, { recursive: true, mode: 0o700 });
+checkDestination(path.resolve(outputDir));
+await mkdir(outputDir, { recursive: true, mode: 0o700 });
+const output = await realpath(outputDir);
+checkDestination(output);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const filename = 'campusconnect_' + db + '_' + stamp + '_' + randomBytes(4).toString('hex') + '.archive.gz';
 const archive = path.join(output, filename);

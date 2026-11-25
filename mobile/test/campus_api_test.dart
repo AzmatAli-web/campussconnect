@@ -26,6 +26,14 @@ const demoProfile = CampusProfile(
 );
 
 void main() {
+  test('invalid success envelopes are reported as campus API errors',() async {
+    final api=CampusApi(idTokenProvider:()async=>'token',
+      client:MockClient((_) async=>http.Response('[]',200)));
+    addTearDown(api.dispose);
+    await expectLater(api.getEvents(),throwsA(isA<CampusApiException>()
+      .having((error)=>error.code,'code','INVALID_RESPONSE')));
+  });
+
   test('student list requests send the ID token and target only own registrations', () async {
     final requested = <Uri>[];
     final client = MockClient((request) async {

@@ -1614,9 +1614,15 @@ test('QR tickets rotate, expire and admit only once at the correct published eve
  const create=await request(app).post('/api/v1/events').set(auth(faculty)).send(makeEvent('QR attendance fixture',2));
  assert.equal(create.status,201);
  const eventId=create.body.data.id;
+ const report=(uid=faculty)=>request(app).get('/api/v1/events/'+eventId+'/attendance').set(auth(uid));
+ const empty=await report();
+ assert.equal(empty.status,200);
+ assert.deepEqual(empty.body.data,{registered:0,checkedIn:0,attendancePercent:null});
+ assert.equal((await report(student)).status,403);
  const receipt=await request(app).post('/api/v1/events/'+eventId+'/registrations')
   .set({...auth(student),'Idempotency-Key':'attendance-ticket-001'}).send({universityEmail:student+'@'+DOMAIN});
  assert.equal(receipt.status,201);
+ assert.deepEqual((await report()).body.data,{registered:1,checkedIn:0,attendancePercent:0});
  const id=receipt.body.data.id;
  const issue=(uid=student)=>request(app).post('/api/v1/me/event-registrations/'+id+'/ticket').set(auth(uid));
  const scan=(code,uid=faculty)=>request(app).post('/api/v1/events/'+eventId+'/check-in').set(auth(uid)).send({code});
@@ -1640,4 +1646,7 @@ test('QR tickets rotate, expire and admit only once at the correct published eve
  assert.equal((await issue()).status,409);
  const roster=await request(app).get('/api/v1/events/'+eventId+'/registrations').set(auth(faculty));
  assert.ok(roster.body.data.find(row=>row.id===id)?.checkedInAt);
+ const finalReport=await report('fixture-admin');
+ assert.equal(finalReport.headers['cache-control'],'no-store');
+ assert.deepEqual(finalReport.body.data,{registered:1,checkedIn:1,attendancePercent:100});
 });

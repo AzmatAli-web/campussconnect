@@ -4,7 +4,7 @@ A **college campus services platform** with a Flutter Android student app, React
 
 ## Current status
 
-The integrated development prototype is on `main` through Milestone 112 (PR #67). Students can use the Flutter app and React portal for campus services, calendars and personal study planning. Assignment reminders, weekly goals and study blocks are account-specific on the current device. The API uses campus authentication and server-enforced roles for shared data.
+The integrated development prototype is documented in the [Milestone 120 FYP handover](docs/FYP_HANDOVER.md), including setup, demo steps and the release decision. Students can use the Flutter app and React portal for campus services, calendars and personal study planning. Assignment reminders, weekly goals and study blocks are account-specific on the current device. The API uses campus authentication and server-enforced roles for shared data.
 
 The repository includes automated QA and an isolated Admin Lab. The development environment has a recorded student sign-in and dashboard check. Live acceptance of privileged roles, physical Android validation and a production release remain pending. See the [pilot acceptance record](docs/PILOT_ACCEPTANCE_RECORD.md) and [release QA guide](docs/RELEASE_QA.md).
 

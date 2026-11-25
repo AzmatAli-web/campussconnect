@@ -224,6 +224,18 @@ export function eventsRouter(deps){
   }finally{await session.endSession();}
   return res.status(201).json(responseBody);
  }));
+ router.get('/events/:id/attendance',noStore,auth,asyncHandler(async(req,res)=>{
+  const event=await Event.findOne({_id:requireObjectId(req.params.id),universityId:deps.config.universityId}).lean();
+  if(!event) throw new HttpError(404,'EVENT_NOT_FOUND','Event not found');
+  if(!await authorizedOrganizer(req,event,event.universityId))
+   throw new HttpError(403,'FORBIDDEN','Current event organizer permission or administrator role required');
+  const [summary]=await EventRegistration.aggregate([
+   {$match:{universityId:event.universityId,eventId:event._id,status:'confirmed'}},
+   {$group:{_id:null,registered:{$sum:1},checkedIn:{$sum:{$cond:[{$eq:[{$type:'$checkedInAt'},'date']},1,0]}}}}
+  ]);
+  const {registered=0,checkedIn=0}=summary??{};
+  res.json({data:{registered,checkedIn,attendancePercent:registered?Math.round(100*checkedIn/registered):null}});
+ }));
  router.get('/events/:id/registrations',noStore,auth,asyncHandler(async(req,res)=>{
   const id=requireObjectId(req.params.id);
   const event=await Event.findOne({_id:id,universityId:deps.config.universityId}).lean();

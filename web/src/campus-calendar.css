@@ -18,3 +18,5 @@
 .wc-calendar-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#557182;margin:10px 0 20px}
 .wc-calendar :focus-visible{outline:3px solid #0e8e85;outline-offset:2px}
 @media(max-width:600px){.wc-calendar-day{min-height:64px;padding:5px;border-radius:7px}.wc-calendar-counts{font-size:9px}.wc-calendar-weekdays span{font-size:10px}.wc-calendar-grid{gap:3px}.wc-calendar-toolbar>div{width:100%;justify-content:space-between}}
+
+.wc-calendar-clash{color:#792e14;background:#ffebd9;border-radius:4px;padding:2px 4px;font-weight:700;font-size:10px;max-width:100%;box-sizing:border-box}

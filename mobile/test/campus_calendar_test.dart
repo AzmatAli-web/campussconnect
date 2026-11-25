@@ -61,6 +61,17 @@ void main(){
     expect(weeklyCalendar(monday,feeds,{},monday),isNull);
   });
 
+  test('overnight overlap marks both entries and permits back-to-back classes',(){
+    final date=DateTime.utc(2027,1,4);
+    final slots=[for(final start in ['09:00','10:00'])CampusTimetableSlot.fromJson({
+      'dayOfWeek':1,'courseTitle':start,'startTime':start,'endTime':start=='09:00'?'10:00':'11:00'})];
+    final event=CampusEvent.fromJson({'title':'Overnight','startsAt':'2027-01-03T16:00:00Z','endsAt':'2027-01-04T04:30:00Z'});
+    final feeds=CalendarFeeds(slots,[event],[]);
+    expect(feeds.agenda(date,CalendarSource.values.toSet()).where((item)=>item.conflict)
+      .map((item)=>item.title),['Overnight','09:00']);
+    expect(feeds.agenda(date,{CalendarSource.classes}).any((item)=>item.conflict),isFalse);
+  });
+
   testWidgets('student navigates month and searches the selected week', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize=const Size(800,1600);

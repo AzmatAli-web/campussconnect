@@ -93,9 +93,11 @@ test('real React workspace: two students share event counts, never receipts or r
           const span=(Date.parse(to)-Date.parse(from))/86400000+1;
           assert.ok([7,42].includes(span));
           const sample={...row(),startsAt:from+'T12:00:00Z',endsAt:from+'T13:00:00Z'};
+          const nextDay=new Date(Date.parse(from)+86400000).toISOString().slice(0,10);
           return send(route,pageNumber===1
             ? Array.from({length:100},(_,i)=>({...sample,id:'range-'+i}))
-            : [{...sample,id:'range-last',title:'Calendar page two'}]);
+            : [{...sample,id:'range-last',title:'Calendar page two'},...['a','b'].map(id=>({
+                ...sample,id,title:'Tuesday '+id,startsAt:nextDay+'T12:00:00Z',endsAt:nextDay+'T13:00:00Z'}))]);
         }
         if (!when) return send(route, [row()]);
         const historic = {...row(), id: '000000000000000000000081', title: 'Past science fair',
@@ -494,9 +496,18 @@ test('real React workspace: two students share event counts, never receipts or r
   assert.equal(await a.getByRole('group',{name:'Month dates'}).getByRole('button').count(),42);
   await a.getByRole('group',{name:'Month dates'}).getByRole('button').first().click();
   await a.getByText('Calendar page two',{exact:true}).waitFor();
+  await a.getByLabel('Show conflicts only in agenda').check();
+  await a.getByText('Calendar page two',{exact:true}).waitFor();
+  await a.getByRole('region',{name:'Selected day agenda'}).getByText('Scheduling conflict',{exact:true}).first().waitFor();
+  await a.getByLabel('Show conflicts only in agenda').uncheck();
   const [weekFile]=await Promise.all([a.waitForEvent('download'),
     a.getByRole('button',{name:'Export selected week (.ics)'}).click()]);
   assert.match(weekFile.suggestedFilename(),/^campusconnect-week-.*\.ics$/);
+  await a.getByText('Days with scheduling conflicts this week: 2').waitFor();
+  await a.getByRole('button',{name:'Next conflict day'}).click();
+  await a.getByText('Tuesday a',{exact:true}).waitFor();
+  await a.getByLabel('Jump to date').fill('2027-02-10');
+  await a.getByRole('region',{name:'Selected day agenda'}).getByRole('heading',{name:/10 February 2027/}).waitFor();
   await a.getByRole('button', {name:'Next month'}).click();
   await a.getByRole('button', {name:'Today',exact:true}).click();
   await a.getByRole('group',{name:'Calendar categories'}).getByLabel('Campus event').uncheck();

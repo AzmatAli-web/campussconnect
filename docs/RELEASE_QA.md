@@ -115,3 +115,7 @@ Keep the backend running separately. If APK installation streams hang after a su
 ## 7. Report format
 
 When testing, record for each module: pass/fail, exact observed error message, page/screen, role used, browser or phone model, and whether you were in **offline preview** or **live mode**. Do not include passwords, MongoDB connection strings, Firebase ID tokens or private student information. Screenshots can hide personally identifying data.
+
+## FYP acceptance coverage
+
+Use the [requirements traceability matrix](FYP_REQUIREMENTS_TRACEABILITY.md) to select role and client cases for staging and to identify deferred features before signing off the candidate.

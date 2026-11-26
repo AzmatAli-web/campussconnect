@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'messages_screen.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -691,6 +692,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   if (!widget.previewMode && widget.onProfileChanged != null)
                     OutlinedButton(onPressed: _savingProfile ? null : _editProfile,
                       child: Text(_savingProfile ? 'Saving…' : 'Edit profile')),
+                  if (!widget.previewMode)
+                    OutlinedButton.icon(icon: const Icon(Icons.mail_outline),
+                      label: const Text('Messages'), onPressed: () => Navigator.push(context,
+                        MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api)))),
                   _ProfileField('Account', widget.profile.status),
                   _ProfileField('Role', widget.profile.roles.join(', ')),
                   _ProfileField('Registration no.', widget.profile.registrationNo ?? 'Not provided'),

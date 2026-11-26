@@ -1,4 +1,5 @@
 const base=(import.meta.env?.VITE_API_BASE_URL||'http://localhost:4000/api/v1').replace(/\/$/,'');
+export const apiOrigin=()=>new URL(base,window.location.href).origin;
 async function readEnvelope(response,fallback){
  const result=await response.json().catch(()=>null);
  if(!response.ok){

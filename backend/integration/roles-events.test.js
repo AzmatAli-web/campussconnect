@@ -5,6 +5,9 @@ import {mkdtemp, rm, writeFile, unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
+import {io as client} from 'socket.io-client';
+import {once} from 'node:events';
+import {attachMessaging} from '../src/services/live-messaging.js';
 import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
 import {HttpError} from '../src/lib/http-error.js';
@@ -50,7 +53,7 @@ const mockFirebase={
   if(!token.startsWith('test-token:')||!people.has(uid)){
    const err=new Error('Invalid test fixture token');err.code='auth/invalid-id-token';throw err;
   }
-  return people.get(uid);
+  return {...people.get(uid),exp:Math.floor(Date.now()/1000)+300};
  },
  async getUser(uid) {
   const claims=people.get(uid);
@@ -1719,9 +1722,54 @@ test('conversation consent, campus scope, retry-safe delivery and cursor history
  assert.deepEqual(list.body.data.map(m=>m.mine),[true,false]);
  const earlier=await request(app).get(history).query({before:list.body.data[0].id}).set(auth(alice));
  assert.deepEqual(earlier.body.data.map(m=>m.body),['Hello']);
+ const unread=async uid=>(await request(app).get(base).set(auth(uid))).body.data.find(row=>row.id===first.body.data.id).unread;
+ const mark=uid=>request(app).patch(url+'/read').set(auth(uid)).send({ids:list.body.data.map(row=>row.id)});
+ assert.equal(await unread(bob),1);
+ assert.equal((await mark(outsider)).status,404);
+ assert.equal((await mark(bob)).body.data.updated,1);
+ assert.equal((await mark(bob)).body.data.updated,0);
+ assert.equal(await unread(bob),0);
+ assert.equal(await unread(alice),1);
  const other=await invite(outsider,bob);
  const declined=base+'/'+other.body.data.id;
  assert.equal((await request(app).patch(declined).set(auth(bob)).send({status:'declined'})).status,200);
  assert.equal((await invite(outsider,bob)).body.data.status,'declined');
  assert.equal((await request(app).get(declined+'/messages').set(auth(bob))).status,404);
+});
+
+test('live sync authenticates and targets the member’s connected devices', {timeout:10000}, async()=>{
+ const server=app.listen(0,'127.0.0.1');
+ await once(server,'listening');
+ const io=attachMessaging(server,app,{config,firebaseAuth:mockFirebase});
+ const devices=[];
+ const open=uid=>{
+  const socket=client('http://127.0.0.1:'+server.address().port,{auth:{token:'test-token:'+uid},
+   transports:['websocket'],forceNew:true,reconnection:false,autoConnect:false});
+  devices.push(socket);
+  return socket;
+ };
+ try{
+  const denied=open('unknown');
+  const rejected=once(denied,'connect_error');
+  denied.connect();
+  await rejected;
+  const devicesForMember=[open('fixture-student-14'),open('fixture-student-14')];
+  const outsider=open('fixture-student-16');
+  await Promise.all([...devicesForMember,outsider].map(socket=>{
+   const ready=once(socket,'connect');socket.connect();return ready;
+  }));
+  const received=devicesForMember.map(socket=>once(socket,'inbox:update'));
+  const outsiderReceived=[];
+  outsider.on('inbox:update',()=>outsiderReceived.push(true));
+  app.emit('conversationChanged',[students[14]._id]);
+  // An ordered sentinel proves the outsider finished consuming this broadcast cycle.
+  const done=once(outsider,'test:done');
+  io.emit('test:done');
+  assert.deepEqual(await Promise.all(received),[[],[]]);
+  await done;
+  assert.deepEqual(outsiderReceived,[]);
+ }finally{
+  devices.forEach(socket=>socket.close());
+  await io.close();
+ }
 });

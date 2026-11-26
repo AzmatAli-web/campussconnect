@@ -1691,7 +1691,7 @@ test('conversation consent, campus scope, retry-safe delivery and cursor history
  const base='/api/v1/conversations';
  const invite=(from,to)=>request(app).post(base).set(auth(from)).send({email:to+'@'+DOMAIN});
  const foreign='fixture-message-foreign';
- await User.create(person(foreign,['student'],{universityId:new mongoose.Types.ObjectId()}));
+ await User.create({...person(foreign),universityId:new mongoose.Types.ObjectId()});
  assert.equal((await invite(alice,foreign)).status,422);
  assert.equal((await invite(alice,alice)).status,422);
  const [first,retry]=await Promise.all([invite(alice,bob),invite(alice,bob)]);

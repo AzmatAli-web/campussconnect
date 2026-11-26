@@ -1,12 +1,13 @@
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, rm, writeFile, unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
 import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
+import {HttpError} from '../src/lib/http-error.js';
 import {createApp} from '../src/app.js';
 import {User} from '../src/models/user.js';
 import {
@@ -89,7 +90,9 @@ before(async()=>{
  config.resourceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-resources-test-'));
  config.marketplaceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-marketplace-test-'));
 
- app=createApp({config,firebaseAuth:mockFirebase});
+ app=createApp({config,firebaseAuth:mockFirebase,scanPdf:async bytes=>{
+  if(bytes.includes('fixture-rejected'))throw new HttpError(422,'RESOURCE_SCAN_REJECTED','Rejected');
+ }});
 },{timeout:180000});
 after(async()=>{
  await mongoose.disconnect();
@@ -606,6 +609,13 @@ test('academic resource upload requires verified faculty; students receive only 
   .set(auth('fixture-faculty-resource-test')),Buffer.from('NOT A PDF'),'fake.pdf');
  assert.equal(invalid.status,415,JSON.stringify(invalid.body));
 
+ const deniedFile=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-resource-test')),Buffer.from('%PDF-1.7 fixture-rejected'));
+ assert.equal(deniedFile.status,422);
+ const held=await AcademicResource.findOne({status:'quarantined'});
+ assert.ok(held.purgeAt);
+ assert.equal((await request(app).get('/api/v1/resources/'+held.id+'/file').set(auth(studentUid))).status,404);
+
  const published=await attachPdf(request(app).post('/api/v1/resources')
   .set(auth('fixture-faculty-resource-test')));
  assert.equal(published.status,201,JSON.stringify(published.body));
@@ -648,7 +658,11 @@ test('academic resource upload requires verified faculty; students receive only 
 
  const missingAuth=await request(app).get('/api/v1/resources/'+item.id+'/file');
  assert.equal(missingAuth.status,401);
- const downloaded=await request(app).get('/api/v1/resources/'+item.id+'/file')
+ const restarted=createApp({config:{...config,resourceUploadDir:path.join(config.resourceUploadDir,'empty')},firebaseAuth:mockFirebase});
+ const stored=await AcademicResource.findById(item.id).select('+pdfBytes');
+ assert.deepEqual(Buffer.from(stored.pdfBytes),fixturePdf);
+ assert.ok(stored.scannedAt && !stored.purgeAt);
+ const downloaded=await request(restarted).get('/api/v1/resources/'+item.id+'/file')
   .set(auth(studentUid)).buffer(true).parse((res,callback)=>{
     const chunks=[];
     res.on('data',chunk=>chunks.push(chunk));
@@ -662,6 +676,13 @@ test('academic resource upload requires verified faculty; students receive only 
  assert.ok(downloaded.headers['content-disposition'].startsWith('attachment;'));
  assert.deepEqual(downloaded.body,fixturePdf);
 
+ const storageKey='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.pdf';
+ await writeFile(path.join(config.resourceUploadDir,storageKey),fixturePdf);
+ const legacy=await AcademicResource.create({...original,_id:new mongoose.Types.ObjectId(),scannedAt:undefined,storageKey});
+ const legacyUrl='/api/v1/resources/'+legacy.id+'/file';
+ assert.equal((await request(app).get(legacyUrl).set(auth(studentUid))).status,200);
+ await unlink(path.join(config.resourceUploadDir,storageKey));
+ assert.equal((await request(restarted).get(legacyUrl).set(auth(studentUid))).status,200);
  const otherFaculty=await request(app).post('/api/v1/resources/'+item.id+'/archive')
   .set(auth('fixture-faculty')).send({});
  assert.equal(otherFaculty.status,403);
@@ -669,6 +690,7 @@ test('academic resource upload requires verified faculty; students receive only 
   .set(auth('fixture-admin')).send({});
  assert.equal(adminArchived.status,200,JSON.stringify(adminArchived.body));
  assert.equal(adminArchived.body.data.status,'archived');
+ assert.ok((await AcademicResource.findById(item.id)).purgeAt>Date.now());
  const noLongerPublic=await request(app).get('/api/v1/resources/'+item.id+'/file')
   .set(auth(studentUid));
  assert.equal(noLongerPublic.status,404);

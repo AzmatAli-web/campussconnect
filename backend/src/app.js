@@ -16,7 +16,7 @@ import {lostFoundRouter} from './routes/lost-found.js';
 import {societyMembershipsRouter} from './routes/society-memberships.js';
 import {notificationsRouter} from './routes/notifications.js';
 import {HttpError} from './lib/http-error.js';
-export function createApp({config,firebaseAuth}) {
+export function createApp({config,firebaseAuth,scanPdf}) {
  const app=express();
  app.disable('x-powered-by');
  app.use(helmet());
@@ -36,7 +36,7 @@ export function createApp({config,firebaseAuth}) {
  app.use('/api/v1',announcementsRouter({config,firebaseAuth}));
  app.use('/api/v1',governanceRouter({config,firebaseAuth}));
  app.use('/api/v1',timetableRouter({config,firebaseAuth}));
- app.use('/api/v1',resourcesRouter({config,firebaseAuth}));
+ app.use('/api/v1',resourcesRouter({config,firebaseAuth,scanPdf}));
  app.use('/api/v1',complaintsRouter({config,firebaseAuth}));
  app.use('/api/v1',feesRouter({config,firebaseAuth}));
  app.use('/api/v1',marketplaceRouter({config,firebaseAuth}));

@@ -1,6 +1,6 @@
 # Milestone 12 — Academic Resources (Faculty PDF library)
 
-CampusConnect now includes a **real PDF resource workflow** using the existing Firebase-authenticated Node.js/Express API, MongoDB metadata, React campus portal, and Flutter student app. Faculty publish resources; students search and download notes. This feature is on a **draft, unmerged branch**.
+CampusConnect now includes a **real PDF resource workflow** using the existing Firebase-authenticated Node.js/Express API, MongoDB metadata, React campus portal, and Flutter student app. Faculty publish resources; students search and download notes.
 
 ## Actors and permissions
 
@@ -22,13 +22,15 @@ CampusConnect now includes a **real PDF resource workflow** using the existing F
 
 PDF uploads validate extension, claimed MIME, 8 MB limit and PDF magic header. All resource responses avoid exposing storage paths, uploader identities, or other private operational data. Downloads are attachment responses with `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`.
 
-### Storage — important limitation
+### M123–124 · Private storage, scanning and retention
 
-For **local single-server development**, uploaded PDF bytes are stored privately under `backend/private_uploads/` (ignored by Git). MongoDB stores metadata and a randomly generated private storage key. The folder is **not** mounted as an Express static directory. Set `RESOURCE_UPLOAD_DIR` in your backend environment to override the path to a securely writable nonpublic directory.
+The API stores the PDF bytes and metadata together in one MongoDB document. The existing upload limit is 8 MiB. Database backup capacity must include the PDF bytes. Downloads recheck current campus membership and publication status.
 
-**Do not use this local disk architecture for production on Vercel or another ephemeral/multi-instance server.** Before production, replace the file store with a managed private object storage service (e.g. S3/R2/Azure), implement controlled signed retrieval or authenticated proxy streaming, malware scanning, quotas, retention/backup and documented privacy policy.
+Configure a private ClamAV daemon with current signatures. Set `RESOURCE_CLAMD_HOST` on the API and, if needed, `RESOURCE_CLAMD_PORT` (default 3310). Restrict the scanner to the trusted service network; it receives the original document. Enable PDF parsing and configure stream and scan limits above the upload limit. Before enabling uploads, verify signature updates and run a clean-PDF scan with the deployed daemon.
 
-PDF magic/header validation is not antivirus scanning. University approval for sharing course material remains the uploader's responsibility.
+Run `npm run db:ensure-indexes` in the backend to install the retention index. New files remain in quarantine until the scanner returns a clean result. Detection returns HTTP 422. A missing or unavailable scanner returns HTTP 503 and the faculty member can retry. Both cases keep the file inaccessible. Quarantined records expire after 24 hours. Archiving revokes access immediately and schedules the database record and its bytes for deletion after 30 days. MongoDB performs expiry asynchronously. Published records have no expiry. Separately managed backups follow their own retention period.
+
+For legacy files, run `node scripts/migrate-resource-pdfs.js` from the backend on a host that still has the original private upload directory and database access. Set `RESOURCE_UPLOAD_DIR` to the original path and use the same scanner configuration. The migration scans each published PDF and atomically moves its contents into its existing record, preserving bookmarks. A request for a legacy PDF also attempts migration before serving it. Review reported IDs and rerun after resolving missing files or service issues. Preserve the legacy disk until migrated downloads and backups have been verified. The utility leaves original disk copies in place for operator-managed disposal. Previously archived records retain their existing retention settings.
 
 ### React
 

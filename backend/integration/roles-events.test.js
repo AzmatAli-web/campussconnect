@@ -9,6 +9,7 @@ import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
 import {HttpError} from '../src/lib/http-error.js';
 import {createApp} from '../src/app.js';
+import {Conversation,Message} from '../src/models/conversation.js';
 import {User} from '../src/models/user.js';
 import {
  Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey
@@ -76,7 +77,7 @@ before(async()=>{
   binary:{version:process.env.MONGOMS_VERSION||'7.0.24'}
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
- for(const model of [User,Event,EventRegistration,Announcement,
+ for(const model of [Conversation,Message,User,Event,EventRegistration,Announcement,
   Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
   await model.createIndexes();
  }
@@ -1683,4 +1684,44 @@ test('QR tickets rotate, expire and admit only once at the correct published eve
  const finalReport=await report('fixture-admin');
  assert.equal(finalReport.headers['cache-control'],'no-store');
  assert.deepEqual(finalReport.body.data,{registered:1,checkedIn:1,attendancePercent:100});
+});
+
+test('conversation consent, campus scope, retry-safe delivery and cursor history',async()=>{
+ const alice='fixture-student-14',bob='fixture-student-15',outsider='fixture-student-16';
+ const base='/api/v1/conversations';
+ const invite=(from,to)=>request(app).post(base).set(auth(from)).send({email:to+'@'+DOMAIN});
+ const foreign='fixture-message-foreign';
+ await User.create(person(foreign,['student'],{universityId:new mongoose.Types.ObjectId()}));
+ assert.equal((await invite(alice,foreign)).status,422);
+ assert.equal((await invite(alice,alice)).status,422);
+ const [first,retry]=await Promise.all([invite(alice,bob),invite(alice,bob)]);
+ assert.equal(first.status,200,JSON.stringify(first.body));
+ assert.equal(first.body.data.id,retry.body.data.id);
+ const url=base+'/'+first.body.data.id,history=url+'/messages';
+ const decide=(uid,status)=>request(app).patch(url).set(auth(uid)).send({status});
+ const send=(uid,body,clientId='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa')=>
+  request(app).post(history).set(auth(uid)).send({body,clientId});
+ assert.equal((await invite(bob,alice)).body.data.status,'pending');
+ assert.equal((await decide(alice,'accepted')).status,404);
+ assert.equal((await decide(outsider,'accepted')).status,404);
+ assert.equal((await send(alice,'Before acceptance')).status,404);
+ assert.equal((await decide(bob,'accepted')).status,200);
+ const [one,two]=await Promise.all([send(alice,'Hello'),send(alice,'Hello')]);
+ assert.equal(one.status,200);
+ assert.equal(one.body.data.id,two.body.data.id);
+ assert.equal((await send(alice,'Changed')).status,409);
+ assert.equal((await send(outsider,'Intrusion')).status,404);
+ assert.equal((await request(app).get(history).set(auth(outsider))).status,404);
+ assert.deepEqual((await request(app).get(base).set(auth(outsider))).body.data,[]);
+ assert.equal((await send(bob,'Welcome')).status,200);
+ const list=await request(app).get(history).set(auth(bob));
+ assert.match(list.headers['cache-control'],/no-store/);
+ assert.deepEqual(list.body.data.map(m=>m.mine),[true,false]);
+ const earlier=await request(app).get(history).query({before:list.body.data[0].id}).set(auth(alice));
+ assert.deepEqual(earlier.body.data.map(m=>m.body),['Hello']);
+ const other=await invite(outsider,bob);
+ const declined=base+'/'+other.body.data.id;
+ assert.equal((await request(app).patch(declined).set(auth(bob)).send({status:'declined'})).status,200);
+ assert.equal((await invite(outsider,bob)).body.data.status,'declined');
+ assert.equal((await request(app).get(declined+'/messages').set(auth(bob))).status,404);
 });

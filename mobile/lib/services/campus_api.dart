@@ -193,6 +193,22 @@ class CampusApi {
         'registrationNo': registration.trim().isEmpty ? null : registration.trim(),
       })));
 
+  Future<List<Json>> conversationPage({String? threadId, String? before}) async {
+    final path = threadId == null ? '/conversations' : '/conversations/$threadId/messages';
+    return asJsonList(await _request(before == null ? path : '$path?before=$before'));
+  }
+
+  Future<Json> requestConversation(String email) async =>
+      asJson(await _request('/conversations', method: 'POST', body: {'email': email}));
+
+  Future<Json> decideConversation(String id, String status) async =>
+      asJson(await _request('/conversations/$id', method: 'PATCH', body: {'status': status}));
+
+  Future<void> sendMessage(String id, String text, String clientId) async {
+    await _request('/conversations/$id/messages', method: 'POST',
+        body: {'body': text, 'clientId': clientId});
+  }
+
   Future<Json> issueEventTicket(String id) async =>
       asJson(await _request('/me/event-registrations/${Uri.encodeComponent(id)}/ticket',method:'POST'));
 

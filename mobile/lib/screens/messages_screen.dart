@@ -43,7 +43,8 @@ class _MessagesState extends State<MessagesScreen> {
   Future<void> load({bool older = false}) async {
     final page = await widget.api.conversationPage(threadId: threadId,
         before: older ? rows.last['id'] as String : null);
-    if (mounted) setState(() {
+    if (!mounted) return;
+    setState(() {
       rows = older ? [...rows, ...page] : page;
       more = page.length == 30;
     });

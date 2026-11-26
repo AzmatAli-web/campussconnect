@@ -1,23 +1,70 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 
-function Mailbox({call,thread,onOpen,onBack}){
+import {io} from 'socket.io-client';
+import {apiOrigin} from './api.js';
+
+function Mailbox({user,call,thread,onOpen,onBack}){
  const path=thread?'/conversations/'+thread.id+'/messages':'/conversations';
  const [rows,setRows]=useState([]),[more,setMore]=useState(false),[busy,setBusy]=useState(true);
  const [error,setError]=useState(''),[draft,setDraft]=useState(''),[notice,setNotice]=useState('');
  const attempt=useRef(null);
+ const loaded=useRef([]),queue=useRef(Promise.resolve()),mounted=useRef(false);
+ const load=useCallback((older=false)=>{
+  const sync=async()=>{
+   if(!mounted.current)return;
+   const prior=loaded.current;
+   let cursor=older?prior.at(-1)?.id:null;
+   const boundary=thread?prior[0]?.id:prior.at(-1)?.id;
+   const merged=new Map(prior.map(row=>[row.id,row]));
+   let page;
+   do{
+    page=await call(path+(cursor?'?before='+cursor:''));
+    if(!mounted.current)return;
+    for(const row of page)merged.set(row.id,row);
+    const unread=thread?page.filter(row=>row.unread).map(row=>row.id):[];
+    if(unread.length&&!document.hidden){
+     await call('/conversations/'+thread.id+'/read',{method:'PATCH',body:{ids:unread}});
+    }
+    cursor=page.at(-1)?.id;
+   }while(!older && boundary && page.length===30 && cursor>boundary && mounted.current);
+   if(!mounted.current)return;
+    const sorted=[...merged.values()].sort((a,b)=>b.id.localeCompare(a.id));
+    loaded.current=sorted;
+    setRows(sorted);
+   if(older||!prior.length||!thread)setMore(page.length===30);
+  };
+  const result=queue.current.then(sync);
+  queue.current=result.catch(()=>{});
+  return result;
+ },[call,path,thread]);
  useEffect(()=>{
-  let active=true;
-  call(path).then(page=>{if(active){setRows(page);setMore(page.length===30);}})
-   .catch(err=>{if(active)setError(err.message);}).finally(()=>{if(active)setBusy(false);});
-  return ()=>{active=false;};
- },[path,call]);
+  mounted.current=true;
+  let pending=false,dirty=false,active=true;
+  async function refresh(){
+   if(document.hidden||!active)return;
+   if(pending){dirty=true;return;}
+   pending=true;
+   try{await load();if(active)setError('');}
+   catch(err){if(active)setError(err.message);}
+   finally{
+    pending=false;
+    if(active)setBusy(false);
+    if(dirty){dirty=false;refresh();}
+   }
+  }
+  const socket=io(apiOrigin(),{transports:['websocket'],autoConnect:false,
+   auth:cb=>user.getIdToken().then(token=>cb({token})).catch(()=>cb({}))});
+  socket.on('connect',refresh).on('inbox:update',refresh);
+  function resume(){if(!document.hidden){if(!socket.connected)socket.connect();refresh();}}
+  document.addEventListener('visibilitychange',resume);
+  const timer=setInterval(resume,60000);
+  resume();
+  return ()=>{active=false;mounted.current=false;clearInterval(timer);socket.disconnect();
+   document.removeEventListener('visibilitychange',resume);};
+ },[load,user]);
  async function run(work){
   setBusy(true);setError('');setNotice('');
   try{await work();}catch(err){setError(err.message);}finally{setBusy(false);}
- }
- async function load(older=false){
-  const page=await call(path+(older?'?before='+rows.at(-1).id:''));
-  setRows(older?[...rows,...page]:page);setMore(page.length===30);
  }
  async function submit(event){
   event.preventDefault();
@@ -49,7 +96,7 @@ function Mailbox({call,thread,onOpen,onBack}){
   {thread?<ol>{[...rows].reverse().map(row=><li key={row.id}><strong>{row.mine?'You':thread.name}</strong>
    <p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{row.body}</p>
    <small>{new Date(row.createdAt).toLocaleString()}</small></li>)}</ol>:
-   <ul>{rows.map(row=><li key={row.id}><strong>{row.name}</strong> · {row.status}
+   <ul>{rows.map(row=><li key={row.id}><strong>{row.name}</strong> · {row.status}{row.unread>0&&' · '+row.unread+' unread'}
     {row.status==='accepted'&&<button onClick={()=>onOpen(row)}>Open conversation</button>}
     {row.incoming&&row.status==='pending'&&<>
      <button disabled={busy} onClick={()=>decide(row,'accepted')}>Accept</button>
@@ -63,7 +110,7 @@ function Mailbox({call,thread,onOpen,onBack}){
   </form>
  </section>;
 }
-export default function MessagesPage({call}){
+export default function MessagesPage({call,user}){
  const [thread,setThread]=useState(null);
- return <Mailbox key={thread?.id??'inbox'} call={call} thread={thread} onOpen={setThread} onBack={()=>setThread(null)}/>;
+ return <Mailbox user={user} key={thread?.id??'inbox'} call={call} thread={thread} onOpen={setThread} onBack={()=>setThread(null)}/>;
 }

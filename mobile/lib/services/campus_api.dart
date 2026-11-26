@@ -198,6 +198,10 @@ class CampusApi {
     return asJsonList(await _request(before == null ? path : '$path?before=$before'));
   }
 
+  Future<void> readMessages(String id, List<String> ids) async {
+    await _request('/conversations/$id/read', method: 'PATCH', body: {'ids': ids});
+  }
+
   Future<Json> requestConversation(String email) async =>
       asJson(await _request('/conversations', method: 'POST', body: {'email': email}));
 

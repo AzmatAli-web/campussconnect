@@ -123,7 +123,7 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const assignmentKey=plannerKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
-  messages:<MessagesPage key={profile._id} call={call}/>,
+  messages:<MessagesPage key={profile._id} user={user} call={call}/>,
   overview:hasRole(profile,'student')?<StudentOverview key={assignmentKey??'overview'} assignmentKey={assignmentKey} preferenceKey={timetableKey} {...props}/>:<Overview {...props}/>,
   events:<Events {...props} busy={busy||loading} revision={revision}/>,
   registrations:<Registrations {...props} revision={revision}/>,

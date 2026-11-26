@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:material_ui/material_ui.dart';
 import 'package:uuid/uuid.dart';
 import '../models/campus_models.dart';
@@ -12,7 +14,65 @@ class MessagesScreen extends StatefulWidget {
   State<MessagesScreen> createState() => _MessagesState();
 }
 
-class _MessagesState extends State<MessagesScreen> {
+class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
+  io.Socket? socket;
+  Timer? timer;
+  bool foreground = true, refreshing = false, dirty = false, connecting = false;
+  Future<void> queue = Future.value();
+
+  bool get visible => mounted && foreground && (ModalRoute.of(context)?.isCurrent ?? true);
+
+  Future<void> connect() async {
+    if (connecting || socket?.connected == true || !visible) return;
+    connecting = true;
+    try {
+      final token = await widget.api.idTokenProvider();
+      if (!visible) return;
+      socket?.dispose();
+      final next = io.io(widget.api.baseUri.origin, io.OptionBuilder()
+          .setTransports(['websocket']).disableAutoConnect().enableForceNew()
+          .setAuth({'token': token}).build());
+      socket = next;
+      next.onConnect((_) => refresh());
+      next.on('inbox:update', (_) => refresh());
+      next.connect();
+    } catch (_) {
+      // The authenticated history request can still recover missed updates.
+    } finally {
+      connecting = false;
+    }
+  }
+
+  Future<void> refresh() async {
+    if (!visible) return;
+    if (refreshing) {
+      dirty = true;
+      return;
+    }
+    refreshing = true;
+    try {
+      await load();
+      if (mounted && error.isNotEmpty) setState(() => error = '');
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      refreshing = false;
+      if (dirty) {
+        dirty = false;
+        refresh();
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (foreground) {
+      connect();
+      refresh();
+    }
+  }
+
   final draft = TextEditingController();
   List<Json> rows = [];
   bool busy = false, more = false;
@@ -23,11 +83,23 @@ class _MessagesState extends State<MessagesScreen> {
   @override
   void initState() {
     super.initState();
-    run(() => load());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      connect();
+      run(() => load());
+    });
+    timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      connect();
+      refresh();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    timer?.cancel();
+    socket?.dispose();
     draft.dispose();
     super.dispose();
   }
@@ -40,13 +112,35 @@ class _MessagesState extends State<MessagesScreen> {
     finally { if (mounted) setState(() => busy = false); }
   }
 
-  Future<void> load({bool older = false}) async {
-    final page = await widget.api.conversationPage(threadId: threadId,
-        before: older ? rows.last['id'] as String : null);
+  Future<void> load({bool older = false}) {
+    final result = queue.then((_) => fetchPages(older));
+    queue = result.catchError((Object _) {});
+    return result;
+  }
+
+  Future<void> fetchPages(bool older) async {
+    if (!mounted) return;
+    final prior = rows;
+    final merged = {for (final row in prior) row['id'] as String: row};
+    String? cursor = older && prior.isNotEmpty ? prior.last['id'] as String : null;
+    final boundary = prior.isEmpty ? null : (threadId == null ? prior.last : prior.first)['id'] as String;
+    late List<Json> page;
+    do {
+      page = await widget.api.conversationPage(threadId: threadId, before: cursor);
+      if (!mounted) return;
+      for (final row in page) {
+        merged[row['id'] as String] = row;
+      }
+      final unread = page.where((row) => row['unread'] == true).map((row) => row['id'] as String).toList();
+      if (threadId != null && visible && unread.isNotEmpty) {
+        await widget.api.readMessages(threadId!, unread);
+      }
+      cursor = page.isEmpty ? null : page.last['id'] as String;
+    } while (mounted && !older && page.length == 30 && boundary != null && cursor!.compareTo(boundary) > 0);
     if (!mounted) return;
     setState(() {
-      rows = older ? [...rows, ...page] : page;
-      more = page.length == 30;
+      rows = merged.values.toList()..sort((a,b) => (b['id'] as String).compareTo(a['id'] as String));
+      if (older || prior.isEmpty || threadId == null) more = page.length == 30;
     });
   }
 
@@ -74,9 +168,12 @@ class _MessagesState extends State<MessagesScreen> {
 
   Widget conversation(Json row) {
     final id = row['id'] as String;
-    return ListTile(title: Text(row['name'] as String), subtitle: Text(row['status'] as String),
-      onTap: row['status'] != 'accepted' ? null : () => Navigator.push(context,
-        MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api, thread: row))),
+    return ListTile(title: Text(row['name'] as String), subtitle: Text([row['status'], if ((row['unread'] as int? ?? 0) > 0) "${row['unread']} unread"].join(' · ')),
+      onTap: row['status'] != 'accepted' ? null : () async {
+        await Navigator.push(context,
+        MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api, thread: row)));
+        await refresh();
+      },
       trailing: row['incoming'] == true && row['status'] == 'pending' ? Wrap(children: [
         for (final status in ['accepted', 'declined'])
           TextButton(onPressed: busy ? null : () => run(() async {

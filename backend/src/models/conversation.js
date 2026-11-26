@@ -12,9 +12,10 @@ conversationSchema.index({universityId:1,requester:1,_id:-1});
 conversationSchema.index({universityId:1,recipient:1,_id:-1});
 const messageSchema=new Schema({
  conversationId:id,sender:id,clientId:{type:String,required:true},
- body:{type:String,required:true,maxlength:2000},createdAt:{type:Date,default:Date.now}
+ readAt:{type:Date,default:null},body:{type:String,required:true,maxlength:2000},createdAt:{type:Date,default:Date.now}
 },{versionKey:false});
 messageSchema.index({conversationId:1,sender:1,clientId:1},{unique:true});
 messageSchema.index({conversationId:1,_id:-1});
+messageSchema.index({conversationId:1,readAt:1,sender:1});
 export const Conversation=mongoose.model('Conversation',conversationSchema);
 export const Message=mongoose.model('Message',messageSchema);

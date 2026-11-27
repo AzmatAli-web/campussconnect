@@ -1,3 +1,4 @@
+import 'campus_assistant.dart';
 import 'dart:convert';
 import 'messages_screen.dart';
 import 'dart:io';
@@ -696,6 +697,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     OutlinedButton.icon(icon: const Icon(Icons.mail_outline),
                       label: const Text('Messages'), onPressed: () => Navigator.push(context,
                         MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api)))),
+                  if (!widget.previewMode)
+                    OutlinedButton(onPressed: () => Navigator.push(context,
+                      MaterialPageRoute<void>(builder: (_) => CampusAssistant(api: widget.api))),
+                      child: const Text('Campus assistant')),
                   _ProfileField('Account', widget.profile.status),
                   _ProfileField('Role', widget.profile.roles.join(', ')),
                   _ProfileField('Registration no.', widget.profile.registrationNo ?? 'Not provided'),

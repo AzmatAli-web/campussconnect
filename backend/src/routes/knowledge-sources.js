@@ -1,3 +1,4 @@
+import {campusAnswer} from '../services/campus-answer.js';
 import {Router} from 'express';
 import {audiences,KnowledgeSource} from '../models/knowledge-source.js';
 import {campusUserMiddleware,needRole} from '../middleware/campus-user.js';
@@ -22,6 +23,20 @@ export function knowledgeSourcesRouter(deps){
    res.json({data:rows});
   });
  }
+ router.post(readerPath+'/answer',asyncHandler(async(req,res)=>{
+  const input=requireBody(req.body,['question']);
+  const question=textField(input.question,'question',3,400);
+  const words=question.match(/[\p{L}\p{N}]+/gu)??[];
+  const sources=words.length?await KnowledgeSource.find({...approved(req),$text:{$search:words.join(' ')}})
+   .select({title:1,text:1,reference:1,score:{$meta:'textScore'}})
+   .sort({score:{$meta:'textScore'},_id:1}).limit(4).lean():[];
+  const answer=await campusAnswer(question,sources,deps.config.assistantModel);
+  // Revalidate after a model call so a concurrent withdrawal is respected.
+  if(answer.citation && !await KnowledgeSource.exists({...approved(req),_id:answer.citation.id})){
+   return res.json({data:{status:'unsupported',answer:null,citation:null}});
+  }
+  res.json({data:answer});
+ }));
  router.get(readerPath,list(approved,publicFields));
  router.get(readerPath+'/:id',asyncHandler(async(req,res)=>{
   const row=await KnowledgeSource.findOne({...approved(req),_id:requireObjectId(req.params.id)}).select(publicFields).lean();

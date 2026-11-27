@@ -20,6 +20,7 @@ export function navigationFor(profile){
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
  items.push(['messages','Messages','✉']);
+ items.push(['assistant','Campus assistant','?']);
  items.push(['profile','My profile','◎']);
  return items.map(([id,label,icon])=>({id,label,icon}));
 }

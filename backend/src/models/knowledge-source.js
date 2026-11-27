@@ -13,4 +13,5 @@ const schema=new Schema({
 schema.index({universityId:1,createdBy:1,clientId:1},{unique:true});
 schema.index({universityId:1,status:1,audience:1,_id:-1});
 schema.index({universityId:1,_id:-1});
+schema.index({universityId:1,title:'text',text:'text'},{weights:{title:5,text:1}});
 export const KnowledgeSource=mongoose.model('KnowledgeSource',schema);

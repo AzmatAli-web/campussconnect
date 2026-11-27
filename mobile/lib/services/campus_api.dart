@@ -198,6 +198,11 @@ class CampusApi {
     return asJsonList(await _request(before == null ? path : '$path?before=$before'));
   }
 
+  Future<Json> askCampus(String question) async =>
+      asJson(await _request('/knowledge-sources/answer', method: 'POST', body: {'question': question}));
+
+  Future<Json> citedSource(String id) async => asJson(await _request('/knowledge-sources/$id'));
+
   Future<Json> conversationState(String id) async =>
       asJson(await _request('/conversations/$id'));
 

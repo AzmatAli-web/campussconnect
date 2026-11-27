@@ -198,6 +198,18 @@ class CampusApi {
     return asJsonList(await _request(before == null ? path : '$path?before=$before'));
   }
 
+  Future<Json> conversationState(String id) async =>
+      asJson(await _request('/conversations/$id'));
+
+  Future<void> blockConversation(String id, bool blocked) async {
+    await _request('/conversations/$id/block', method: 'PATCH', body: {'blocked': blocked});
+  }
+
+  Future<void> reportConversation(String id, String reason, String? messageId) async {
+    await _request('/conversations/$id/reports', method: 'POST',
+        body: {'reason': reason, 'messageId': messageId});
+  }
+
   Future<void> readMessages(String id, List<String> ids) async {
     await _request('/conversations/$id/read', method: 'PATCH', body: {'ids': ids});
   }

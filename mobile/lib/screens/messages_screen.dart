@@ -73,6 +73,7 @@ class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
     }
   }
 
+  Json? current;
   final draft = TextEditingController();
   List<Json> rows = [];
   bool busy = false, more = false;
@@ -83,6 +84,7 @@ class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    current = widget.thread;
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -120,6 +122,12 @@ class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
 
   Future<void> fetchPages(bool older) async {
     if (!mounted) return;
+    final id = threadId;
+    if (id != null) {
+      final state = await widget.api.conversationState(id);
+      if (!mounted) return;
+      setState(() => current = state);
+    }
     final prior = rows;
     final merged = {for (final row in prior) row['id'] as String: row};
     String? cursor = older && prior.isNotEmpty ? prior.last['id'] as String : null;
@@ -166,15 +174,38 @@ class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
     await load();
   }
 
+  Future<void> report(Json thread, [String? messageId]) async {
+    final reason = await showDialog<String>(context: context, builder: (context) =>
+      SimpleDialog(title: Text(messageId == null ? 'Report conversation' : 'Report message'),
+        children: [
+          for (final reason in ['Harassment', 'Spam', 'Inappropriate content', 'Other safety concern'])
+            SimpleDialogOption(onPressed: () => Navigator.pop(context, reason), child: Text(reason)),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ]));
+    if (reason == null || !mounted) return;
+    await run(() async {
+      await widget.api.reportConversation(thread['id'] as String, reason, messageId);
+      if (mounted) setState(() => notice = 'Report received by campus moderation.');
+    });
+  }
+
+  Widget controls(Json row) => Wrap(children: [
+    TextButton(onPressed: busy ? null : () => run(() async {
+      await widget.api.blockConversation(row['id'] as String, row['blockedByMe'] != true);
+      await load();
+    }), child: Text(row['blockedByMe'] == true ? 'Unblock' : 'Block')),
+    TextButton(onPressed: busy ? null : () => report(row), child: const Text('Report conversation')),
+  ]);
+
   Widget conversation(Json row) {
     final id = row['id'] as String;
-    return ListTile(title: Text(row['name'] as String), subtitle: Text([row['status'], if ((row['unread'] as int? ?? 0) > 0) "${row['unread']} unread"].join(' · ')),
+    return ListTile(title: Text(row['name'] as String), subtitle: Text([row['status'], if (row['paused'] == true) 'Messaging paused', if ((row['unread'] as int? ?? 0) > 0) "${row['unread']} unread"].join(' · ')),
       onTap: row['status'] != 'accepted' ? null : () async {
         await Navigator.push(context,
         MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api, thread: row)));
         await refresh();
       },
-      trailing: row['incoming'] == true && row['status'] == 'pending' ? Wrap(children: [
+      trailing: row['paused'] != true && row['incoming'] == true && row['status'] == 'pending' ? Wrap(children: [
         for (final status in ['accepted', 'declined'])
           TextButton(onPressed: busy ? null : () => run(() async {
             await widget.api.decideConversation(id, status);
@@ -194,15 +225,21 @@ class _MessagesState extends State<MessagesScreen> with WidgetsBindingObserver {
         if (error.isNotEmpty) Text(error),
         if (notice.isNotEmpty) Text(notice),
         if (!busy && error.isEmpty && rows.isEmpty) Text(inbox ? 'No conversations yet.' : 'No messages yet.'),
-        if (inbox) ...rows.map(conversation)
+        if (inbox) ...rows.expand((row) => [conversation(row), controls(row)])
         else for (final row in rows.reversed) ListTile(
+          trailing: row['mine'] == true ? null : IconButton(tooltip: 'Report message', icon: const Icon(Icons.flag),
+            onPressed: busy ? null : () => report(widget.thread!, row['id'] as String)),
           title: Text(row['body'] as String), subtitle: Text(row['mine'] == true ? 'You' : widget.thread!['name'] as String)),
         if (more) TextButton(onPressed: busy ? null : () => run(() => load(older:true)), child: const Text('Load older')),
+        if (current != null) controls(current!),
+        if (current?['paused'] == true) const Text('Messaging is paused. You can still view history and report messages.')
+        else ...[
         TextField(controller:draft, enabled:!busy, maxLength:inbox ? 254 : 2000, maxLines:inbox ? 1 : 3,
           keyboardType:inbox ? TextInputType.emailAddress : TextInputType.multiline,
           decoration: InputDecoration(labelText:inbox ? 'Recipient campus email' : 'Your message')),
         FilledButton(onPressed:busy ? null : () => run(submit),
           child:Text(inbox ? 'Request conversation' : 'Send message')),
+        ],
       ]));
   }
 }

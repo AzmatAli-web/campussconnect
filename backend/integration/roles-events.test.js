@@ -12,7 +12,7 @@ import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
 import {HttpError} from '../src/lib/http-error.js';
 import {createApp} from '../src/app.js';
-import {Conversation,Message} from '../src/models/conversation.js';
+import {Conversation,ConversationReport,Message} from '../src/models/conversation.js';
 import {User} from '../src/models/user.js';
 import {
  Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey
@@ -80,7 +80,7 @@ before(async()=>{
   binary:{version:process.env.MONGOMS_VERSION||'7.0.24'}
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
- for(const model of [Conversation,Message,User,Event,EventRegistration,Announcement,
+ for(const model of [Conversation,ConversationReport,Message,User,Event,EventRegistration,Announcement,
   Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
   await model.createIndexes();
  }
@@ -1730,6 +1730,31 @@ test('conversation consent, campus scope, retry-safe delivery and cursor history
  assert.equal((await mark(bob)).body.data.updated,0);
  assert.equal(await unread(bob),0);
  assert.equal(await unread(alice),1);
+ const block=(uid,blocked)=>request(app).patch(url+'/block').set(auth(uid)).send({blocked});
+ assert.equal((await block(outsider,true)).status,404);
+ assert.equal((await block(alice,true)).body.data.blockedByMe,true);
+ assert.equal((await block(bob,true)).body.data.paused,true);
+ assert.equal((await block(alice,false)).body.data.paused,true);
+ assert.equal((await invite(alice,bob)).status,409);
+ assert.equal((await send(alice,'Blocked')).body.error.code,'CONTACT_PAUSED');
+ assert.equal((await send(bob,'Blocked')).body.error.code,'CONTACT_PAUSED');
+ assert.equal((await request(app).get(history).set(auth(bob))).body.data.length,2);
+ const report=(uid,messageId)=>request(app).post(url+'/reports').set(auth(uid)).send({reason:'Harassing contact',messageId});
+ assert.equal((await report(outsider,one.body.data.id)).status,404);
+ assert.equal((await report(alice,one.body.data.id)).status,404);
+ const evidence=await report(bob,one.body.data.id);
+ assert.equal(evidence.status,200);
+ assert.equal((await report(bob,one.body.data.id)).body.data.id,evidence.body.data.id);
+ const queue='/api/v1/admin/conversation-reports';
+ assert.equal((await request(app).get(queue).set(auth(bob))).status,403);
+ const cases=await request(app).get(queue).set(auth('fixture-admin'));
+ assert.deepEqual(cases.body.data.map(row=>row.excerpt),['Hello']);
+ const review=uid=>request(app).patch(queue+'/'+evidence.body.data.id).set(auth(uid));
+ assert.equal((await review(outsider)).status,403);
+ assert.equal((await review('fixture-admin')).status,200);
+ assert.deepEqual((await request(app).get(queue).set(auth('fixture-admin'))).body.data,[]);
+ assert.equal((await block(bob,false)).body.data.paused,false);
+ assert.equal((await send(alice,'Resumed','bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb')).status,200);
  const other=await invite(outsider,bob);
  const declined=base+'/'+other.body.data.id;
  assert.equal((await request(app).patch(declined).set(auth(bob)).send({status:'declined'})).status,200);

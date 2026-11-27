@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import {Conversation,Message} from '../src/models/conversation.js';
+import {Conversation,ConversationReport,Message} from '../src/models/conversation.js';
 import mongoose from 'mongoose';
 import {parseEnvironment} from '../src/config/environment.js';
 import {connectDatabase} from '../src/config/database.js';
@@ -20,7 +20,7 @@ async function main(){
  if(!config.mongoUri||!config.universityId) throw new Error('Database and university must be configured first');
  await connectDatabase(config);
  try{
-  for(const model of [Conversation,Message,User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
+  for(const model of [Conversation,ConversationReport,Message,User,AdminBootstrap,AuditLog,StaffInvitation,Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
    await model.createIndexes();
    console.log('Checked indexes:',model.collection.name);
   }

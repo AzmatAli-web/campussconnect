@@ -10,4 +10,8 @@ Run `npm run db:ensure-indexes` from the backend before enabling the feature on 
 
 The API requires an active campus session. Requests, decisions and history are scoped to the authenticated university. Only the named recipient can decide, and only participants in accepted conversations can read or post. Names are captured when a request is made. Messages persist in the application database. Web and Flutter receive authenticated Socket.IO updates while Messages is open. A signal carries no message text. Clients fetch authorized history, merge by message ID and recover missed pages on reconnect. A foreground refresh every minute also covers missed signals across server replicas. Opening a thread marks the fetched incoming messages as read across devices. Earlier messages without a read timestamp count as unread until opened.
 
-Next milestone: M128 conversation blocking and reporting before pilot use.
+Either participant can block a pending request or an existing conversation. Both participants retain access to their accepted history. Sending and invitations stay paused until each person who blocked chooses Unblock.
+
+On web and Flutter, choose Report conversation or Report message. A message report includes only the selected incoming message as evidence. The campus admin can open Administration → Private messaging reports, review the reason and evidence, and mark the report reviewed. The database records the reviewer and review time. Existing account moderation remains a separate decision.
+
+Next milestone: M129 — approved campus knowledge sources for the AI assistant.

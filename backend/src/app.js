@@ -1,3 +1,4 @@
+import {knowledgeSourcesRouter} from './routes/knowledge-sources.js';
 import {conversationsRouter} from './routes/conversations.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -32,6 +33,7 @@ export function createApp({config,firebaseAuth,scanPdf}) {
   const ready=Object.values(checks).every(Boolean);
   res.status(ready?200:503).json({data:{status:ready?'ready':'not_ready',checks}});
  });
+ app.use('/api/v1',knowledgeSourcesRouter({config,firebaseAuth}));
  app.use('/api/v1',conversationsRouter({config,firebaseAuth}));
  app.use('/api/v1',identityRouter({config,firebaseAuth}));
  app.use('/api/v1',eventsRouter({config,firebaseAuth}));

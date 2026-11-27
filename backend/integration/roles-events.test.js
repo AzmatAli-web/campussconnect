@@ -1,3 +1,4 @@
+import {KnowledgeSource} from '../src/models/knowledge-source.js';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
@@ -80,7 +81,7 @@ before(async()=>{
   binary:{version:process.env.MONGOMS_VERSION||'7.0.24'}
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
- for(const model of [Conversation,ConversationReport,Message,User,Event,EventRegistration,Announcement,
+ for(const model of [KnowledgeSource,Conversation,ConversationReport,Message,User,Event,EventRegistration,Announcement,
   Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
   await model.createIndexes();
  }
@@ -1797,4 +1798,40 @@ test('live sync authenticates and targets the member’s connected devices', {ti
   devices.forEach(socket=>socket.close());
   await io.close();
  }
+});
+
+test('knowledge sources require approval and current campus audience for listing and citation lookup',async()=>{
+ const admin='fixture-admin',student='fixture-student-14',author='/api/v1/admin/knowledge-sources',reader='/api/v1/knowledge-sources';
+ const input={title:'Library orientation',reference:'Fictional handbook, p. 4',text:'Example library hours for the test campus.',
+  audience:'campus',clientId:'aa110000-0000-4000-8000-000000000001'};
+ const create=(uid,body)=>request(app).post(author).set(auth(uid)).send(body);
+ const read=(path,uid=student)=>request(app).get(path).set(auth(uid));
+ const change=(id,status,uid=admin)=>request(app).patch(author+'/'+id).set(auth(uid)).send({status});
+ assert.equal((await request(app).get(reader)).status,401);
+ assert.equal((await create(student,input)).status,403);
+ assert.equal((await read(author)).status,403);
+ const draft=await create(admin,input);
+ assert.equal(draft.status,200);
+ const id=draft.body.data.id;
+ assert.equal((await create(admin,input)).body.data.id,id);
+ assert.equal((await create(admin,{...input,title:'Different edition'})).status,409);
+ assert.equal((await read(reader+'/'+id)).status,404);
+ assert.equal((await change(id,'approved',student)).status,403);
+ assert.equal((await change(id,'approved')).status,200);
+ const restricted=await create(admin,{...input,clientId:'aa110000-0000-4000-8000-000000000002',audience:'admin'});
+ const restrictedId=restricted.body.data.id;
+ assert.equal((await change(restrictedId,'approved')).status,200);
+ const foreign=await KnowledgeSource.create({...input,universityId:new mongoose.Types.ObjectId(),createdBy:students[14]._id,status:'approved'});
+ assert.equal((await read(reader+'/'+foreign._id,admin)).status,404);
+ assert.equal((await read(reader+'/'+restrictedId+'?audience=admin')).status,404);
+ assert.equal((await read(reader+'/'+restrictedId,admin)).status,200);
+ const response=await read(reader);
+ assert.match(response.headers['cache-control'],/no-store/);
+ assert.deepEqual(response.body.data.map(source=>source._id),[id]);
+ assert.equal(response.body.data[0].reference,input.reference);
+ assert.equal(response.body.data[0].createdBy,undefined);
+ assert.equal((await change(id,'withdrawn')).status,200);
+ assert.equal((await read(reader+'/'+id)).status,404);
+ assert.deepEqual((await read(reader)).body.data,[]);
+ assert.equal((await change(id,'approved')).status,409);
 });

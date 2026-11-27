@@ -1,3 +1,4 @@
+import KnowledgeSources from './KnowledgeSources.jsx';
 import React,{useState} from 'react';
 import {formatDate} from './dashboard-domain.js';
 
@@ -41,6 +42,7 @@ export default function AdminPanel({data,call,act,busy,showRoster,openRoster,ros
  }
  return <div className="wc-stack">
   <div className="wc-admin-banner"><strong>Restricted Admin workspace</strong><small>Every operation is checked by the backend against an authenticated identity and an active Admin role.</small></div>
+  <KnowledgeSources call={call}/>
   <section className="wc-panel"><h2>Private messaging reports</h2>
    <button disabled={busy} onClick={()=>act(loadReports,'Report queue refreshed.')}>Load open reports</button>
    {reports?.length===0&&<p>No open reports.</p>}

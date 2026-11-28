@@ -1,6 +1,7 @@
 import {knowledgeSourcesRouter} from './routes/knowledge-sources.js';
 import {conversationsRouter} from './routes/conversations.js';
 import express from 'express';
+import {isIP} from 'node:net';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -26,7 +27,17 @@ export function createApp({config,firebaseAuth,scanPdf}) {
  app.use(express.json({limit:'32kb',strict:true}));
  // In-memory integration suites issue hundreds of requests against one app instance.
  // Disable throttling only for NODE_ENV=test; development/production remain rate-limited.
- if(config.nodeEnv!=='test') app.use('/api/v1',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
+ if(config.nodeEnv!=='test'){
+  const options={windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false};
+  // Enable only for a service accepting traffic exclusively from Railway's public HTTP edge.
+  if(config.railwayEdgeOnly)options.keyGenerator=req=>{
+   const address=req.get('x-real-ip');
+   const version=typeof address==='string'?isIP(address):0;
+   if(version===6 && !address.includes('%'))return new URL('http://['+address+']/').hostname;
+   return version===4?address:req.socket.remoteAddress;
+  };
+  app.use('/api/v1',rateLimit(options));
+ }
  app.get('/api/v1/health/live',(_req,res)=>res.json({data:{status:'alive'}}));
  app.get('/api/v1/health/ready',(_req,res)=>{
   const checks={database:databaseReady(),firebase:Boolean(firebaseAuth),university:Boolean(config.universityId),emailDomains:config.domains.length>0};

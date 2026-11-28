@@ -390,7 +390,9 @@ class CampusSociety {
   final String slug;
   final String description;
   final String status;
+  final String contactEmail;
   const CampusSociety({
+    this.contactEmail = '',
     required this.id,required this.name,required this.slug,
     required this.description,required this.status,
   });
@@ -398,6 +400,7 @@ class CampusSociety {
     id:stringField(data,'id'),
     name:stringField(data,'name'),
     slug:stringField(data,'slug'),
+    contactEmail:stringField(data,'contactEmail'),
     description:stringField(data,'description'),
     status:stringField(data,'status'),
   );

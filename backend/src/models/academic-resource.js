@@ -2,10 +2,6 @@ import mongoose from 'mongoose';
 
 const {Schema} = mongoose;
 
-/**
- * Published PDFs remain private at rest: storageKey is only ever used by the
- * authenticated file-streaming route and never returned in resource listings.
- */
 const resourceSchema = new Schema({
   universityId: {type: Schema.Types.ObjectId, required: true},
   uploadedBy: {type: Schema.Types.ObjectId, required: true},
@@ -17,10 +13,13 @@ const resourceSchema = new Schema({
   courseCode: {type: String, required: true, maxlength: 24},
   courseCodeKey: {type: String, required: true, maxlength: 24},
   fileName: {type: String, required: true, maxlength: 160},
-  storageKey: {type: String, required: true},
+  storageKey: String, // Present on legacy filesystem records.
+  pdfBytes: {type: Buffer, select: false},
+  scannedAt: Date,
+  purgeAt: Date,
   sizeBytes: {type: Number, required: true, min: 1, max: 8388608},
   mimeType: {type: String, enum: ['application/pdf'], required: true},
-  status: {type: String, enum: ['published', 'archived'], required: true, default: 'published'},
+  status: {type: String, enum: ['quarantined', 'published', 'archived'], required: true, default: 'published'},
   archivedBy: {type: Schema.Types.ObjectId, default: null},
   archivedAt: {type: Date, default: null}
 }, {timestamps: true, collection: 'academic_resources', versionKey: false});
@@ -28,6 +27,8 @@ const resourceSchema = new Schema({
 resourceSchema.index({universityId: 1, status: 1, programKey: 1,
   semester: 1, courseCodeKey: 1, createdAt: -1});
 resourceSchema.index({universityId: 1, uploadedBy: 1, createdAt: -1});
+
+resourceSchema.index({purgeAt:1}, {expireAfterSeconds:0, partialFilterExpression:{status:{$in:['quarantined','archived']}}});
 
 export const AcademicResource = mongoose.models.AcademicResource ??
   mongoose.model('AcademicResource', resourceSchema);

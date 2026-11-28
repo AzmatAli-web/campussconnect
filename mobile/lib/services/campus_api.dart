@@ -187,6 +187,49 @@ class CampusApi {
     return asJsonList(await _request('/events?$query')).map(CampusEvent.fromJson).toList();
   }
 
+  Future<CampusProfile> updateProfile(String name, String registration) async =>
+      CampusProfile.fromJson(asJson(await _request('/me', method: 'PATCH', body: {
+        'fullName': name.trim(),
+        'registrationNo': registration.trim().isEmpty ? null : registration.trim(),
+      })));
+
+  Future<List<Json>> conversationPage({String? threadId, String? before}) async {
+    final path = threadId == null ? '/conversations' : '/conversations/$threadId/messages';
+    return asJsonList(await _request(before == null ? path : '$path?before=$before'));
+  }
+
+  Future<Json> askCampus(String question) async =>
+      asJson(await _request('/knowledge-sources/answer', method: 'POST', body: {'question': question}));
+
+  Future<Json> citedSource(String id) async => asJson(await _request('/knowledge-sources/$id'));
+
+  Future<Json> conversationState(String id) async =>
+      asJson(await _request('/conversations/$id'));
+
+  Future<void> blockConversation(String id, bool blocked) async {
+    await _request('/conversations/$id/block', method: 'PATCH', body: {'blocked': blocked});
+  }
+
+  Future<void> reportConversation(String id, String reason, String? messageId) async {
+    await _request('/conversations/$id/reports', method: 'POST',
+        body: {'reason': reason, 'messageId': messageId});
+  }
+
+  Future<void> readMessages(String id, List<String> ids) async {
+    await _request('/conversations/$id/read', method: 'PATCH', body: {'ids': ids});
+  }
+
+  Future<Json> requestConversation(String email) async =>
+      asJson(await _request('/conversations', method: 'POST', body: {'email': email}));
+
+  Future<Json> decideConversation(String id, String status) async =>
+      asJson(await _request('/conversations/$id', method: 'PATCH', body: {'status': status}));
+
+  Future<void> sendMessage(String id, String text, String clientId) async {
+    await _request('/conversations/$id/messages', method: 'POST',
+        body: {'body': text, 'clientId': clientId});
+  }
+
   Future<Json> issueEventTicket(String id) async =>
       asJson(await _request('/me/event-registrations/${Uri.encodeComponent(id)}/ticket',method:'POST'));
 

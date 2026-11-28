@@ -19,6 +19,9 @@ export function navigationFor(profile){
  if(hasRole(profile,'student')||hasRole(profile,'financeOfficer'))items.push(['fees','Fees & dues','▥']);
  if(canOrganize(profile))items.push(['organizer','Organizer studio','✦']);
  if(hasRole(profile,'admin'))items.push(['admin','Administration','⚙']);
+ items.push(['messages','Messages','✉']);
+ items.push(['assistant','Campus assistant','?']);
+ items.push(['profile','My profile','◎']);
  return items.map(([id,label,icon])=>({id,label,icon}));
 }
 export const formatDate=value=>{

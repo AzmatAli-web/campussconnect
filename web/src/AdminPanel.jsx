@@ -1,3 +1,4 @@
+import KnowledgeSources from './KnowledgeSources.jsx';
 import React,{useState} from 'react';
 import {formatDate} from './dashboard-domain.js';
 
@@ -7,6 +8,8 @@ const initialReview={method:'facultyEmail',evidenceReference:'',reviewNote:'',at
 
 export default function AdminPanel({data,call,act,busy,showRoster,openRoster,rosters}){
  const users=data.users||[],societies=data.societies||[],audits=data.audit||[],events=data.events||[];
+ const [reports,setReports]=useState(null);
+ const loadReports=async()=>setReports(await call('/admin/conversation-reports'));
  const [target,setTarget]=useState('');
  const [review,setReview]=useState(initialReview);
  const [society,setSociety]=useState({name:'',slug:'',description:''});
@@ -39,6 +42,17 @@ export default function AdminPanel({data,call,act,busy,showRoster,openRoster,ros
  }
  return <div className="wc-stack">
   <div className="wc-admin-banner"><strong>Restricted Admin workspace</strong><small>Every operation is checked by the backend against an authenticated identity and an active Admin role.</small></div>
+  <KnowledgeSources call={call}/>
+  <section className="wc-panel"><h2>Private messaging reports</h2>
+   <button disabled={busy} onClick={()=>act(loadReports,'Report queue refreshed.')}>Load open reports</button>
+   {reports?.length===0&&<p>No open reports.</p>}
+   {reports?.map(report=><article key={report.id}>
+    <h3>Reported account · {users.find(user=>user.id===report.subject)?.fullName||report.subject}</h3>
+    <p>{report.reason}</p>{report.excerpt&&<blockquote>{report.excerpt}</blockquote>}
+    <button disabled={busy} onClick={()=>act(async()=>{
+     await call('/admin/conversation-reports/'+report.id,{method:'PATCH'});await loadReports();
+    },'Report marked as reviewed.')}>Mark reviewed</button>
+   </article>)}</section>
   <div className="wc-metrics"><div className="wc-metric"><small>Campus users</small><strong>{users.length}</strong><em>First 100 records</em></div><div className="wc-metric"><small>Published events</small><strong>{events.length}</strong><em>Campus records</em></div><div className="wc-metric"><small>Societies</small><strong>{societies.length}</strong><em>Active groups</em></div><div className="wc-metric"><small>Audit entries</small><strong>{audits.length}</strong><em>Recent actions</em></div></div>
   <div className="wc-columns">
    <section className="wc-panel"><Header kicker="FACULTY VERIFICATION" title="Approve faculty" desc="Review official faculty evidence independently before approving."/>

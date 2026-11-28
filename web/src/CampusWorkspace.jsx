@@ -31,7 +31,9 @@ const StudyPlanner=lazy(()=>import('./StudyPlanner.jsx'));
 const CampusCalendar=lazy(()=>import('./CampusCalendar.jsx'));
 const Admin=lazy(()=>import('./AdminPanel.jsx'));
 
-const titles={overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',study:'Weekly Study Planner',calendar:'My Campus Calendar',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
+const CampusAssistant=lazy(()=>import('./CampusAssistant.jsx'));
+const MessagesPage=lazy(()=>import('./MessagesPage.jsx'));
+const titles={assistant:'Campus assistant',messages:'Private messages',profile:'My profile',overview:'Your campus at a glance',events:'Explore campus events',registrations:'My registrations',announcements:'Campus announcements',timetable:'Official academic timetable',resources:'Academic learning resources',assignments:'Assignment Tracker',study:'Weekly Study Planner',calendar:'My Campus Calendar',marketplace:'Student Marketplace',lostfound:'Campus Lost & Found',societies:'Campus Society Memberships',notifications:'Campus Notifications',complaints:'Private complaints & tracking',fees:'Fees & payment records',organizer:'Organizer studio',admin:'Campus administration'};
 const requestsFor=(tab,profile)=>{
  const requested={};
  if(['overview','admin'].includes(tab))requested.events='/events?limit=50';
@@ -122,6 +124,8 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
  const assignmentKey=plannerKey(profile);
  const props={data,profile,user,busy,call,act,register,showRoster,openRoster,rosters,choose};
  const page={
+  assistant:<CampusAssistant key={profile._id} call={call}/>,
+  messages:<MessagesPage key={profile._id} user={user} call={call}/>,
   overview:hasRole(profile,'student')?<StudentOverview key={assignmentKey??'overview'} assignmentKey={assignmentKey} preferenceKey={timetableKey} {...props}/>:<Overview {...props}/>,
   events:<Events {...props} busy={busy||loading} revision={revision}/>,
   registrations:<Registrations {...props} revision={revision}/>,
@@ -137,6 +141,17 @@ export default function CampusWorkspace({user,profile,onSignOut,onProfileChange}
   notifications:<NotificationsPage {...props}/>,
   complaints:<ComplaintsPage {...props}/>,
   fees:<FeesPage {...props}/>,
+  profile:<form className="wc-panel wc-stack" key={profile._id} onSubmit={event=>{
+   event.preventDefault();
+   const values=new FormData(event.currentTarget);
+   const body={fullName:values.get('fullName').trim(),registrationNo:values.get('registrationNo').trim()||null};
+   act(async()=>onProfileChange(await call('/me',{method:'PATCH',body})),'Profile saved.');
+  }}>
+   <p>{profile.emailNormalized}</p>
+   <label>Full name<input required minLength={2} maxLength={120} name="fullName" defaultValue={profile.fullName}/></label>
+   <label>Registration number (optional)<input minLength={3} maxLength={40} name="registrationNo" defaultValue={profile.registrationNo||''}/></label>
+   <button className="wc-primary" disabled={busy}>Save profile</button>
+  </form>,
   organizer:<Organizer {...props}/>,
   admin:<Admin {...props}/>
  }[activeTab];

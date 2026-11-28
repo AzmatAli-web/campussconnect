@@ -11,7 +11,7 @@ import {pagination,requireObjectId} from '../services/mvp-validation.js';
 import {societyDirectoryQuery,societyMembershipView} from '../services/society-membership-validation.js';
 import {
   parseStatusChange,parseFacultyApproval,parseManagerAssignment,
-  parseStaffInvitation,parseStaffActivation,parseReason,parseSociety,
+  parseStaffInvitation,parseStaffActivation,parseReason,parseSociety,parseSocietyProfile,
   assertEligibleFaculty,assertVerifiedActiveCampusUser,parseFinanceGrant
 } from '../services/governance-policy.js';
 
@@ -24,7 +24,7 @@ const asUser=(user)=>({
   status:user.status,requestedRole:user.requestedRole,
   activeRoles:user.activeRoles,facultyVerificationStatus:user.facultyVerificationStatus
 });
-const asSociety=(s)=>({id:String(s._id),name:s.name,slug:s.slug,status:s.status,description:s.description});
+const asSociety=(s)=>({id:String(s._id),name:s.name,slug:s.slug,status:s.status,description:s.description,...(s.contactEmail?{contactEmail:s.contactEmail}:{})});
 const action=(uni,admin,code,type,id,details={})=>({
   universityId:uni,actorId:admin._id,action:code,targetType:type,targetId:id,details
 });
@@ -301,6 +301,25 @@ export function governanceRouter(deps) {
       return s;
     });
     return res.status(201).json({data:asSociety(created)});
+  }));
+
+  router.patch('/managed-societies/:id/profile',auth,asyncHandler(async(req,res)=>{
+    needRole(req,'societyManager');
+    const societyId=requireObjectId(req.params.id);
+    const update=parseSocietyProfile(req.body);
+    const changed=await transaction(async session=>{
+      // A concurrent revocation must serialize with this edit on the assignment.
+      const assignment=await SocietyManagerAssignment.findOneAndUpdate({
+        societyId,universityId:uni,userId:req.currentUser._id,status:'active'
+      },{$currentDate:{updatedAt:true}},{session,timestamps:false});
+      if(!assignment)throw new HttpError(403,'SOCIETY_MANAGER_REQUIRED','Active society assignment required');
+      const society=await Society.findOneAndUpdate({_id:societyId,universityId:uni,status:'active'},
+        {$set:update},{new:true,runValidators:true,session});
+      if(!society)throw new HttpError(404,'SOCIETY_NOT_FOUND','Active society not found');
+      await AuditLog.create([action(uni,req.currentUser,'society.profile.updated','society',societyId)],{session});
+      return society;
+    });
+    res.json({data:asSociety(changed)});
   }));
 
   router.get('/me/managed-societies',auth,asyncHandler(async(req,res)=>{

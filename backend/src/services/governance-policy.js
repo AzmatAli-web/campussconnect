@@ -42,6 +42,14 @@ export function parseReason(body) {
   requireBody(body,['reason']);
   return textField(body.reason,'reason',8,500);
 }
+export function parseSocietyProfile(body){
+  requireBody(body,['description','contactEmail']);
+  const description=textField(body.description,'description',10,1000);
+  const contactEmail=body.contactEmail===null?null:textField(body.contactEmail,'contactEmail',3,254).toLowerCase();
+  if(contactEmail&&!EMAIL.test(contactEmail))throw new HttpError(422,'INVALID_CONTACT_EMAIL','Enter a valid society contact email');
+  return {description,contactEmail};
+}
+
 export function parseSociety(body){
   requireBody(body,['name','slug','description']);
   const name=textField(body.name,'name',3,120);

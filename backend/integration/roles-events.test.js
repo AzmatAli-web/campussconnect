@@ -1,13 +1,19 @@
+import {KnowledgeSource} from '../src/models/knowledge-source.js';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, rm, writeFile, unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
+import {io as client} from 'socket.io-client';
+import {once} from 'node:events';
+import {attachMessaging} from '../src/services/live-messaging.js';
 import {MongoMemoryReplSet} from 'mongodb-memory-server';
 
+import {HttpError} from '../src/lib/http-error.js';
 import {createApp} from '../src/app.js';
+import {Conversation,ConversationReport,Message} from '../src/models/conversation.js';
 import {User} from '../src/models/user.js';
 import {
  Event,EventRegistration,Announcement,Society,SocietyManagerAssignment,IdempotencyKey
@@ -48,7 +54,7 @@ const mockFirebase={
   if(!token.startsWith('test-token:')||!people.has(uid)){
    const err=new Error('Invalid test fixture token');err.code='auth/invalid-id-token';throw err;
   }
-  return people.get(uid);
+  return {...people.get(uid),exp:Math.floor(Date.now()/1000)+300};
  },
  async getUser(uid) {
   const claims=people.get(uid);
@@ -75,7 +81,7 @@ before(async()=>{
   binary:{version:process.env.MONGOMS_VERSION||'7.0.24'}
  });
  await mongoose.connect(mongo.getUri(),{autoIndex:true});
- for(const model of [User,Event,EventRegistration,Announcement,
+ for(const model of [KnowledgeSource,Conversation,ConversationReport,Message,User,Event,EventRegistration,Announcement,
   Society,SocietyManagerAssignment,IdempotencyKey,AdminBootstrap,AuditLog,StaffInvitation,TimetableSlot,AcademicResource,StudentComplaint,FeeInvoice,FeePaymentRecord,MarketplaceListing,MarketplaceReport,LostFoundItem,SocietyMembership,CampusNotification,AnnouncementNotificationRead,NotificationPushDevice]){
   await model.createIndexes();
  }
@@ -89,7 +95,9 @@ before(async()=>{
  config.resourceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-resources-test-'));
  config.marketplaceUploadDir=await mkdtemp(path.join(tmpdir(),'cc-marketplace-test-'));
 
- app=createApp({config,firebaseAuth:mockFirebase});
+ app=createApp({config,firebaseAuth:mockFirebase,scanPdf:async bytes=>{
+  if(bytes.includes('fixture-rejected'))throw new HttpError(422,'RESOURCE_SCAN_REJECTED','Rejected');
+ }});
 },{timeout:180000});
 after(async()=>{
  await mongoose.disconnect();
@@ -126,6 +134,15 @@ test('only test fixture Admin can initialize society and assign manager',async()
  assert.equal(mine.status,200,JSON.stringify(mine.body));
  assert.equal(mine.body.data.length,1);
  assert.equal(mine.body.data[0].id,societyId);
+ const edit=(id,body)=>request(app).patch('/api/v1/managed-societies/'+id+'/profile')
+  .set(auth('fixture-manager')).send(body);
+ const updatedProfile={description:'Software Engineering Student Society',contactEmail:'guild@example.test'};
+ assert.equal((await edit(societyId,{...updatedProfile,status:'archived'})).status,422);
+ assert.equal((await edit(String(new mongoose.Types.ObjectId()),updatedProfile)).status,403);
+ assert.equal((await edit(societyId,updatedProfile)).status,200);
+ const directory=await request(app).get('/api/v1/societies').set(auth('fixture-student-10'));
+ assert.equal(directory.body.data.find(row=>row.id===societyId)?.contactEmail,updatedProfile.contactEmail);
+
  const notMine=await request(app).get('/api/v1/me/managed-societies').set(auth('fixture-unauthorized'));
  assert.equal(notMine.status,403);
 
@@ -248,6 +265,9 @@ test('revoked Society Manager loses ability to publish and audit trail records t
   .post('/api/v1/admin/society-manager-assignments/'+assignment._id+'/revoke')
   .set(auth('fixture-admin')).send({reason:'End of test fixture assignment'});
  assert.equal(revoked.status,200,JSON.stringify(revoked.body));
+ const editAfterRevocation=await request(app).patch('/api/v1/managed-societies/'+assignment.societyId+'/profile')
+  .set(auth('fixture-manager')).send({description:'Former manager change',contactEmail:null});
+ assert.equal(editAfterRevocation.status,403);
  const society=await Society.findOne({slug:'software-guild'});
  const denied=await request(app).post('/api/v1/events')
   .set(auth('fixture-manager')).send({...makeEvent('Revoked manager event'),societyId:String(society._id)});
@@ -594,6 +614,13 @@ test('academic resource upload requires verified faculty; students receive only 
   .set(auth('fixture-faculty-resource-test')),Buffer.from('NOT A PDF'),'fake.pdf');
  assert.equal(invalid.status,415,JSON.stringify(invalid.body));
 
+ const deniedFile=await attachPdf(request(app).post('/api/v1/resources')
+  .set(auth('fixture-faculty-resource-test')),Buffer.from('%PDF-1.7 fixture-rejected'));
+ assert.equal(deniedFile.status,422);
+ const held=await AcademicResource.findOne({status:'quarantined'});
+ assert.ok(held.purgeAt);
+ assert.equal((await request(app).get('/api/v1/resources/'+held.id+'/file').set(auth(studentUid))).status,404);
+
  const published=await attachPdf(request(app).post('/api/v1/resources')
   .set(auth('fixture-faculty-resource-test')));
  assert.equal(published.status,201,JSON.stringify(published.body));
@@ -636,7 +663,11 @@ test('academic resource upload requires verified faculty; students receive only 
 
  const missingAuth=await request(app).get('/api/v1/resources/'+item.id+'/file');
  assert.equal(missingAuth.status,401);
- const downloaded=await request(app).get('/api/v1/resources/'+item.id+'/file')
+ const restarted=createApp({config:{...config,resourceUploadDir:path.join(config.resourceUploadDir,'empty')},firebaseAuth:mockFirebase});
+ const stored=await AcademicResource.findById(item.id).select('+pdfBytes');
+ assert.deepEqual(Buffer.from(stored.pdfBytes),fixturePdf);
+ assert.ok(stored.scannedAt && !stored.purgeAt);
+ const downloaded=await request(restarted).get('/api/v1/resources/'+item.id+'/file')
   .set(auth(studentUid)).buffer(true).parse((res,callback)=>{
     const chunks=[];
     res.on('data',chunk=>chunks.push(chunk));
@@ -650,6 +681,13 @@ test('academic resource upload requires verified faculty; students receive only 
  assert.ok(downloaded.headers['content-disposition'].startsWith('attachment;'));
  assert.deepEqual(downloaded.body,fixturePdf);
 
+ const storageKey='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.pdf';
+ await writeFile(path.join(config.resourceUploadDir,storageKey),fixturePdf);
+ const legacy=await AcademicResource.create({...original,_id:new mongoose.Types.ObjectId(),scannedAt:undefined,storageKey});
+ const legacyUrl='/api/v1/resources/'+legacy.id+'/file';
+ assert.equal((await request(app).get(legacyUrl).set(auth(studentUid))).status,200);
+ await unlink(path.join(config.resourceUploadDir,storageKey));
+ assert.equal((await request(restarted).get(legacyUrl).set(auth(studentUid))).status,200);
  const otherFaculty=await request(app).post('/api/v1/resources/'+item.id+'/archive')
   .set(auth('fixture-faculty')).send({});
  assert.equal(otherFaculty.status,403);
@@ -657,6 +695,7 @@ test('academic resource upload requires verified faculty; students receive only 
   .set(auth('fixture-admin')).send({});
  assert.equal(adminArchived.status,200,JSON.stringify(adminArchived.body));
  assert.equal(adminArchived.body.data.status,'archived');
+ assert.ok((await AcademicResource.findById(item.id)).purgeAt>Date.now());
  const noLongerPublic=await request(app).get('/api/v1/resources/'+item.id+'/file')
   .set(auth(studentUid));
  assert.equal(noLongerPublic.status,404);
@@ -1649,4 +1688,164 @@ test('QR tickets rotate, expire and admit only once at the correct published eve
  const finalReport=await report('fixture-admin');
  assert.equal(finalReport.headers['cache-control'],'no-store');
  assert.deepEqual(finalReport.body.data,{registered:1,checkedIn:1,attendancePercent:100});
+});
+
+test('conversation consent, campus scope, retry-safe delivery and cursor history',async()=>{
+ const alice='fixture-student-14',bob='fixture-student-15',outsider='fixture-student-16';
+ const base='/api/v1/conversations';
+ const invite=(from,to)=>request(app).post(base).set(auth(from)).send({email:to+'@'+DOMAIN});
+ const foreign='fixture-message-foreign';
+ await User.create({...person(foreign),universityId:new mongoose.Types.ObjectId()});
+ assert.equal((await invite(alice,foreign)).status,422);
+ assert.equal((await invite(alice,alice)).status,422);
+ const [first,retry]=await Promise.all([invite(alice,bob),invite(alice,bob)]);
+ assert.equal(first.status,200,JSON.stringify(first.body));
+ assert.equal(first.body.data.id,retry.body.data.id);
+ const url=base+'/'+first.body.data.id,history=url+'/messages';
+ const decide=(uid,status)=>request(app).patch(url).set(auth(uid)).send({status});
+ const send=(uid,body,clientId='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa')=>
+  request(app).post(history).set(auth(uid)).send({body,clientId});
+ assert.equal((await invite(bob,alice)).body.data.status,'pending');
+ assert.equal((await decide(alice,'accepted')).status,404);
+ assert.equal((await decide(outsider,'accepted')).status,404);
+ assert.equal((await send(alice,'Before acceptance')).status,404);
+ assert.equal((await decide(bob,'accepted')).status,200);
+ const [one,two]=await Promise.all([send(alice,'Hello'),send(alice,'Hello')]);
+ assert.equal(one.status,200);
+ assert.equal(one.body.data.id,two.body.data.id);
+ assert.equal((await send(alice,'Changed')).status,409);
+ assert.equal((await send(outsider,'Intrusion')).status,404);
+ assert.equal((await request(app).get(history).set(auth(outsider))).status,404);
+ assert.deepEqual((await request(app).get(base).set(auth(outsider))).body.data,[]);
+ assert.equal((await send(bob,'Welcome')).status,200);
+ const list=await request(app).get(history).set(auth(bob));
+ assert.match(list.headers['cache-control'],/no-store/);
+ assert.deepEqual(list.body.data.map(m=>m.mine),[true,false]);
+ const earlier=await request(app).get(history).query({before:list.body.data[0].id}).set(auth(alice));
+ assert.deepEqual(earlier.body.data.map(m=>m.body),['Hello']);
+ const unread=async uid=>(await request(app).get(base).set(auth(uid))).body.data.find(row=>row.id===first.body.data.id).unread;
+ const mark=uid=>request(app).patch(url+'/read').set(auth(uid)).send({ids:list.body.data.map(row=>row.id)});
+ assert.equal(await unread(bob),1);
+ assert.equal((await mark(outsider)).status,404);
+ assert.equal((await mark(bob)).body.data.updated,1);
+ assert.equal((await mark(bob)).body.data.updated,0);
+ assert.equal(await unread(bob),0);
+ assert.equal(await unread(alice),1);
+ const block=(uid,blocked)=>request(app).patch(url+'/block').set(auth(uid)).send({blocked});
+ assert.equal((await block(outsider,true)).status,404);
+ assert.equal((await block(alice,true)).body.data.blockedByMe,true);
+ assert.equal((await block(bob,true)).body.data.paused,true);
+ assert.equal((await block(alice,false)).body.data.paused,true);
+ assert.equal((await invite(alice,bob)).status,409);
+ assert.equal((await send(alice,'Blocked')).body.error.code,'CONTACT_PAUSED');
+ assert.equal((await send(bob,'Blocked')).body.error.code,'CONTACT_PAUSED');
+ assert.equal((await request(app).get(history).set(auth(bob))).body.data.length,2);
+ const report=(uid,messageId)=>request(app).post(url+'/reports').set(auth(uid)).send({reason:'Harassing contact',messageId});
+ assert.equal((await report(outsider,one.body.data.id)).status,404);
+ assert.equal((await report(alice,one.body.data.id)).status,404);
+ const evidence=await report(bob,one.body.data.id);
+ assert.equal(evidence.status,200);
+ assert.equal((await report(bob,one.body.data.id)).body.data.id,evidence.body.data.id);
+ const queue='/api/v1/admin/conversation-reports';
+ assert.equal((await request(app).get(queue).set(auth(bob))).status,403);
+ const cases=await request(app).get(queue).set(auth('fixture-admin'));
+ assert.deepEqual(cases.body.data.map(row=>row.excerpt),['Hello']);
+ const review=uid=>request(app).patch(queue+'/'+evidence.body.data.id).set(auth(uid));
+ assert.equal((await review(outsider)).status,403);
+ assert.equal((await review('fixture-admin')).status,200);
+ assert.deepEqual((await request(app).get(queue).set(auth('fixture-admin'))).body.data,[]);
+ assert.equal((await block(bob,false)).body.data.paused,false);
+ assert.equal((await send(alice,'Resumed','bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb')).status,200);
+ const other=await invite(outsider,bob);
+ const declined=base+'/'+other.body.data.id;
+ assert.equal((await request(app).patch(declined).set(auth(bob)).send({status:'declined'})).status,200);
+ assert.equal((await invite(outsider,bob)).body.data.status,'declined');
+ assert.equal((await request(app).get(declined+'/messages').set(auth(bob))).status,404);
+});
+
+test('live sync authenticates and targets the member’s connected devices', {timeout:10000}, async()=>{
+ const server=app.listen(0,'127.0.0.1');
+ await once(server,'listening');
+ const io=attachMessaging(server,app,{config,firebaseAuth:mockFirebase});
+ const devices=[];
+ const open=uid=>{
+  const socket=client('http://127.0.0.1:'+server.address().port,{auth:{token:'test-token:'+uid},
+   transports:['websocket'],forceNew:true,reconnection:false,autoConnect:false});
+  devices.push(socket);
+  return socket;
+ };
+ try{
+  const denied=open('unknown');
+  const rejected=once(denied,'connect_error');
+  denied.connect();
+  await rejected;
+  const devicesForMember=[open('fixture-student-14'),open('fixture-student-14')];
+  const outsider=open('fixture-student-16');
+  await Promise.all([...devicesForMember,outsider].map(socket=>{
+   const ready=once(socket,'connect');socket.connect();return ready;
+  }));
+  const received=devicesForMember.map(socket=>once(socket,'inbox:update'));
+  const outsiderReceived=[];
+  outsider.on('inbox:update',()=>outsiderReceived.push(true));
+  app.emit('conversationChanged',[students[14]._id]);
+  // An ordered sentinel proves the outsider finished consuming this broadcast cycle.
+  const done=once(outsider,'test:done');
+  io.emit('test:done');
+  assert.deepEqual(await Promise.all(received),[[],[]]);
+  await done;
+  assert.deepEqual(outsiderReceived,[]);
+ }finally{
+  devices.forEach(socket=>socket.close());
+  await io.close();
+ }
+});
+
+test('knowledge sources require approval and current campus audience for listing and citation lookup',async()=>{
+ const admin='fixture-admin',student='fixture-student-14',author='/api/v1/admin/knowledge-sources',reader='/api/v1/knowledge-sources';
+ const input={title:'Library orientation',reference:'Fictional handbook, p. 4',text:'Example library hours for the test campus.',
+  audience:'campus',clientId:'aa110000-0000-4000-8000-000000000001'};
+ const create=(uid,body)=>request(app).post(author).set(auth(uid)).send(body);
+ const read=(path,uid=student)=>request(app).get(path).set(auth(uid));
+ const change=(id,status,uid=admin)=>request(app).patch(author+'/'+id).set(auth(uid)).send({status});
+ assert.equal((await request(app).get(reader)).status,401);
+ assert.equal((await create(student,input)).status,403);
+ assert.equal((await read(author)).status,403);
+ const draft=await create(admin,input);
+ assert.equal(draft.status,200);
+ const id=draft.body.data.id;
+ assert.equal((await create(admin,input)).body.data.id,id);
+ assert.equal((await create(admin,{...input,title:'Different edition'})).status,409);
+ assert.equal((await read(reader+'/'+id)).status,404);
+ assert.equal((await change(id,'approved',student)).status,403);
+ assert.equal((await change(id,'approved')).status,200);
+ const restricted=await create(admin,{...input,clientId:'aa110000-0000-4000-8000-000000000002',audience:'admin'});
+ const restrictedId=restricted.body.data.id;
+ assert.equal((await change(restrictedId,'approved')).status,200);
+ const foreign=await KnowledgeSource.create({...input,universityId:new mongoose.Types.ObjectId(),createdBy:students[14]._id,status:'approved'});
+ assert.equal((await read(reader+'/'+foreign._id,admin)).status,404);
+ assert.equal((await read(reader+'/'+restrictedId+'?audience=admin')).status,404);
+ assert.equal((await read(reader+'/'+restrictedId,admin)).status,200);
+ const response=await read(reader);
+ assert.match(response.headers['cache-control'],/no-store/);
+ assert.deepEqual(response.body.data.map(source=>source._id),[id]);
+ assert.equal(response.body.data[0].reference,input.reference);
+ assert.equal(response.body.data[0].createdBy,undefined);
+ const question='When is fictional orientation?';
+ const faqText='Fictional orientation begins at 9 AM on Monday.';
+ const faq=await create(admin,{...input,title:question,text:faqText,clientId:'aa110000-0000-4000-8000-000000000003',audience:'admin'});
+ const ask=(uid,query)=>request(app).post(reader+'/answer').set(auth(uid)).send({question:query});
+ assert.equal((await ask(admin,question)).body.data.status,'unsupported');
+ assert.equal((await change(faq.body.data.id,'approved')).status,200);
+ const answered=await ask(admin,question);
+ assert.equal(answered.status,200,JSON.stringify(answered.body));
+ assert.equal(answered.body.data.answer,faqText);
+ assert.equal(answered.body.data.citation.id,faq.body.data.id);
+ assert.equal((await ask(student,question)).body.data.status,'unsupported');
+ assert.equal((await ask(admin,'How expensive is the swimming pool?')).body.data.citation,null);
+ assert.equal((await change(faq.body.data.id,'withdrawn')).status,200);
+ assert.equal((await ask(admin,question)).body.data.status,'unsupported');
+ assert.equal((await change(id,'withdrawn')).status,200);
+ assert.equal((await read(reader+'/'+id)).status,404);
+ assert.deepEqual((await read(reader)).body.data,[]);
+ assert.equal((await change(id,'approved')).status,409);
 });

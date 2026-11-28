@@ -1,4 +1,6 @@
+import 'campus_assistant.dart';
 import 'dart:convert';
+import 'messages_screen.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -41,12 +43,14 @@ String _date(DateTime? date) {
 class StudentDashboard extends StatefulWidget {
   final CampusApi api;
   final CampusProfile profile;
+  final ValueChanged<CampusProfile>? onProfileChanged;
   /// When true, the UI uses in-memory fictional records only.
   final bool previewMode;
   const StudentDashboard({
     super.key,
     required this.api,
     required this.profile,
+    this.onProfileChanged,
     this.previewMode = false,
   });
 
@@ -618,6 +622,47 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
       );
 
+  Future<void> _editProfile() async {
+    var name = widget.profile.name;
+    var registration = widget.profile.registrationNo ?? '';
+    final form = GlobalKey<FormState>();
+    final save = await showDialog<bool>(context: context, builder: (dialogContext) =>
+      AlertDialog(title: const Text('Edit profile'), content: SingleChildScrollView(
+        child: Form(key: form, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextFormField(initialValue: name, maxLength: 120,
+            decoration: const InputDecoration(labelText: 'Full name'),
+            validator: (value) => (value ?? '').trim().length < 2 ? 'Enter at least two characters' : null,
+            onChanged: (value) => name = value),
+          TextFormField(initialValue: registration, maxLength: 40,
+            decoration: const InputDecoration(labelText: 'Registration number (optional)'),
+            validator: (value) {
+              final length = (value ?? '').trim().length;
+              return length > 0 && length < 3 ? 'Enter at least three characters' : null;
+            }, onChanged: (value) => registration = value),
+        ]))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () {
+            if (form.currentState!.validate()) Navigator.pop(dialogContext, true);
+          }, child: const Text('Save')),
+        ]));
+    if (save != true || !mounted) return;
+    setState(() => _savingProfile = true);
+    try {
+      final profile = await widget.api.updateProfile(name, registration);
+      if (mounted) {
+        widget.onProfileChanged?.call(profile);
+        _snack('Profile saved.');
+      }
+    } catch (error) {
+      if (mounted) _snack(error.toString());
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
+  }
+
+  bool _savingProfile = false;
+
   Widget _profilePage() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -645,6 +690,17 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   Text(widget.profile.email, style: const TextStyle(color: _muted)),
                   const SizedBox(height: 14),
                   const Divider(color: _line),
+                  if (!widget.previewMode && widget.onProfileChanged != null)
+                    OutlinedButton(onPressed: _savingProfile ? null : _editProfile,
+                      child: Text(_savingProfile ? 'Saving…' : 'Edit profile')),
+                  if (!widget.previewMode)
+                    OutlinedButton.icon(icon: const Icon(Icons.mail_outline),
+                      label: const Text('Messages'), onPressed: () => Navigator.push(context,
+                        MaterialPageRoute<void>(builder: (_) => MessagesScreen(api: widget.api)))),
+                  if (!widget.previewMode)
+                    OutlinedButton(onPressed: () => Navigator.push(context,
+                      MaterialPageRoute<void>(builder: (_) => CampusAssistant(api: widget.api))),
+                      child: const Text('Campus assistant')),
                   _ProfileField('Account', widget.profile.status),
                   _ProfileField('Role', widget.profile.roles.join(', ')),
                   _ProfileField('Registration no.', widget.profile.registrationNo ?? 'Not provided'),

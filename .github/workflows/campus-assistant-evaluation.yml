@@ -1,0 +1,46 @@
+name: Campus assistant evaluation
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/qa/campus-assistant-cases.js'
+      - 'backend/scripts/evaluate-campus-assistant.js'
+      - 'backend/src/services/campus-answer.js'
+      - 'backend/src/routes/knowledge-sources.js'
+      - '.github/workflows/campus-assistant-evaluation.yml'
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Evaluate FAQ baseline
+        run: npm run qa:assistant
+        env:
+          ASSISTANT_EVAL_OUTPUT: faq-results.json
+      - name: Start isolated model
+        run: |
+          docker run -d --name assistant-model -p 127.0.0.1:11434:11434 ollama/ollama:0.6.8
+          curl -fsS --retry 12 --retry-all-errors --retry-delay 2 http://127.0.0.1:11434/api/version
+          docker exec assistant-model ollama pull qwen2.5:3b
+          docker exec assistant-model ollama list
+          curl -fsS http://127.0.0.1:11434/api/generate -d '{"model":"qwen2.5:3b","stream":false}'
+      - name: Evaluate live passage selection
+        run: npm run qa:assistant
+        env:
+          CAMPUS_ASSISTANT_MODEL: qwen2.5:3b
+          ASSISTANT_EVAL_OUTPUT: model-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: campus-assistant-evaluation
+          path: backend/*-results.json

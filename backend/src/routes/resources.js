@@ -1,5 +1,5 @@
-import {randomUUID} from 'node:crypto';
-import {promises as fs} from 'node:fs';
+import {scanResource} from '../services/resource-scanner.js';
+import {migrateLegacyPdf, quarantineExpiry} from '../services/resource-storage.js';
 import path from 'node:path';
 import multer from 'multer';
 import {Router} from 'express';
@@ -53,6 +53,7 @@ function uploadRoot(deps) {
 export function resourcesRouter(deps) {
   const router = Router();
   const auth = campusUserMiddleware(deps);
+  const scan = deps.scanPdf ?? scanResource;
   router.use((_req, res, next) => {
     res.set('Cache-Control', 'private, no-store');
     res.set('X-Content-Type-Options', 'nosniff');
@@ -85,7 +86,7 @@ export function resourcesRouter(deps) {
     }
     const rows = await AcademicResource.find({
       universityId: deps.config.universityId,
-      uploadedBy: req.currentUser._id
+      uploadedBy: req.currentUser._id, status: {$in:['published','archived']}
     }).select('title description program semester courseCode fileName sizeBytes status createdAt')
       .sort({createdAt: -1, _id: -1}).limit(100).lean();
     return res.json({data: rows.map(resourceView)});
@@ -95,52 +96,31 @@ export function resourcesRouter(deps) {
     asyncHandler(async(req, res) => {
       const metadata = validateResourceMetadata(req.body);
       const bytes = validatePdf(req.file);
-      const storageKey = randomUUID() + '.pdf';
-      const root = uploadRoot(deps);
-      await fs.mkdir(root, {recursive: true, mode: 0o700});
-      await fs.writeFile(path.join(root, storageKey), bytes, {flag: 'wx', mode: 0o600});
-      let resource;
-      try {
-        resource = await AcademicResource.create({
-          ...metadata, universityId: deps.config.universityId,
-          uploadedBy: req.currentUser._id,
-          fileName: safeDownloadName(req.file.originalname),
-          storageKey, sizeBytes: bytes.length, mimeType: 'application/pdf',
-          status: 'published'
-        });
-      } catch (error) {
-        await fs.unlink(path.join(root, storageKey)).catch(() => {});
-        throw error;
-      }
+      const pending = await AcademicResource.create({
+        ...metadata, universityId:deps.config.universityId, uploadedBy:req.currentUser._id,
+        fileName:safeDownloadName(req.file.originalname), mimeType:'application/pdf',
+        sizeBytes:bytes.length, pdfBytes:bytes, status:'quarantined', purgeAt:quarantineExpiry()
+      });
+      await scan(bytes);
+      const resource = await AcademicResource.findOneAndUpdate(
+        {_id:pending._id, status:'quarantined'},
+        {$set:{status:'published', scannedAt:new Date()}, $unset:{purgeAt:1}}, {new:true});
+      if (!resource) throw new HttpError(409,'RESOURCE_CHANGED','Upload expired. Please retry.');
       return res.status(201).json({data: resourceView(resource)});
     })
   );
 
-  router.get('/resources/:id/file', auth, asyncHandler(async(req, res, next) => {
-    const id = requireObjectId(req.params.id);
-    const resource = await AcademicResource.findOne({
-      _id: id, universityId: deps.config.universityId, status: 'published'
-    }).lean();
-    if (!resource) throw new HttpError(404, 'RESOURCE_NOT_FOUND', 'Resource not found');
-    if (!/^[a-f0-9-]{36}\.pdf$/.test(resource.storageKey)) {
+  router.get('/resources/:id/file', auth, asyncHandler(async(req, res) => {
+    const filter = {_id:requireObjectId(req.params.id), universityId:deps.config.universityId,
+      status:'published'};
+    let resource = await AcademicResource.findOne(filter).select('+pdfBytes');
+    if (resource?.storageKey && !resource.scannedAt) {
+      await migrateLegacyPdf(resource, uploadRoot(deps), scan);
+      resource = await AcademicResource.findOne(filter).select('+pdfBytes');
+    }
+    if (!resource || !resource.scannedAt || resource.pdfBytes?.length !== resource.sizeBytes)
       throw new HttpError(404, 'RESOURCE_NOT_FOUND', 'Resource file unavailable');
-    }
-    const root = uploadRoot(deps);
-    let size;
-    try { size = (await fs.stat(path.join(root, resource.storageKey))).size; }
-    catch { throw new HttpError(404, 'RESOURCE_FILE_MISSING', 'Resource file unavailable'); }
-    if (size !== resource.sizeBytes) {
-      throw new HttpError(409, 'RESOURCE_FILE_CHANGED', 'Resource file is unavailable');
-    }
-    res.download(resource.storageKey, resource.fileName, {
-      root,
-      headers: {'Content-Type': 'application/pdf',
-        'Cache-Control': 'private, no-store',
-        'X-Content-Type-Options': 'nosniff'}
-    }, error => {
-      if (error && !res.headersSent) next(error);
-      else if (error) res.destroy();
-    });
+    res.attachment(resource.fileName).type('application/pdf').send(resource.pdfBytes);
   }));
 
   router.post('/resources/:id/archive', auth, asyncHandler(async(req, res) => {
@@ -161,7 +141,7 @@ export function resourcesRouter(deps) {
     const updated = await AcademicResource.findOneAndUpdate({
       _id: id, universityId: deps.config.universityId, status: 'published'
     }, {$set: {status: 'archived', archivedBy: req.currentUser._id,
-      archivedAt: new Date()}}, {new: true});
+      archivedAt: new Date(), purgeAt:new Date(Date.now()+30*86400000)}}, {new: true});
     if (!updated) throw new HttpError(409, 'RESOURCE_CHANGED', 'Resource was already archived');
     return res.json({data: {id, status: 'archived'}});
   }));

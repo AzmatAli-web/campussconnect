@@ -232,6 +232,7 @@ class _SocietiesScreenState extends State<SocietiesScreen>{
             Text(society.name,style:const TextStyle(
               color:_ink,fontSize:18,fontWeight:FontWeight.w900)),
             const SizedBox(height:7),
+            if(society.contactEmail.isNotEmpty) SelectableText('Contact: ${society.contactEmail}'),
             Text(society.description,
               style:const TextStyle(color:_muted,height:1.5,fontSize:12)),
             const SizedBox(height:10),

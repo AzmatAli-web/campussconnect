@@ -17,5 +17,9 @@ export function parseEnvironment(source = process.env) {
   const domains = [...new Set((source.UNIVERSITY_EMAIL_DOMAINS ?? '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean))];
   if (!domains.every(x=>DOMAIN.test(x))) throw new Error('Invalid UNIVERSITY_EMAIL_DOMAINS');
   if (nodeEnv === 'production' && (!mongoUri || !firebaseProjectId || !universityId || domains.length===0)) throw new Error('Production requires MongoDB, Firebase, university ID and email domains');
-  return Object.freeze({railwayEdgeOnly:source.RAILWAY_EDGE_ONLY==='true',assistantModel:(source.CAMPUS_ASSISTANT_MODEL??'').trim(),port,nodeEnv,corsOrigin,mongoUri,firebaseProjectId,universityId,domains:Object.freeze(domains)});
+  const uid=(source.PILOT_ACCOUNT_UID??'').trim();
+  const email=(source.PILOT_ACCOUNT_EMAIL??'').trim().toLowerCase();
+  if (Boolean(uid)!==Boolean(email) || uid.length>128 || (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) throw new Error('Configure both PILOT_ACCOUNT_UID and PILOT_ACCOUNT_EMAIL for one Firebase account');
+  const pilotAccount=uid?Object.freeze({uid,email}):null;
+  return Object.freeze({pilotAccount,railwayEdgeOnly:source.RAILWAY_EDGE_ONLY==='true',assistantModel:(source.CAMPUS_ASSISTANT_MODEL??'').trim(),port,nodeEnv,corsOrigin,mongoUri,firebaseProjectId,universityId,domains:Object.freeze(domains)});
 }

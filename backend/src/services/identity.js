@@ -7,10 +7,13 @@ export function emailMatchesDomains(email,domains) {
   const e=normalizeEmail(email),at=e.lastIndexOf('@');
   return at>0 && domains.includes(e.slice(at+1));
 }
-export function assertVerifiedCampusIdentity(claims,domains) {
+export function identityAllowed(uid,email,domains,pilotAccount) {
+  return emailMatchesDomains(email,domains) || Boolean(pilotAccount && uid===pilotAccount.uid && normalizeEmail(email)===pilotAccount.email);
+}
+export function assertVerifiedCampusIdentity(claims,domains,pilotAccount) {
   if (!domains.length) throw new HttpError(503,'CAMPUS_DOMAIN_NOT_CONFIGURED','University email domain not configured');
   if (!claims || claims.email_verified!==true || typeof claims.uid!=='string' || !claims.uid) throw new HttpError(403,'EMAIL_NOT_VERIFIED','Verified email is required');
-  if (!emailMatchesDomains(claims.email,domains)) throw new HttpError(403,'UNIVERSITY_EMAIL_REQUIRED','Verified university email is required');
+  if (!identityAllowed(claims.uid,claims.email,domains,pilotAccount)) throw new HttpError(403,'UNIVERSITY_EMAIL_REQUIRED','Verified university email is required');
   return normalizeEmail(claims.email);
 }
 function validateCommon(input,allowed) {

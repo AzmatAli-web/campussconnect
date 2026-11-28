@@ -8,7 +8,7 @@ export const campusUserMiddleware=({config,firebaseAuth})=>[
  requireFirebaseAuth(firebaseAuth),
  asyncHandler(async(req,_res,next)=>{
   if(!config.universityId || mongoose.connection.readyState!==1) throw new HttpError(503,'SERVICE_NOT_READY','University or database not configured');
-  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains);
+  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains,config.pilotAccount);
   const user=await User.findOne({firebaseUid:req.firebaseClaims.uid,universityId:config.universityId});
   if(!user) throw new HttpError(403,'PROFILE_REQUIRED','Create your campus profile first');
   if(user.emailNormalized!==email) throw new HttpError(403,'EMAIL_CHANGED','Contact an administrator');

@@ -7,7 +7,7 @@ import {connectDatabase} from '../src/config/database.js';
 import {configureFirebase} from '../src/config/firebase.js';
 import {User} from '../src/models/user.js';
 import {AdminBootstrap,AuditLog} from '../src/models/governance.js';
-import {emailMatchesDomains,normalizeEmail} from '../src/services/identity.js';
+import {identityAllowed} from '../src/services/identity.js';
 import {canBootstrapAdmin} from '../src/services/governance-policy.js';
 
 async function main() {
@@ -22,7 +22,7 @@ async function main() {
   const auth=configureFirebase(config);
   // This remotely validates the Firebase Admin SDK credential, not merely SDK initialization.
   const fb=await auth.getUser(uid);
-  if(!fb.email||!fb.emailVerified||!emailMatchesDomains(fb.email,config.domains)) {
+  if(!fb.email||!fb.emailVerified||!identityAllowed(fb.uid,fb.email,config.domains,config.pilotAccount)) {
     throw new Error('Target Firebase account needs verified approved university email');
   }
   await connectDatabase(config);
@@ -38,7 +38,7 @@ async function main() {
       const lock=await AdminBootstrap.exists({universityId:uniId}).session(session);
       if(!canBootstrapAdmin({
         firebaseUser:{uid:fb.uid,email:fb.email,emailVerified:fb.emailVerified},
-        user,domainApproved:emailMatchesDomains(fb.email,config.domains),
+        user,domainApproved:identityAllowed(fb.uid,fb.email,config.domains,config.pilotAccount),
         universityExists:Boolean(university),alreadyBootstrapped:Boolean(lock),existingAdmin:Boolean(exists)
       })) throw new Error('Bootstrap refused: user is not eligible or an Admin already exists');
       await AdminBootstrap.create([{universityId:uniId,adminUserId:user._id,firebaseUid:uid}],{session});

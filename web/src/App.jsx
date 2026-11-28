@@ -33,7 +33,7 @@ export default function App(){
  },[]);
  async function handleCredentials(e){
   e.preventDefault();setError('');setMessage('');
-  if(!matchesUniversity(email)){setError('Use your verified university email ending in @'+(domain||'the approved domain'));return;}
+  if(mode==='register' && !matchesUniversity(email)){setError('Use your verified university email ending in @'+(domain||'the approved domain'));return;}
   setBusy(true);
   try{
    if(mode==='register'){

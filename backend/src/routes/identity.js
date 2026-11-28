@@ -14,7 +14,7 @@ export function identityRouter({config,firebaseAuth}) {
   next();
  });
  router.post('/auth/bootstrap-profile',asyncHandler(async(req,res)=>{
-  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains);
+  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains,config.pilotAccount);
   const input=validateBootstrap(req.body);
   const existing=await User.findOne({firebaseUid:req.firebaseClaims.uid});
   if (existing) {
@@ -28,7 +28,7 @@ export function identityRouter({config,firebaseAuth}) {
   return res.status(201).json(data(created));
  }));
  const own=asyncHandler(async(req,_res,next)=>{
-  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains);
+  const email=assertVerifiedCampusIdentity(req.firebaseClaims,config.domains,config.pilotAccount);
   const user=await User.findOne({firebaseUid:req.firebaseClaims.uid,universityId:config.universityId});
   if (!user) throw new HttpError(404,'PROFILE_NOT_FOUND','Profile not provisioned');
   if (user.emailNormalized!==email) throw new HttpError(403,'EMAIL_CHANGED','Email change requires administrator review');

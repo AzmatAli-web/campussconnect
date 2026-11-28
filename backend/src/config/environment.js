@@ -17,5 +17,5 @@ export function parseEnvironment(source = process.env) {
   const domains = [...new Set((source.UNIVERSITY_EMAIL_DOMAINS ?? '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean))];
   if (!domains.every(x=>DOMAIN.test(x))) throw new Error('Invalid UNIVERSITY_EMAIL_DOMAINS');
   if (nodeEnv === 'production' && (!mongoUri || !firebaseProjectId || !universityId || domains.length===0)) throw new Error('Production requires MongoDB, Firebase, university ID and email domains');
-  return Object.freeze({assistantModel:(source.CAMPUS_ASSISTANT_MODEL??'').trim(),port,nodeEnv,corsOrigin,mongoUri,firebaseProjectId,universityId,domains:Object.freeze(domains)});
+  return Object.freeze({railwayEdgeOnly:source.RAILWAY_EDGE_ONLY==='true',assistantModel:(source.CAMPUS_ASSISTANT_MODEL??'').trim(),port,nodeEnv,corsOrigin,mongoUri,firebaseProjectId,universityId,domains:Object.freeze(domains)});
 }

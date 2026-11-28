@@ -38,7 +38,10 @@ export function createApp({config,firebaseAuth,scanPdf}) {
   };
   app.use('/api/v1',rateLimit(options));
  }
- app.get('/api/v1/health/live',(_req,res)=>res.json({data:{status:'alive'}}));
+ const revision=process.env.RAILWAY_GIT_COMMIT_SHA;
+ const liveStatus={status:'alive'};
+ if(typeof revision==='string' && /^[a-f0-9]{40}$/i.test(revision))liveStatus.revision=revision;
+ app.get('/api/v1/health/live',(_req,res)=>res.set('Cache-Control','no-store').json({data:liveStatus}));
  app.get('/api/v1/health/ready',(_req,res)=>{
   const checks={database:databaseReady(),firebase:Boolean(firebaseAuth),university:Boolean(config.universityId),emailDomains:config.domains.length>0};
   const ready=Object.values(checks).every(Boolean);

@@ -17,6 +17,8 @@ const mongo = js => run('mongosh', '--norc', '--quiet', '--host', host, '--eval'
 const rows = [{_id: 'event-1', title: 'Synthetic Campus Workshop', room: 'Lab 2'},
   {_id: 'event-2', title: 'Synthetic Campus Fair', room: 'Hall 1'}];
 const receipt = {_id:'receipt-1', eventId:'event-1', studentId:'synthetic-student'};
+const restrictedSource = {_id:'source-1', universityId:'campus-fixture', audience:'admin',
+  status:'withdrawn', title:'Fictional release note', text:'Archived pilot evidence.'};
 const started = performance.now();
 let ownsContainer = false;
 
@@ -36,6 +38,7 @@ try {
     events.insertMany(${JSON.stringify(rows)});
     const registrations = db.getSiblingDB('${source}').event_registrations;
     registrations.createIndex({eventId:1,studentId:1},{unique:true});
+    db.getSiblingDB('${source}').knowledgesources.insertOne(${JSON.stringify(restrictedSource)});
     registrations.insertOne(${JSON.stringify(receipt)});`);
   await run('mongodump', '--host', host, '--db=' + source, '--archive=' + archive, '--gzip');
   await run('test', '-s', archive);
@@ -49,11 +52,12 @@ try {
     const recovered = db.getSiblingDB('${restored}').events;
     const s = db.getSiblingDB('${source}').events;
     const registrations = db.getSiblingDB('${restored}').event_registrations;
-    print(JSON.stringify({receipt:registrations.findOne({_id:'receipt-1'}),registrationIndexes:registrations.getIndexes(),rows:recovered.find().sort({_id:1}).toArray(),
+    print(JSON.stringify({knowledge:db.getSiblingDB('${restored}').knowledgesources.findOne({_id:'source-1'}),receipt:registrations.findOne({_id:'receipt-1'}),registrationIndexes:registrations.getIndexes(),rows:recovered.find().sort({_id:1}).toArray(),
       indexes:recovered.getIndexes(), source:s.find().sort({_id:1}).toArray()}));
   `);
   const result = JSON.parse(verification.trim());
   assert.deepEqual(result.rows, rows, 'Restored documents differ from the backup fixture');
+  assert.deepEqual(result.knowledge, restrictedSource, 'Audience and withdrawal state must survive recovery');
   assert.deepEqual(result.receipt, receipt, 'Registration did not survive the restore');
   assert.ok(result.rows.some(event => event._id === result.receipt.eventId), 'Restored registration refers to a missing event');
   assert.ok(result.registrationIndexes.some(index => index.unique &&
